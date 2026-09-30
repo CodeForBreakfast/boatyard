@@ -1,5 +1,7 @@
 # boatyard — working notes
 
+`docs/design.md` is the spec.
+
 ## Building and testing
 
 `nix develop` gives you the toolchain. `nix flake check` is the whole of CI, and
