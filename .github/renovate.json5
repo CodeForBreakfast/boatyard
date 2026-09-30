@@ -1,0 +1,44 @@
+{
+  $schema: "https://docs.renovatebot.com/renovate-schema.json",
+
+  // No schedule and no grouping: a grouped pull request that goes red says
+  // nothing about which bump did it.
+
+  extends: ["config:best-practices"],
+
+  rangeStrategy: "pin",
+
+  automerge: true,
+
+  // Off by default, and config:best-practices does not turn it on, so without
+  // this line flake.lock goes unmaintained.
+  nix: {
+    enabled: true,
+  },
+
+  packageRules: [
+    {
+      matchPackageNames: ["*"],
+      minimumReleaseAge: "7 days",
+    },
+    {
+      matchUpdateTypes: ["minor", "major"],
+      automerge: false,
+      addLabels: ["renovate/needs-review"],
+    },
+    {
+      // Lock-file maintenance rebuilds the lock from nix's own resolver, so
+      // the age gate above never sees the versions it brings.
+      matchUpdateTypes: ["lockFileMaintenance"],
+      automerge: false,
+      addLabels: ["renovate/needs-review"],
+    },
+    {
+      // The `conventional subject` job holds a title to 72 characters, and the
+      // default topic is the action's full name, which overruns it for the two
+      // DeterminateSystems actions in ci.yml. Dropping the owner fits.
+      matchManagers: ["github-actions"],
+      commitMessageTopic: "{{{replace '^.*/' '' depName}}}",
+    },
+  ],
+}

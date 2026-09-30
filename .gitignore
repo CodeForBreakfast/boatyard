@@ -1,4 +1,19 @@
-.beads/
+# nix
+result
+result-*
+.direnv/
+
+# beads
+/.beads/
+/.beads.gate.lock
+.beads-credential-key
+.dolt/
+*.db
+
+# machine-local
 .env.local
 .envrc.local
 CLAUDE.local.md
+
+# A seat's worktree is a checkout of this repository, not a source file.
+.claude/worktrees/
