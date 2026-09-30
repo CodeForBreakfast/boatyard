@@ -1,0 +1,195 @@
+#!/usr/bin/env bash
+# berth-herdr: berth's adapter for herdr, which `berth` runs with the verbs
+# already parsed. See docs/design.md, "The herdr adapter".
+#
+# A berth is a herdr pane, and its id is herdr's pane id. A yard is a herdr
+# session. The relationship and the opener live on the pane as metadata
+# tokens, so herdr itself is the only record.
+#
+# Needs: bash, coreutils, herdr, jq.
+set -euo pipefail
+
+yard=${BERTH_YARD:-${HERDR_SESSION:-default}}
+
+# A split never leaves either half of a pane under min_rows.
+min_rows=12
+divider_rows=2
+
+die() {
+  echo "berth (herdr): $1" >&2
+  exit 1
+}
+
+# Prints the result of a herdr call against the yard. A pane herdr does not
+# have returns 3, so a caller can answer gone. Anything else that fails ends
+# berth. An inherited HERDR_SOCKET_PATH names the caller's session, which
+# must not override the yard.
+herdr_result() {
+  local out status code message
+  out=$(env -u HERDR_SOCKET_PATH herdr --session "$yard" "$@" 2>&1) && status=0 || status=$?
+  code=$(jq -r '.error.code? // empty' <<<"$out" 2>/dev/null) || code=""
+  if [ "$status" = 0 ] && [ -z "$code" ]; then
+    [ -z "$out" ] || jq -c '.result // empty' <<<"$out" 2>/dev/null ||
+      die "herdr $1 $2 answered with something other than JSON: $out"
+    return 0
+  fi
+  [ "$code" != pane_not_found ] || return 3
+  message=$(jq -r '.error.message? // empty' <<<"$out" 2>/dev/null) || message=""
+  die "herdr $1 $2 failed in yard $yard: ${message:-$out}"
+}
+
+pane_get() {
+  local result
+  result=$(herdr_result pane get "$1") || return
+  jq -c .pane <<<"$result"
+}
+
+# Prints the pane of a berth that has to exist for the verb to go on.
+existing_pane() { # <id> <what the verb could not do>
+  local pane status=0
+  pane=$(pane_get "$1") || status=$?
+  case $status in
+    0) printf '%s\n' "$pane" ;;
+    3) die "the berth $1 is gone, so $2." ;;
+    *) exit "$status" ;;
+  esac
+}
+
+# The given berth, or the calling pane.
+berth_id() {
+  local id=${1:-${HERDR_PANE_ID:-}}
+  [ -n "$id" ] || die "no berth was given, and the caller is not a berth."
+  printf '%s\n' "$id"
+}
+
+port_state='
+  # ponytail: a straight mapping, so a pane parked on background work reads
+  # active and an agent herdr cannot classify reads active too. The four
+  # states and herdr'"'"'s corrections are yard-2wr.8.
+  def port_state:
+    if .agent == null then "gone"
+    elif .agent_status == "blocked" then "blocked"
+    elif .agent_status == "idle" or .agent_status == "done" then "at-rest"
+    else "active" end;'
+
+# Splits the tallest of the given panes: down while both halves clear
+# min_rows, otherwise right. Prints the new pane's id.
+split_tallest() { # <cwd> <panes as a JSON array>
+  local target
+  target=$(jq -r --argjson floor "$min_rows" --argjson divider "$divider_rows" '
+    sort_by(.scroll.viewport_rows) | last
+    | "\(.pane_id) \(if (.scroll.viewport_rows - $divider) / 2 | floor >= $floor
+                     then "down" else "right" end)"' <<<"$2")
+  herdr_result pane split "${target% *}" --direction "${target#* }" --cwd "$1" \
+    "${berth_env[@]}" --no-focus | jq -r .pane.pane_id
+}
+
+open() {
+  local as=$1 cwd=$2 label=$3 opener=$4 id opener_pane workspace panes tab
+  shift 4
+  berth_env=(--env BERTH_BACKEND=herdr --env "BERTH_YARD=$yard")
+
+  if [ "$as" = independent ]; then
+    opener=""
+    id=$(herdr_result workspace create --cwd "$cwd" ${label:+--label "$label"} \
+      "${berth_env[@]}" --no-focus | jq -r .root_pane.pane_id)
+  else
+    opener=$(berth_id "$opener")
+    opener_pane=$(existing_pane "$opener" "there is nothing to open a $as beside")
+    workspace=$(jq -r .workspace_id <<<"$opener_pane")
+
+    if [ "$as" = tender ]; then
+      id=$(split_tallest "$cwd" "[$opener_pane]")
+    else
+      # One tab holds an opener's workers.
+      panes=$(herdr_result pane list --workspace "$workspace")
+      tab=$(jq -r --arg opener "$opener" '
+        first(.panes[] | select(.tokens.berth_parent == $opener
+                                and .tokens.berth_relationship == "worker"))
+        | .tab_id' <<<"$panes")
+      if [ -n "$tab" ]; then
+        id=$(split_tallest "$cwd" "$(jq -c --arg tab "$tab" '[.panes[] | select(.tab_id == $tab)]' <<<"$panes")")
+      else
+        id=$(herdr_result tab create --workspace "$workspace" --cwd "$cwd" --label workers \
+          "${berth_env[@]}" --no-focus | jq -r .root_pane.pane_id)
+      fi
+    fi
+  fi
+
+  [ -z "$label" ] || herdr_result pane rename "$id" "$label" >/dev/null
+  herdr_result pane report-metadata "$id" --source berth --token "berth_relationship=$as" \
+    ${opener:+--token "berth_parent=$opener"} >/dev/null
+
+  # herdr gives a pane its id only once it exists, so BERTH_ID reaches the
+  # command rather than the pane's shell.
+  local command
+  printf -v command '%q ' "$@"
+  herdr_result pane run "$id" "env BERTH_ID=$(printf '%q' "$id") $command" >/dev/null
+
+  printf '%s\n' "$id"
+}
+
+name() {
+  local id pane
+  id=$(berth_id "$1")
+  pane=$(existing_pane "$id" "it cannot be named")
+  herdr_result pane rename "$id" "$2" >/dev/null
+  if [ "$(jq -r '.tokens.berth_relationship // empty' <<<"$pane")" = independent ]; then
+    herdr_result workspace rename "$(jq -r .workspace_id <<<"$pane")" "$2" >/dev/null
+  fi
+}
+
+list() {
+  yard=${1:-$yard}
+  herdr_result pane list | jq "$port_state"'
+    [.panes[] | select(.tokens.berth_relationship) | {
+      id: .pane_id,
+      label: (.label // null),
+      relationship: .tokens.berth_relationship,
+      parent: (.tokens.berth_parent // null),
+      state: port_state
+    }]'
+}
+
+state() {
+  local id pane status=0
+  id=$(berth_id "$1")
+  pane=$(pane_get "$id") || status=$?
+  case $status in
+    0) jq -r "$port_state port_state" <<<"$pane" ;;
+    3) echo gone ;;
+    *) exit "$status" ;;
+  esac
+}
+
+# Closing a berth closes the berths it opened first. herdr keeps a
+# workspace's other panes when its first pane closes, so an independent berth
+# closes its whole workspace.
+close() {
+  local id pane panes child status=0
+  id=$(berth_id "$1")
+  pane=$(pane_get "$id") || status=$?
+  case $status in
+    0) ;;
+    3) return 0 ;;
+    *) exit "$status" ;;
+  esac
+
+  panes=$(herdr_result pane list)
+  for child in $(jq -r --arg id "$id" '.panes[] | select(.tokens.berth_parent == $id) | .pane_id' <<<"$panes"); do
+    close "$child"
+  done
+
+  if [ "$(jq -r '.tokens.berth_relationship // empty' <<<"$pane")" = independent ]; then
+    herdr_result workspace close "$(jq -r .workspace_id <<<"$pane")" >/dev/null
+  else
+    herdr_result pane close "$id" >/dev/null
+  fi
+}
+
+verb=$1
+shift
+case "$verb" in
+  open | name | list | state | close) "$verb" "$@" ;;
+  *) die "berth passed an unknown verb, $verb." ;;
+esac

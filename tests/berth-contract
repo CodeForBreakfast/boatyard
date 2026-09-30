@@ -1,0 +1,147 @@
+#!/usr/bin/env bash
+# The port contract: what every berth adapter must do. See docs/design.md,
+# "The port: berth" and "Testing".
+#
+# Run it with berth on the path, and BERTH_BACKEND and BERTH_YARD naming a
+# yard that is up and holds no berths. It reads nothing of any backend, so a
+# second adapter runs it unchanged.
+#
+# Needs: bash, coreutils, jq, berth.
+set -uo pipefail
+
+: "${BERTH_BACKEND:?}" "${BERTH_YARD:?}"
+unset BERTH_ID
+
+work=$(mktemp -d)
+failures=0
+
+check() { # <what> <want> <got>
+  if [ "$2" = "$3" ]; then
+    echo "ok: $1"
+  else
+    echo "FAIL: $1: wanted '$2', got '$3'"
+    failures=$((failures + 1))
+  fi
+}
+
+refused() { # <what> <command>...
+  local what=$1 err
+  shift
+  if err=$("$@" 2>&1 >/dev/null); then
+    echo "FAIL: $what: it succeeded"
+    failures=$((failures + 1))
+  else
+    check "$what, with the reason on stderr" true "$([ -n "$err" ] && echo true || echo false)"
+  fi
+}
+
+field() { # <id> <field>
+  berth list | jq -r --arg id "$1" --arg field "$2" \
+    '.[] | select(.id == $id) | .[$field] // "null"'
+}
+
+listed() { # <id>
+  berth list | jq -r --arg id "$1" 'any(.[]; .id == $id)'
+}
+
+# Opens a berth whose command records the environment it was given.
+open_recording() { # <relationship> <label> <record>
+  berth open --as "$1" --cwd "$work" --label "$2" -- \
+    bash -c 'env >"$1.part" && mv "$1.part" "$1"' recorder "$3"
+}
+
+recorded() { # <record> <variable>
+  local _
+  for _ in $(seq 1 100); do
+    [ -f "$1" ] && break
+    sleep 0.1
+  done
+  sed -n "s/^$2=//p" "$1" 2>/dev/null
+}
+
+echo "# open in each relationship"
+
+independent=$(open_recording independent "a line of work" "$work/independent")
+check "an independent berth is listed as independent" independent "$(field "$independent" relationship)"
+check "an independent berth has no parent" null "$(field "$independent" parent)"
+check "an independent berth takes its label" "a line of work" "$(field "$independent" label)"
+check "the command learns its own BERTH_ID" "$independent" "$(recorded "$work/independent" BERTH_ID)"
+check "the command learns BERTH_BACKEND" "$BERTH_BACKEND" "$(recorded "$work/independent" BERTH_BACKEND)"
+check "the command learns BERTH_YARD" "$BERTH_YARD" "$(recorded "$work/independent" BERTH_YARD)"
+
+# The rest are opened from inside the independent berth, as its own
+# command would open them.
+worker=$(BERTH_ID=$independent open_recording worker "a worker" "$work/worker")
+check "a worker is listed as a worker" worker "$(field "$worker" relationship)"
+check "a worker's parent is its opener" "$independent" "$(field "$worker" parent)"
+check "a worker's command learns its own BERTH_ID" "$worker" "$(recorded "$work/worker" BERTH_ID)"
+check "a worker inherits BERTH_YARD" "$BERTH_YARD" "$(recorded "$work/worker" BERTH_YARD)"
+
+second_worker=$(BERTH_ID=$independent berth open --as worker --cwd "$work" -- true)
+check "a second worker has the same parent" "$independent" "$(field "$second_worker" parent)"
+check "a berth opened without a label has none" null "$(field "$second_worker" label)"
+
+tender=$(BERTH_ID=$independent open_recording tender "a view" "$work/tender")
+check "a tender is listed as a tender" tender "$(field "$tender" relationship)"
+check "a tender's parent is its opener" "$independent" "$(field "$tender" parent)"
+check "a tender's command learns its own BERTH_ID" "$tender" "$(recorded "$work/tender" BERTH_ID)"
+
+check "every id is distinct" 4 "$(printf '%s\n' "$independent" "$worker" "$second_worker" "$tender" | sort -u | wc -l)"
+check "the list is JSON with the port's fields" true "$(berth list | jq 'all(.[]; keys == ["id", "label", "parent", "relationship", "state"])')"
+
+echo "# name"
+
+berth name "$worker" "renamed"
+check "name relabels a berth" renamed "$(field "$worker" label)"
+BERTH_ID=$worker berth name "named by itself"
+check "name with no id relabels the calling berth" "named by itself" "$(field "$worker" label)"
+berth name "$independent" "renamed line"
+check "name relabels an independent berth" "renamed line" "$(field "$independent" label)"
+
+echo "# close"
+
+berth close "$second_worker"
+check "a closed berth is not listed" false "$(listed "$second_worker")"
+check "a closed berth reports gone" gone "$(berth state "$second_worker")"
+check "closing a worker leaves its opener" true "$(listed "$independent")"
+check "closing a worker leaves its sibling" true "$(listed "$worker")"
+berth close "$second_worker"
+check "closing a closed berth succeeds" 0 "$?"
+
+nested=$(BERTH_ID=$worker berth open --as tender --cwd "$work" -- true)
+BERTH_ID=$worker berth close
+check "close with no id closes the calling berth" false "$(listed "$worker")"
+check "closing a berth closes what it opened" false "$(listed "$nested")"
+
+echo "# the cascade"
+
+another=$(BERTH_ID=$independent berth open --as worker --cwd "$work" -- true)
+berth close "$independent"
+for id in "$independent" "$another" "$tender"; do
+  check "closing an independent berth closes $id" false "$(listed "$id")"
+done
+check "the yard holds no berths" 0 "$(berth list | jq length)"
+
+echo "# errors"
+
+refused "a berth needs a backend named" env -u BERTH_BACKEND berth list
+refused "a backend with no adapter is refused" env BERTH_BACKEND=no-such-backend berth list
+refused "a worker needs an opener" berth open --as worker --cwd "$work" -- true
+refused "a tender needs an opener" berth open --as tender --cwd "$work" -- true
+refused "a worker's opener has to exist" env BERTH_ID="$independent" berth open --as worker --cwd "$work" -- true
+refused "a gone berth cannot be named" berth name "$independent" "too late"
+refused "open needs a relationship it knows" berth open --as stranger --cwd "$work" -- true
+refused "open needs a command" berth open --as independent --cwd "$work"
+state=$(berth state "$independent")
+check "state on a gone berth answers and exits 0" "gone 0" "$state $?"
+
+err=$(env BERTH_YARD=no-such-yard berth list 2>&1 >/dev/null) && status=0 || status=$?
+check "an unreachable yard fails" 1 "$([ "$status" != 0 ] && echo 1 || echo 0)"
+check "the failure names the adapter" true "$(case "$err" in *"$BERTH_BACKEND"*) echo true ;; *) echo false ;; esac)"
+
+echo
+if [ "$failures" -gt 0 ]; then
+  echo "$failures failed."
+  exit 1
+fi
+echo "The contract holds for $BERTH_BACKEND."
