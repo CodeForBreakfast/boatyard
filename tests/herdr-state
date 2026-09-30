@@ -37,7 +37,7 @@ echo "# straight mappings"
 
 maps gone "a pane with no agent" "$(pane "" unknown)"
 maps at-rest "an idle agent" "$(pane claude idle)"
-maps at-rest "an agent whose turn is done" "$(pane claude done)"
+maps at-rest "an agent whose turn is done" "$(pane claude "done")"
 maps blocked "a blocked agent" "$(pane claude blocked)"
 maps active "a working agent" "$(pane claude working osc_title_working live_turn_working)"
 maps active "an agent herdr has not classified yet" "$(pane claude unknown)"
