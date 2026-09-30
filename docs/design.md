@@ -1,7 +1,5 @@
 # Boatyard design
 
-Status: draft. Sections marked **[NOT YET APPROVED]** have been proposed but not approved. Everything else is settled.
-
 ## Purpose
 
 Boatyard runs coding agents in terminal multiplexer panes and coordinates them. It hides the multiplexer behind a port, so that moving to another multiplexer means writing an adapter rather than editing skills. herdr is the first backend. tuios, Orca and tmux are candidates.
@@ -154,7 +152,7 @@ The slash-only skills set `disable-model-invocation: true`, because plugin skill
 
 The skills contain no multiplexer syntax. They call only `sign-on` and `berth`. Coordination runs over [commy](https://github.com/CodeForBreakfast/commy), with each effort indexed in a `boatyard` topic in its project's channel, and the [beads](https://github.com/gastownhall/beads) graph is the system of record. A worker records its berth id on its bead as `agent_pane`, so bead viewers can draw the berth against its work.
 
-## Packaging [NOT YET APPROVED]
+## Packaging
 
 - **One repository, one Claude Code plugin, `boatyard`.** It holds the skills and puts the executables in its `bin/`, which reaches the Bash tool's path.
 - **One flake exporting three packages:** `berth`, `bilge-pump` and `sign-on`. The packages matter as much as the plugin. `bilge-pump` runs detached, and the persistent set starts under a service manager, and neither of those sees the plugin's `bin/`.
@@ -162,7 +160,7 @@ The skills contain no multiplexer syntax. They call only `sign-on` and `berth`. 
 - **Runtime dependencies.** The scripts in `bin/` state their dependencies, such as `jq`, for readers who do not use nix.
 - **One revision per host.** Claude Code puts a plugin's `bin/` after the ambient path, so where a host installs the packages, the packages run and the plugin supplies only the skills. A host that installs both loads the plugin from the same revision as the packages, with `--plugin-dir` on its Claude Code command.
 
-## Testing [NOT YET APPROVED]
+## Testing
 
 - **Port contract suite.** One suite states what every adapter must do: open in each relationship, list, name, send-text, send-key, wait-text, read, state across all four states, close, and the cascade when an independent berth closes. It runs against every adapter.
   - For herdr, it runs a throwaway server with `HOME` redirected and every `HERDR_*` variable unset. An inherited `HERDR_SOCKET_PATH` would otherwise drive the live session. The server runs inside the nix build sandbox, so the suite is a flake check.
@@ -170,7 +168,7 @@ The skills contain no multiplexer syntax. They call only `sign-on` and `berth`. 
 - **Unit tests.** The pure decisions have their own tests: `bilge-pump`'s compaction decision, and each adapter's mapping from backend states to the four port states, including the herdr parked-on-background-work correction.
 - **End to end.** One real effort runs on `steward` and `worker` before any previous system is retired.
 
-## Migration from an existing herdr-based setup [NOT YET APPROVED]
+## Migration from an existing herdr-based setup
 
 Build beside the existing system under the new names. The two share one herdr server without colliding. Every command, environment variable, state file and index topic is new, and each pane is launched by one system and compacted by that system's own monitor. The existing system stays untouched until the last step.
 
