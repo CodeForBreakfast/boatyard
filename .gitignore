@@ -1,0 +1,4 @@
+.beads/
+.env.local
+.envrc.local
+CLAUDE.local.md
