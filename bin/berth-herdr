@@ -21,22 +21,52 @@ die() {
   exit 1
 }
 
-# Prints the result of a herdr call against the yard. A pane herdr does not
-# have returns 3, so a caller can answer gone. Anything else that fails ends
-# berth. An inherited HERDR_SOCKET_PATH names the caller's session, which
-# must not override the yard.
-herdr_result() {
-  local out status code message
-  out=$(env -u HERDR_SOCKET_PATH herdr --session "$yard" "$@" 2>&1) && status=0 || status=$?
+# Returns 3 for a pane herdr does not have, so a caller can answer gone.
+# Anything else that fails ends berth.
+herdr_failed() { # <herdr's output> <herdr arguments>...
+  local out=$1 code message
+  shift
   code=$(jq -r '.error.code? // empty' <<<"$out" 2>/dev/null) || code=""
-  if [ "$status" = 0 ] && [ -z "$code" ]; then
-    [ -z "$out" ] || jq -c '.result // empty' <<<"$out" 2>/dev/null ||
-      die "herdr $1 $2 answered with something other than JSON: $out"
-    return 0
-  fi
   [ "$code" != pane_not_found ] || return 3
   message=$(jq -r '.error.message? // empty' <<<"$out" 2>/dev/null) || message=""
   die "herdr $1 $2 failed in yard $yard: ${message:-$out}"
+}
+
+# Prints what a herdr call against the yard prints. An inherited
+# HERDR_SOCKET_PATH names the caller's session, which must not override the
+# yard.
+herdr_call() {
+  local out status=0
+  out=$(env -u HERDR_SOCKET_PATH herdr --session "$yard" "$@" 2>&1) || status=$?
+  if [ "$status" != 0 ]; then
+    herdr_failed "$out" "$@"
+    return
+  fi
+  printf '%s\n' "$out"
+}
+
+# Prints the result of a herdr call that answers in JSON.
+herdr_result() {
+  local out
+  out=$(herdr_call "$@") || return
+  if jq -e '.error? // empty' <<<"$out" >/dev/null 2>&1; then
+    herdr_failed "$out" "$@"
+    return
+  fi
+  [ -z "$out" ] || jq -c '.result // empty' <<<"$out" 2>/dev/null ||
+    die "herdr $1 $2 answered with something other than JSON: $out"
+}
+
+# Runs a call on a berth that has to exist for the verb to go on.
+on_berth() { # <id> <what the verb could not do> <call>...
+  local id=$1 what=$2 status=0
+  shift 2
+  "$@" || status=$?
+  case $status in
+    0) ;;
+    3) die "the berth $id is gone, so $what." ;;
+    *) exit "$status" ;;
+  esac
 }
 
 pane_get() {
@@ -45,15 +75,8 @@ pane_get() {
   jq -c .pane <<<"$result"
 }
 
-# Prints the pane of a berth that has to exist for the verb to go on.
 existing_pane() { # <id> <what the verb could not do>
-  local pane status=0
-  pane=$(pane_get "$1") || status=$?
-  case $status in
-    0) printf '%s\n' "$pane" ;;
-    3) die "the berth $1 is gone, so $2." ;;
-    *) exit "$status" ;;
-  esac
+  on_berth "$1" "$2" pane_get "$1"
 }
 
 # The given berth, or the calling pane.
@@ -140,6 +163,53 @@ name() {
   fi
 }
 
+yard_running() {
+  env -u HERDR_SOCKET_PATH herdr --session "$yard" status server --json | jq -e .running >/dev/null
+}
+
+serve() {
+  yard=$1
+  ! yard_running || die "the yard $yard is already being served."
+  exec env -u HERDR_SOCKET_PATH herdr --session "$yard" server
+}
+
+stop() {
+  yard=$1
+  yard_running || return 0
+  herdr_call server stop >/dev/null
+}
+
+send_text() {
+  local id
+  id=$(berth_id "$1")
+  on_berth "$id" "it cannot take text" herdr_result pane send-text "$id" "$2" >/dev/null
+}
+
+send_key() {
+  local id
+  id=$(berth_id "$1")
+  on_berth "$id" "it cannot take a key" herdr_result pane send-keys "$id" "$2" >/dev/null
+}
+
+# herdr searches about two screens of recent output unless told more, which
+# a long enough line outgrows.
+recent_lines=1000
+
+# Matches the unwrapped output, so a line that wraps past the pane's height
+# still matches whole.
+wait_text() {
+  local id
+  id=$(berth_id "$1")
+  on_berth "$id" "there is nothing to wait on" herdr_result pane wait-output "$id" \
+    --match "$2" --source recent-unwrapped --lines "$recent_lines" --timeout "$(($3 * 1000))" >/dev/null
+}
+
+read_screen() {
+  local id
+  id=$(berth_id "$1")
+  on_berth "$id" "it cannot be read" herdr_call pane read "$id" --source visible --format text
+}
+
 list() {
   yard=${1:-$yard}
   herdr_result pane list | jq "$port_state"'
@@ -191,6 +261,10 @@ close() {
 verb=$1
 shift
 case "$verb" in
-  open | name | list | state | close) "$verb" "$@" ;;
+  serve | stop | open | name | list | state | close) "$verb" "$@" ;;
+  send-text) send_text "$@" ;;
+  send-key) send_key "$@" ;;
+  wait-text) wait_text "$@" ;;
+  read) read_screen "$@" ;;
   *) die "berth passed an unknown verb, $verb." ;;
 esac

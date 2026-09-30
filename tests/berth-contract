@@ -99,6 +99,51 @@ check "name with no id relabels the calling berth" "named by itself" "$(field "$
 berth name "$independent" "renamed line"
 check "name relabels an independent berth" "renamed line" "$(field "$independent" label)"
 
+echo "# send-text, send-key, wait-text and read"
+
+# Every pattern this section waits for is built by the berth's command at
+# run time, so the command line the berth echoes never matches it.
+# shellcheck disable=SC2016 # the berth's own shell expands it
+typist=$(berth open --as independent --cwd "$work" -- \
+  bash -c 'echo "${1^^}"; while read -r line; do echo "heard ${line^^}"; done' typist ready)
+berth wait-text "$typist" READY --timeout 10
+check "wait-text sees what a berth prints" 0 "$?"
+
+berth send-text "$typist" "hello"
+started=$(date +%s%N)
+berth wait-text "$typist" "heard HELLO" --timeout 1 2>/dev/null
+check "text sent without a key is not submitted, so wait-text fails at its timeout" 1 "$?"
+check "wait-text waits out its timeout before it fails" true \
+  "$([ $(($(date +%s%N) - started)) -ge 1000000000 ] && echo true || echo false)"
+
+berth send-key "$typist" Enter
+BERTH_ID=$typist berth wait-text "heard HELLO" --timeout 10
+check "send-key submits the text, and wait-text with no id watches the calling berth" 0 "$?"
+
+check "read prints the visible screen" true \
+  "$(berth read "$typist" | grep -q 'heard HELLO' && echo true || echo false)"
+check "read prints plain text" false \
+  "$(berth read "$typist" | grep -q $'\e' && echo true || echo false)"
+check "read with no id reads the calling berth" true \
+  "$(BERTH_ID=$typist berth read | grep -q 'heard HELLO' && echo true || echo false)"
+
+BERTH_ID=$typist berth send-text "again"
+BERTH_ID=$typist berth send-key Enter
+berth wait-text "$typist" "heard AGAIN" --timeout 10
+check "send-text and send-key with no id reach the calling berth" 0 "$?"
+
+# A line this long wraps to more rows than a pane has, so it is never on
+# screen whole.
+tall=$(berth open --as independent --cwd "$work" -- bash -c 'printf "%020000d\n" 0; sleep 600')
+berth wait-text "$tall" "$(printf '%020000d' 0)" --timeout 10
+check "wait-text sees text taller than its berth" 0 "$?"
+
+refused "wait-text needs a timeout" berth wait-text "$typist" READY
+refused "wait-text needs a timeout in whole seconds" berth wait-text "$typist" READY --timeout soon
+
+berth close "$typist"
+berth close "$tall"
+
 echo "# close"
 
 berth close "$second_worker"
@@ -123,6 +168,29 @@ for id in "$independent" "$another" "$tender"; do
 done
 check "the yard holds no berths" 0 "$(berth list | jq length)"
 
+echo "# serve and stop"
+
+served="$BERTH_YARD-served"
+berth serve "$served" >"$work/serve.log" 2>&1 &
+serving=$!
+trap 'kill "$serving" 2>/dev/null' EXIT
+for _ in $(seq 1 100); do
+  berth list "$served" >/dev/null 2>&1 && break
+  sleep 0.1
+done
+check "serve brings a yard up" 0 "$(berth list "$served" | jq length)"
+check "serve stays in the foreground" true "$(kill -0 "$serving" 2>/dev/null && echo true || echo false)"
+refused "a yard that is being served cannot be served again" berth serve "$served"
+
+berth stop "$served"
+check "stop succeeds" 0 "$?"
+wait "$serving"
+check "serve exits 0 once its yard stops" 0 "$?"
+trap - EXIT
+refused "a stopped yard cannot list its berths" berth list "$served"
+berth stop "$served"
+check "stopping a stopped yard succeeds" 0 "$?"
+
 echo "# errors"
 
 refused "a berth needs a backend named" env -u BERTH_BACKEND berth list
@@ -131,6 +199,11 @@ refused "a worker needs an opener" berth open --as worker --cwd "$work" -- true
 refused "a tender needs an opener" berth open --as tender --cwd "$work" -- true
 refused "a worker's opener has to exist" env BERTH_ID="$independent" berth open --as worker --cwd "$work" -- true
 refused "a gone berth cannot be named" berth name "$independent" "too late"
+refused "a gone berth cannot take text" berth send-text "$independent" "too late"
+refused "a gone berth cannot take a key" berth send-key "$independent" Enter
+refused "a gone berth cannot be waited on" berth wait-text "$independent" "too late" --timeout 1
+refused "a gone berth cannot be read" berth read "$independent"
+refused "serve needs a yard" berth serve
 refused "open needs a relationship it knows" berth open --as stranger --cwd "$work" -- true
 refused "open needs a command" berth open --as independent --cwd "$work"
 state=$(berth state "$independent")

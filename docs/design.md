@@ -68,7 +68,7 @@ Each adapter maps its backend's states onto these four and corrects its backend'
 | `berth list [<yard>]` | Prints the berths as JSON: id, label, relationship, parent and state. |
 | `berth send-text [<id>] <text>` | Types text into a berth. |
 | `berth send-key [<id>] <key>` | Sends one key, such as `Enter`. |
-| `berth wait-text [<id>] <pattern> --timeout <s>` | Blocks until the pattern appears on screen, or fails at the timeout. |
+| `berth wait-text [<id>] <text> --timeout <s>` | Blocks until the text appears within one line on screen, or fails at the timeout. The text is literal, because each backend has its own regular expression dialect. |
 | `berth read [<id>]` | Prints the visible screen as plain text. |
 | `berth state [<id>]` | Prints one of the four states. |
 | `berth close [<id>]` | Closes a berth. |

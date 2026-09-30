@@ -5,11 +5,21 @@
 # BERTH_BACKEND names, `berth-<backend>` beside this script. An adapter takes
 # the verbs already parsed:
 #
+#   serve <yard>
+#   stop <yard>
 #   open <independent|worker|tender> <cwd> <label> <opener> <command>...
 #   name <id> <label>
 #   list <yard>
+#   send-text <id> <text>
+#   send-key <id> <key>
+#   wait-text <id> <text> <seconds>
+#   read <id>
 #   state <id>
 #   close <id>
+#
+# serve execs the backend, so that a service manager supervises the real
+# process. wait-text matches its text as a literal within one line of recent
+# output, and read prints the visible screen as plain text.
 #
 # <opener> is BERTH_ID, and so is <id> when the caller gave none. Either is
 # empty when BERTH_ID is unset too, and the adapter then resolves the calling
@@ -20,9 +30,15 @@ set -euo pipefail
 
 usage() {
   cat >&2 <<'EOF'
-usage: berth open --as independent|worker|tender --cwd <dir> [--label <text>] -- <command>...
+usage: berth serve <yard>
+       berth stop <yard>
+       berth open --as independent|worker|tender --cwd <dir> [--label <text>] -- <command>...
        berth name [<id>] <label>
        berth list [<yard>]
+       berth send-text [<id>] <text>
+       berth send-key [<id>] <key>
+       berth wait-text [<id>] <text> --timeout <seconds>
+       berth read [<id>]
        berth state [<id>]
        berth close [<id>]
 EOF
@@ -44,6 +60,10 @@ adapter="$(dirname "$(readlink -f "$0")")/berth-$BERTH_BACKEND"
 [ -x "$adapter" ] || die "there is no adapter for the backend '$BERTH_BACKEND'."
 
 case "$verb" in
+  serve | stop)
+    [ $# = 1 ] || usage
+    exec "$adapter" "$verb" "$1"
+    ;;
   open)
     as="" cwd="" label=""
     while [ $# -gt 0 ]; do
@@ -60,10 +80,25 @@ case "$verb" in
     [ -d "$cwd" ] || die "--cwd $cwd is not a directory."
     exec "$adapter" open "$as" "$(cd "$cwd" && pwd)" "$label" "${BERTH_ID:-}" "$@"
     ;;
-  name)
+  name | send-text | send-key)
     case $# in
-      1) exec "$adapter" name "${BERTH_ID:-}" "$1" ;;
-      2) exec "$adapter" name "$1" "$2" ;;
+      1) exec "$adapter" "$verb" "${BERTH_ID:-}" "$1" ;;
+      2) exec "$adapter" "$verb" "$1" "$2" ;;
+      *) usage ;;
+    esac
+    ;;
+  wait-text)
+    timeout="" args=()
+    while [ $# -gt 0 ]; do
+      case "$1" in
+        --timeout) timeout=${2:-}; shift 2 || usage ;;
+        *) args+=("$1"); shift ;;
+      esac
+    done
+    [[ $timeout =~ ^[0-9]+$ ]] || usage
+    case ${#args[@]} in
+      1) exec "$adapter" wait-text "${BERTH_ID:-}" "${args[0]}" "$timeout" ;;
+      2) exec "$adapter" wait-text "${args[0]}" "${args[1]}" "$timeout" ;;
       *) usage ;;
     esac
     ;;
@@ -71,7 +106,7 @@ case "$verb" in
     [ $# -le 1 ] || usage
     exec "$adapter" list "${1:-}"
     ;;
-  state | close)
+  read | state | close)
     case $# in
       0) exec "$adapter" "$verb" "${BERTH_ID:-}" ;;
       1) exec "$adapter" "$verb" "$1" ;;
