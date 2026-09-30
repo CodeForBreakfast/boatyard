@@ -111,14 +111,15 @@ It is written first. Its obligations beyond straight mapping:
 
 1. It opens a berth through `berth open`.
 2. It starts the configured Claude Code command in that berth.
-3. It gets past the startup gate: `berth wait-text` for the prompt text, then `berth send-key Enter`, repeated until the prompt clears.
+3. It gets past the startup gate: `berth wait-text` for the gate's text, then `berth send-key Enter`, repeated until `berth read` no longer shows the gate. `wait-text` cannot tell when the gate has gone, because it searches recent output.
 4. It attaches `bilge-pump` to the berth.
 
 The host supplies the site-specific parts as configuration:
 
 - the Claude Code command, including any wrapper, environment setup and flags;
-- the startup gate's text, because the gate comes from the host's flags. With none configured, `sign-on` waits for the agent to reach `at-rest`;
-- the MCP start-up timeout.
+- the startup gate's text, because the gate comes from the host's flags. With none configured, `sign-on` returns once the agent has shown, and the steward finds a gate nobody configured as a blocked berth;
+- the MCP start-up timeout;
+- how long an agent may take to show its gate, or to show at all.
 
 Each launch states its own relationship, working directory, label and prompt. It may add a model, an effort level, an extra working directory, environment variables, a settings file and a compaction threshold. A steward's settings file lets it run `sign-on`, and a worker gets none.
 

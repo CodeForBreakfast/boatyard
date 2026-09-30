@@ -1,0 +1,211 @@
+#!/usr/bin/env bash
+# sign-on's tests: it opens a berth, starts the configured command in it, gets
+# past the startup gate and attaches bilge-pump. See docs/design.md,
+# "sign-on".
+#
+# Run it with sign-on, berth and bilge-pump on the path, and BERTH_BACKEND and
+# BERTH_YARD naming a yard that is up.
+#
+# Needs: bash, coreutils, git, jq.
+set -uo pipefail
+
+: "${BERTH_BACKEND:?}" "${BERTH_YARD:?}"
+unset BERTH_ID
+
+work=$(mktemp -d)
+failures=0
+
+check() { # <what> <want> <got>
+  if [ "$2" = "$3" ]; then
+    echo "ok: $1"
+  else
+    echo "FAIL: $1: wanted '$2', got '$3'"
+    failures=$((failures + 1))
+  fi
+}
+
+contains() { # <text> <part>
+  case "$1" in *"$2"*) echo true ;; *) echo false ;; esac
+}
+
+# Waits up to ten seconds for a command to succeed.
+eventually() { # <command>...
+  local _
+  for _ in $(seq 1 100); do
+    "$@" && return 0
+    sleep 0.1
+  done
+  return 1
+}
+
+export BILGE_PUMP_STATE_DIR="$work/pump"
+pid_of() { cat "$BILGE_PUMP_STATE_DIR/$BERTH_YARD/$1/pid" 2>/dev/null; }
+pumping() { [ -n "$(pid_of "$1")" ] && kill -0 "$(pid_of "$1")" 2>/dev/null; }
+stop_pumps() {
+  local file
+  for file in "$BILGE_PUMP_STATE_DIR/$BERTH_YARD"/*/pid; do
+    [ -f "$file" ] && kill "$(cat "$file")" 2>/dev/null
+  done
+}
+trap stop_pumps EXIT
+
+gate="I am using this for local development"
+
+# A backend knows Claude Code by its process name, so a copy of bash named
+# claude stands in for it. It shows the gate until it has had the given
+# number of Enters, then draws the given screen, as the berth contract's
+# stand-in does.
+cp "$(command -v bash)" "$work/claude"
+cat >"$work/stand-in" <<EOF
+prompt_box() { printf '\n────────\n❯ \n────────\n'; }
+screen=\$1 enters=\$2
+if [ "\$enters" -gt 0 ]; then
+  printf 'Loading development channels\n❯ 1. $gate\n  2. Exit\n'
+  while [ "\$enters" -gt 0 ]; do
+    read -r _
+    enters=\$((enters - 1))
+  done
+  # Scrolled away rather than cleared, so the gate stays in the recent
+  # output that wait-text searches.
+  for _ in \$(seq 1 200); do echo; done
+fi
+while :; do
+  printf '\e[H\e[2J'
+  case \$screen in
+    rest) printf '\e]0;✳ Claude\a'; prompt_box ;;
+    turn) printf '\e]0;⠂ Claude\a✻ Thinking… (esc to interrupt)\n' ;;
+  esac
+  read -r screen
+done
+EOF
+
+# The command sign-on is configured with. It records what it was given, then
+# becomes the stand-in.
+seat() { # <name> <screen> <enters the gate takes>
+  mkdir -p "$work/$1"
+  cat >"$work/$1/seat" <<EOF
+#!$BASH
+printf '%s\n' "\$@" >"$work/$1/args"
+env >"$work/$1/env"
+pwd >"$work/$1/pwd"
+exec "$work/claude" --norc --noprofile "$work/stand-in" $2 $3
+EOF
+  chmod +x "$work/$1/seat"
+  printf '%s\n' "$work/$1/seat"
+}
+
+recorded() { # <name> <variable>
+  eventually test -f "$work/$1/env"
+  sed -n "s/^$2=//p" "$work/$1/env"
+}
+
+export SIGN_ON_START_TIMEOUT=30
+mkdir -p "$work/project" "$work/extra"
+prompt="/boatyard:worker #project/effort-bead"
+
+echo "# a configured gate"
+
+id=$(SIGN_ON_CLAUDE=$(seat gated rest 2) SIGN_ON_GATE=$gate SIGN_ON_MCP_TIMEOUT=120000 \
+  sign-on --as independent --cwd "$work/project" --label "a seat" --model a-model \
+  --effort high --add-dir "$work/extra" --env SEAT_ROLE=tester \
+  --settings "$work/settings.json" --threshold 70 "$prompt" 2>"$work/gated.err")
+check "sign-on succeeds" 0 "$?"
+check "it prints only the berth's id" 1 "$(printf '%s\n' "$id" | wc -l)"
+check "it opens the berth in the relationship given" independent \
+  "$(berth list | jq -r --arg id "$id" '.[] | select(.id == $id) | .relationship')"
+check "it labels the berth" "a seat" \
+  "$(berth list | jq -r --arg id "$id" '.[] | select(.id == $id) | .label')"
+check "the command gets the launch's flags, then the prompt" \
+  "--model a-model --effort high --add-dir $work/extra --settings $work/settings.json -- $prompt" \
+  "$(tr '\n' ' ' <"$work/gated/args" | sed 's/ $//')"
+check "the command starts in the working directory given" "$work/project" "$(cat "$work/gated/pwd")"
+check "the command learns its BERTH_ID" "$id" "$(recorded gated BERTH_ID)"
+check "the command learns its BERTH_YARD" "$BERTH_YARD" "$(recorded gated BERTH_YARD)"
+check "the command gets the launch's environment" tester "$(recorded gated SEAT_ROLE)"
+check "the command gets the MCP start-up timeout" 120000 "$(recorded gated MCP_TIMEOUT)"
+check "the gate took two Enters and is gone from the screen" false \
+  "$(contains "$(berth read "$id")" "$gate")"
+berth wait-text "$id" "$gate" --timeout 1 2>/dev/null
+check "wait-text still finds the cleared gate, so it cannot say when a gate goes" 0 "$?"
+check "bilge-pump is attached to the berth" true "$(pumping "$id" && echo true || echo false)"
+eventually test -f "$BILGE_PUMP_STATE_DIR/$BERTH_YARD/$id/heartbeat"
+check "bilge-pump takes the launch's threshold" 70 \
+  "$(cut -d' ' -f4 "$BILGE_PUMP_STATE_DIR/$BERTH_YARD/$id/heartbeat" 2>/dev/null)"
+opener=$id
+
+echo "# no gate configured"
+
+id=$(SIGN_ON_CLAUDE=$(seat resting rest 0) sign-on --as independent --cwd "$work/project" "$prompt")
+check "an agent at its prompt has shown" 0 "$?"
+check "with no flags, the command gets only the prompt" "-- $prompt" \
+  "$(tr '\n' ' ' <"$work/resting/args" | sed 's/ $//')"
+# The yard's own environment reaches every berth, so "none" is whatever that
+# holds.
+check "with no timeout configured, sign-on sets none" "${MCP_TIMEOUT:-}" "$(recorded resting MCP_TIMEOUT)"
+check "bilge-pump is attached to a berth with no gate" true "$(pumping "$id" && echo true || echo false)"
+
+id=$(SIGN_ON_CLAUDE=$(seat busy turn 0) sign-on --as independent --cwd "$work/project" "$prompt")
+check "an agent already in its first turn has shown" 0 "$?"
+check "bilge-pump is attached to a busy berth" true "$(pumping "$id" && echo true || echo false)"
+
+id=$(BERTH_ID=$opener SIGN_ON_CLAUDE=$(seat worker rest 0) \
+  sign-on --as worker --cwd "$work/project" --label bead "$prompt")
+check "a worker is opened beside its opener" "$opener" \
+  "$(berth list | jq -r --arg id "$id" '.[] | select(.id == $id) | .parent')"
+
+echo "# a seat is born in the main checkout"
+
+export GIT_AUTHOR_NAME=fixture GIT_AUTHOR_EMAIL=fixture@example.invalid
+export GIT_COMMITTER_NAME=fixture GIT_COMMITTER_EMAIL=fixture@example.invalid
+git init --quiet "$work/repo"
+git -C "$work/repo" commit --quiet --allow-empty -m base
+git -C "$work/repo" worktree add --quiet "$work/linked" 2>/dev/null
+mkdir -p "$work/repo/sub"
+
+SIGN_ON_CLAUDE=$(seat linked rest 0) \
+  sign-on --as independent --cwd "$work/linked" "$prompt" >/dev/null 2>"$work/linked.err"
+check "a linked worktree gives way to its main checkout" "$(cd "$work/repo" && pwd -P)" \
+  "$(cat "$work/linked/pwd")"
+check "and sign-on says so" true "$(contains "$(cat "$work/linked.err")" "$work/linked")"
+
+SIGN_ON_CLAUDE=$(seat sub rest 0) \
+  sign-on --as independent --cwd "$work/repo/sub" "$prompt" >/dev/null 2>"$work/sub.err"
+check "a directory inside the main checkout stays as given" "$work/repo/sub" "$(cat "$work/sub/pwd")"
+check "and sign-on says nothing of it" "" "$(cat "$work/sub.err")"
+
+echo "# failures"
+
+fails() { # <what> <word the reason has> <sign-on's environment and arguments>...
+  local what=$1 word=$2 err status
+  shift 2
+  err=$(env "$@" 2>&1 >/dev/null) && status=0 || status=$?
+  check "$what fails" true "$([ "$status" != 0 ] && echo true || echo false)"
+  check "$what says why" true "$(contains "$err" "$word")"
+}
+
+pumps() { find "$BILGE_PUMP_STATE_DIR/$BERTH_YARD" -name pid | wc -l; }
+before=$(pumps)
+fails "a command that never becomes an agent" "no agent" \
+  SIGN_ON_CLAUDE=true SIGN_ON_START_TIMEOUT=3 sign-on --as independent --cwd "$work/project" "$prompt"
+check "bilge-pump is not attached to a berth that failed" "$before" "$(pumps)"
+fails "a gate that never appears" "$gate" \
+  SIGN_ON_CLAUDE="$(seat ungated rest 0)" SIGN_ON_GATE="$gate" SIGN_ON_START_TIMEOUT=3 \
+  sign-on --as independent --cwd "$work/project" "$prompt"
+fails "a gate that does not clear" "$gate" \
+  SIGN_ON_CLAUDE="$(seat stuck rest 100)" SIGN_ON_GATE="$gate" \
+  sign-on --as independent --cwd "$work/project" "$prompt"
+
+fails "a caller with no yard" BERTH_YARD \
+  -u BERTH_YARD sign-on --as independent --cwd "$work/project" "$prompt"
+fails "a launch with no prompt" usage sign-on --as independent --cwd "$work/project"
+fails "a launch with two prompts" usage sign-on --as independent --cwd "$work/project" one two
+fails "a launch with no working directory" usage sign-on --as independent "$prompt"
+fails "an --env that is not an assignment" usage \
+  sign-on --as independent --cwd "$work/project" --env SEAT_ROLE "$prompt"
+
+echo
+if [ "$failures" -gt 0 ]; then
+  echo "$failures failed."
+  exit 1
+fi
+echo "sign-on works."
