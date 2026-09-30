@@ -144,6 +144,63 @@ refused "wait-text needs a timeout in whole seconds" berth wait-text "$typist" R
 berth close "$typist"
 berth close "$tall"
 
+echo "# state"
+
+# A backend knows Claude Code by its process name and reads its state from
+# the screen, so a copy of bash named claude stands in for it and draws
+# Claude's screens on cue.
+cp "$(command -v bash)" "$work/claude"
+cat >"$work/stand-in" <<'EOF'
+prompt_box() { printf '\n────────\n❯ \n────────\n'; }
+screen=rest
+while :; do
+  clear
+  case $screen in
+    rest) printf '\e]0;✳ Claude\a'; prompt_box ;;
+    turn) printf '\e]0;⠂ Claude\a✻ Thinking… (esc to interrupt)\n' ;;
+    parked) printf '\e]0;⠂ Claude\a✻ Waiting for 2 background agents to finish\n'; prompt_box ;;
+    permission) printf '\e]0;✳ Claude\aDo you want to proceed?\n❯ 1. Yes\n  2. No\n\nEsc to cancel\n' ;;
+    leave) exit ;;
+  esac
+  read -r screen
+done
+EOF
+
+# A backend may take a few seconds to read a screen, so a state is awaited
+# rather than read once.
+settles() { # <what> <id> <want>
+  local got _
+  for _ in $(seq 1 200); do
+    got=$(berth state "$2")
+    [ "$got" = "$3" ] && break
+    sleep 0.1
+  done
+  check "$1 reads $3" "$3" "$got"
+  check "$1 is listed as $3" "$3" "$(field "$2" state)"
+}
+
+shows() { # <id> <screen>
+  berth send-text "$1" "$2"
+  berth send-key "$1" Enter
+}
+
+agent=$(berth open --as independent --cwd "$work" -- "$work/claude" --norc --noprofile "$work/stand-in")
+settles "an agent at its prompt" "$agent" at-rest
+shows "$agent" turn
+settles "an agent with a turn in flight" "$agent" active
+shows "$agent" parked
+settles "an agent parked while background work runs" "$agent" at-rest
+shows "$agent" permission
+settles "an agent at a permission prompt" "$agent" blocked
+check "state with no id reads the calling berth" blocked "$(BERTH_ID=$agent berth state)"
+shows "$agent" leave
+settles "a berth whose agent has left" "$agent" gone
+berth close "$agent"
+
+shell=$(berth open --as independent --cwd "$work" -- sleep 600)
+settles "a berth running something other than an agent" "$shell" gone
+berth close "$shell"
+
 echo "# close"
 
 berth close "$second_worker"
