@@ -89,6 +89,8 @@ Every berth carries three variables:
 
 A berth opened from inside another inherits `BERTH_BACKEND` and `BERTH_YARD`. An adapter may set variables of its own, but consumers read only these three.
 
+A caller that is not itself a berth has none of the three: a service manager's unit, or a pane a person opened by hand. The host's environment then names the backend, and the adapter resolves the yard and the calling pane from its backend's own variables. With no backend named, `berth` exits non-zero.
+
 ### Errors
 
 - A berth that no longer exists reports state `gone` and exits 0. That is an answer, not a failure.
@@ -101,6 +103,8 @@ It is written first. Its obligations beyond straight mapping:
 
 - **Layout.** An independent berth becomes a workspace. Workers share one tab in their opener's workspace and split it. A tender splits beside its opener. The choice of split direction lives here.
 - **The parked-on-background-work correction** described under Agent states.
+- **The cascade.** herdr keeps a workspace's other panes when its first pane closes, so the adapter closes them itself.
+- **Screen source.** `wait-text` matches herdr's recent output, not only the visible frame. A pane shorter than the text it waits for never shows all of it at once.
 - **Package parameter.** herdr's package is a parameter, so a host can supply a platform-specific build.
 
 ## `sign-on`
@@ -115,8 +119,12 @@ It is written first. Its obligations beyond straight mapping:
 The host supplies the site-specific parts as configuration:
 
 - the Claude Code command, including any wrapper, environment setup and flags;
-- the settings file to pass;
+- the startup gate's text, because the gate comes from the host's flags. With none configured, `sign-on` waits for the agent to reach `at-rest`;
 - the MCP start-up timeout.
+
+Each launch states its own relationship, working directory, label and prompt. It may add a model, an effort level, an extra working directory, environment variables, a settings file and a compaction threshold. A steward's settings file lets it run `sign-on`, and a worker gets none.
+
+A seat is born in its repository's main checkout, never in a linked worktree. Claude Code reads its instructions, skills and trust state from the launch directory and cannot re-read them after a `cd`.
 
 The persistent set's start-up script calls `sign-on` too, so the gate logic exists once.
 
@@ -126,7 +134,7 @@ The persistent set's start-up script calls `sign-on` too, so the gate logic exis
 
 - **It consumes the port.** It reads `berth state` and types through `berth send-text`. It runs one long-lived process per berth, attached by `sign-on` or by hand.
 - **It works without orchestration.** A person running one agent in one multiplexer pane can use it. It always needs a multiplexer, because Claude Code offers no outside way to trigger a compact.
-- **The context figure comes from a statusline tap.** A plugin cannot register the main statusline, and hook input carries no context figure. So `bilge-pump` ships a tap that reads the statusline's input, records the context figure for the berth in a state file, and passes the input on unchanged to the user's own statusline command. The user wires it in with one settings line.
+- **The context figure comes from a statusline tap.** A plugin cannot register the main statusline, and hook input carries no context figure. So `bilge-pump` ships a tap that reads the statusline's input, records the context figure for the berth in a state file, and passes the input on unchanged to the user's own statusline command. The state file is keyed by yard and berth id, because a berth id is unique only within its yard. The user wires it in with one settings line.
 - **A berth with no figure is never compacted.** It is left to Claude Code's auto-compact, which is what happens today without a compactor. The compactor logs once per berth that it has no figure.
 - **Heartbeat.** It rewrites a heartbeat file for each berth every tick, holding the epoch, state, free context, threshold and yard. A reader can then tell a ticking compactor from a wedged one.
 - **One compactor per berth.** It declines to start where one already runs. Its state directory is configurable.
@@ -139,10 +147,10 @@ The persistent set's start-up script calls `sign-on` too, so the gate logic exis
 |---|---|---|
 | `steward` | Drives one multi-agent effort anchored on one bead. | slash only |
 | `worker` | Executes one bead as a berth in an effort. `sign-on` starts it by typing `/boatyard:worker <brief>`. | slash only |
-| `muster` | Turns a body of work into an effort a steward can drive cold, then launches the steward. | slash only |
+| `muster` | Turns a body of work into an effort a steward can drive cold, then launches the steward. | model-invoked, so an agent told to start an effort can run it from its own seat. Its description says to use it only when invoked by name. |
 | `tally` | A read-only roll-up of every live effort and what each needs from a human. | model-invoked, so plain questions reach it. Its description says "boatyard" and "effort". |
 
-The slash-only skills set `disable-model-invocation: true`, because plugin skills cannot be disabled one at a time.
+The slash-only skills set `disable-model-invocation: true`, because plugin skills cannot be disabled one at a time. Claude Code then refuses them to the Skill tool, so only a typed command or a launch prompt starts one.
 
 The skills contain no multiplexer syntax. They call only `sign-on` and `berth`. Coordination runs over [commy](https://github.com/CodeForBreakfast/commy), with each effort indexed in a `boatyard` topic in its project's channel, and the [beads](https://github.com/gastownhall/beads) graph is the system of record. A worker records its berth id on its bead as `agent_pane`, so bead viewers can draw the berth against its work.
 
@@ -152,31 +160,34 @@ The skills contain no multiplexer syntax. They call only `sign-on` and `berth`. 
 - **One flake exporting three packages:** `berth`, `bilge-pump` and `sign-on`. The packages matter as much as the plugin. `bilge-pump` runs detached, and the persistent set starts under a service manager, and neither of those sees the plugin's `bin/`.
 - **Host inputs.** The multiplexer package, the Claude Code command and flags, the settings path and the state directory are all package arguments or configuration. A host supplies its own.
 - **Runtime dependencies.** The scripts in `bin/` state their dependencies, such as `jq`, for readers who do not use nix.
+- **One revision per host.** Claude Code puts a plugin's `bin/` after the ambient path, so where a host installs the packages, the packages run and the plugin supplies only the skills. A host that installs both loads the plugin from the same revision as the packages, with `--plugin-dir` on its Claude Code command.
 
 ## Testing [NOT YET APPROVED]
 
 - **Port contract suite.** One suite states what every adapter must do: open in each relationship, list, name, send-text, send-key, wait-text, read, state across all four states, close, and the cascade when an independent berth closes. It runs against every adapter.
-  - For herdr, it runs a throwaway server with `HOME` redirected and every `HERDR_*` variable unset. An inherited `HERDR_SOCKET_PATH` would otherwise drive the live session.
+  - For herdr, it runs a throwaway server with `HOME` redirected and every `HERDR_*` variable unset. An inherited `HERDR_SOCKET_PATH` would otherwise drive the live session. The server runs inside the nix build sandbox, so the suite is a flake check.
+  - herdr treats a process named `claude` as an agent and reads its state from the screen. The suite drives the states with a stand-in process of that name, not with Claude Code.
 - **Unit tests.** The pure decisions have their own tests: `bilge-pump`'s compaction decision, and each adapter's mapping from backend states to the four port states, including the herdr parked-on-background-work correction.
 - **End to end.** One real effort runs on `steward` and `worker` before any previous system is retired.
 
 ## Migration from an existing herdr-based setup [NOT YET APPROVED]
 
-Build beside the existing system under the new names. The two share one herdr server without colliding, because every name, environment variable and index topic is new. The existing system stays untouched until the last step.
+Build beside the existing system under the new names. The two share one herdr server without colliding. Every command, environment variable, state file and index topic is new, and each pane is launched by one system and compacted by that system's own monitor. The existing system stays untouched until the last step.
+
+The work lands in three places: this repository, the host configuration that packages the old launcher and the persistent set, and the user's Claude Code configuration, which holds the old skills, the statusline, the settings and the hooks.
 
 1. Build `berth` with the herdr adapter and its contract suite.
-2. Build `bilge-pump`, with the statusline tap and the no-figure fallback. It must decline to start on a pane an existing monitor already covers, and write its heartbeat where existing readers look, until those readers move.
+2. Build `bilge-pump`, with the statusline tap and the no-figure fallback. Wire the tap into the statusline. The statusline's compactor indicator reads whichever heartbeat its pane has, the old one or the new one.
 3. Build `sign-on`, which attaches `bilge-pump`.
-4. Write `steward` and `worker`, and run one real effort on them, indexed in a `boatyard` topic.
-5. Move the persistent set's start-up script onto `sign-on`. Point the statusline and the steward's start-up check at the new heartbeat.
-6. Write `muster` and `tally`. `tally` reads both the old and the new index topics until the last old effort closes.
-7. Retire the old skills, the old launcher and the old monitor. Each old index topic gets one closing line pointing at `boatyard`.
+4. Write `steward` and `worker`. Install the packages and the plugin on one host, and allow `berth` and `sign-on` in the permission settings the seats run under. Then run one real effort, its steward started by hand with `sign-on` and indexed in a `boatyard` topic.
+5. Move the persistent set, one host at a time, because each host has its own service manager. Its server runs under `berth serve`, and its start-up script opens each agent with `sign-on`.
+6. Write `muster` and `tally`. Switch every skill that starts an effort to `muster`, so that no new effort starts on the old system. `tally` reads both the old and the new index topics until the last old effort closes.
+7. When the last old effort has closed, retire the old skills, the old launcher and the old monitor. Remove their names from the hooks, the settings and the other skills that mention them, and tell each project to do the same in its own notes. Each old index topic gets one closing line pointing at `boatyard`.
 
-The migration is done when no search finds the old skill and launcher names, and no raw multiplexer calls remain in the in-scope files.
+The migration is done when no search of the host configuration or the Claude Code configuration finds the old skill, launcher and monitor names, and no raw multiplexer calls remain in the in-scope files.
 
 ## Open decisions
 
-- **The blocked-duration record.** The previous monitor also logged how long a pane stayed blocked. Nothing reads that log but a human, and it is not about compaction. The draft leaves it out of `bilge-pump`. A human decides whether to drop it or rebuild it on the orchestration side when something needs it.
 - **The second adapter.** tmux would bring `bilge-pump` to the most users. tuios fits the port model most closely. Orca was the original request for a second backend.
 
 ## Rejected alternatives
