@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+# berth-herdr-state: the port state of a herdr pane. It reads nothing but its
+# input, so it is tested without a yard. See docs/design.md, "Agent states".
+#
+# Reads a pane as `herdr pane get` describes one, with `evaluated_rules` from
+# `herdr agent explain --json` added when herdr says the agent is working.
+# Prints active, at-rest, blocked or gone.
+#
+# Needs: bash, jq.
+set -euo pipefail
+
+exec jq -r '
+  def matched($id): any(.evaluated_rules[]?; .id == $id and .matched);
+
+  # Claude parked at its prompt while background work runs keeps a spinner in
+  # its title, so herdr reports it working. The background rules match then,
+  # and live_turn_working, which wants a turn in flight, does not.
+  def parked:
+    (matched("live_turn_working") | not)
+    and (matched("background_agents_working")
+         or matched("background_shell_working")
+         or matched("background_mcp_task_working"));
+
+  if .agent == null then "gone"
+  elif .agent_status == "idle" or .agent_status == "done" then "at-rest"
+  elif .agent_status == "blocked" then "blocked"
+  elif .agent_status == "working" then (if parked then "at-rest" else "active" end)
+  # herdr has not classified the screen yet, as while an agent starts, or a
+  # full-screen view hides it. Nothing should type into it.
+  elif .agent_status == "unknown" then "active"
+  else error("berth (herdr): herdr reported an agent status berth does not know, \(.agent_status).")
+  end'

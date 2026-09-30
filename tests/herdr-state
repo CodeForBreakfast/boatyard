@@ -1,0 +1,69 @@
+#!/usr/bin/env bash
+# The herdr adapter's mapping from herdr's agent states to the port's four,
+# with its corrections. See docs/design.md, "Agent states" and "Testing".
+#
+# Run it with berth-herdr-state on the path.
+#
+# Needs: bash, jq.
+set -uo pipefail
+
+failures=0
+
+check() { # <what> <want> <got>
+  if [ "$2" = "$3" ]; then
+    echo "ok: $1"
+  else
+    echo "FAIL: $1: wanted '$2', got '$3'"
+    failures=$((failures + 1))
+  fi
+}
+
+# A pane as herdr describes one, with the rules herdr's trace says matched.
+pane() { # <agent> <agent status> [<matched rule>...]
+  local agent=$1 status=$2
+  shift 2
+  jq -nc --arg agent "$agent" --arg status "$status" '
+    {pane_id: "w9:p9", agent: (if $agent == "" then null else $agent end), agent_status: $status,
+     evaluated_rules: ([$ARGS.positional[] | {id: ., matched: true}]
+                       + [{id: "some_rule_that_did_not_match", matched: false}])}' \
+    --args "$@"
+}
+
+maps() { # <want> <what> <pane>
+  check "$2 reads $1" "$1" "$(berth-herdr-state <<<"$3")"
+}
+
+echo "# straight mappings"
+
+maps gone "a pane with no agent" "$(pane "" unknown)"
+maps at-rest "an idle agent" "$(pane claude idle)"
+maps at-rest "an agent whose turn is done" "$(pane claude "done")"
+maps blocked "a blocked agent" "$(pane claude blocked)"
+maps active "a working agent" "$(pane claude working osc_title_working live_turn_working)"
+maps active "an agent herdr has not classified yet" "$(pane claude unknown)"
+
+echo "# parked on background work"
+
+for rule in background_agents_working background_shell_working background_mcp_task_working; do
+  maps at-rest "a working agent parked with $rule" \
+    "$(pane claude working osc_title_working "$rule" live_prompt_box)"
+  maps active "a working agent mid-turn with $rule" \
+    "$(pane claude working osc_title_working live_turn_working "$rule")"
+done
+maps active "a working agent with no trace" \
+  "$(jq -c 'del(.evaluated_rules)' <<<"$(pane claude working)")"
+maps blocked "a blocked agent with background work" \
+  "$(pane claude blocked background_agents_working)"
+
+echo "# what it does not know"
+
+err=$(pane claude snoozing | berth-herdr-state 2>&1 >/dev/null) && status=0 || status=$?
+check "a status herdr has added since fails" 1 "$([ "$status" != 0 ] && echo 1 || echo 0)"
+check "the failure names the status" true "$(case "$err" in *snoozing*) echo true ;; *) echo false ;; esac)"
+
+echo
+if [ "$failures" -gt 0 ]; then
+  echo "$failures failed."
+  exit 1
+fi
+echo "The herdr state mapping holds."

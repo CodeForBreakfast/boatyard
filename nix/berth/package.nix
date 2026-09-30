@@ -6,16 +6,17 @@ stdenvNoCC.mkDerivation {
 
   src = lib.fileset.toSource {
     root = ../../bin;
-    fileset = lib.fileset.unions [ ../../bin/berth ../../bin/berth-herdr ];
+    fileset = lib.fileset.unions [ ../../bin/berth ../../bin/berth-herdr ../../bin/berth-herdr-state ];
   };
 
   nativeBuildInputs = [ makeWrapper ];
   buildInputs = [ bash ];
 
   installPhase = ''
-    install -Dm755 -t $out/bin berth berth-herdr
+    install -Dm755 -t $out/bin berth berth-herdr berth-herdr-state
     wrapProgram $out/bin/berth --prefix PATH : ${lib.makeBinPath [ coreutils ]}
     wrapProgram $out/bin/berth-herdr --prefix PATH : ${lib.makeBinPath [ coreutils herdr jq ]}
+    wrapProgram $out/bin/berth-herdr-state --prefix PATH : ${lib.makeBinPath [ jq ]}
   '';
 
   meta.mainProgram = "berth";

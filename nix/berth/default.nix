@@ -18,10 +18,17 @@ in
     berth-contract-herdr = herdrSuite "berth-contract";
     berth-herdr-layout = herdrSuite "herdr-layout";
 
+    berth-herdr-state = pkgs.runCommand "berth-herdr-state"
+      { nativeBuildInputs = [ berth pkgs.bash pkgs.jq ]; } ''
+      bash ${../../tests/herdr-state}
+      touch $out
+    '';
+
     berth-shellcheck = pkgs.runCommand "berth-shellcheck"
       { nativeBuildInputs = [ pkgs.shellcheck ]; } ''
-      shellcheck ${../../bin/berth} ${../../bin/berth-herdr} \
-        ${../../tests/with-herdr-yard} ${../../tests/berth-contract} ${../../tests/herdr-layout}
+      shellcheck ${../../bin/berth} ${../../bin/berth-herdr} ${../../bin/berth-herdr-state} \
+        ${../../tests/with-herdr-yard} ${../../tests/berth-contract} ${../../tests/herdr-layout} \
+        ${../../tests/herdr-state}
       touch $out
     '';
   };

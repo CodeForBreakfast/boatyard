@@ -9,6 +9,7 @@
 # Needs: bash, coreutils, herdr, jq.
 set -euo pipefail
 
+here=$(dirname "$(readlink -f "$0")")
 yard=${BERTH_YARD:-${HERDR_SESSION:-default}}
 berth_env=(--env BERTH_BACKEND=herdr --env "BERTH_YARD=$yard")
 
@@ -21,13 +22,15 @@ die() {
   exit 1
 }
 
-# Returns 3 for a pane herdr does not have, so a caller can answer gone.
-# Anything else that fails ends berth.
+# Returns 3 for a pane or an agent herdr does not have, so a caller can answer
+# gone. Anything else that fails ends berth.
 herdr_failed() { # <herdr's output> <herdr arguments>...
   local out=$1 code message
   shift
   code=$(jq -r '.error.code? // empty' <<<"$out" 2>/dev/null) || code=""
-  [ "$code" != pane_not_found ] || return 3
+  case $code in
+    pane_not_found | agent_not_found) return 3 ;;
+  esac
   message=$(jq -r '.error.message? // empty' <<<"$out" 2>/dev/null) || message=""
   die "herdr $1 $2 failed in yard $yard: ${message:-$out}"
 }
@@ -45,14 +48,21 @@ herdr_call() {
   printf '%s\n' "$out"
 }
 
-# Prints the result of a herdr call that answers in JSON.
-herdr_result() {
+# Prints what a herdr call that answers in JSON prints.
+herdr_json() {
   local out
   out=$(herdr_call "$@") || return
   if jq -e '.error? // empty' <<<"$out" >/dev/null 2>&1; then
     herdr_failed "$out" "$@"
     return
   fi
+  printf '%s\n' "$out"
+}
+
+# Prints the result of a herdr call that answers in JSON.
+herdr_result() {
+  local out
+  out=$(herdr_json "$@") || return
   [ -z "$out" ] || jq -c '.result // empty' <<<"$out" 2>/dev/null ||
     die "herdr $1 $2 answered with something other than JSON: $out"
 }
@@ -86,15 +96,24 @@ berth_id() {
   printf '%s\n' "$id"
 }
 
-port_state='
-  # ponytail: a straight mapping of herdr states, without the corrections the
-  # spec asks for. A pane parked on background work reads active, and so does
-  # an agent herdr cannot classify.
-  def port_state:
-    if .agent == null then "gone"
-    elif .agent_status == "blocked" then "blocked"
-    elif .agent_status == "idle" or .agent_status == "done" then "at-rest"
-    else "active" end;'
+# Prints the port state of a pane herdr has described. herdr's rule trace
+# goes with a working agent, because that is where herdr's mistake lies.
+pane_state() { # <pane>
+  local pane=$1 explained status=0
+  if [ "$(jq -r .agent_status <<<"$pane")" = working ]; then
+    explained=$(herdr_json agent explain "$(jq -r .pane_id <<<"$pane")" --json) || status=$?
+    case $status in
+      0) pane=$(jq -c --argjson explained "$explained" \
+        '.evaluated_rules = $explained.evaluated_rules' <<<"$pane") ;;
+      3)
+        echo gone
+        return
+        ;;
+      *) exit "$status" ;;
+    esac
+  fi
+  "$here/berth-herdr-state" <<<"$pane"
+}
 
 # Splits the tallest of the given panes: down while both halves clear
 # min_rows, otherwise right. Prints the new pane's id.
@@ -211,15 +230,22 @@ read_screen() {
 }
 
 list() {
+  local panes berths id states='{}' state
   yard=${1:-$yard}
-  herdr_result pane list | jq "$port_state"'
-    [.panes[] | select(.tokens.berth_relationship) | {
+  panes=$(herdr_result pane list)
+  berths=$(jq -c '[.panes[] | select(.tokens.berth_relationship)]' <<<"$panes")
+  for id in $(jq -r '.[].pane_id' <<<"$berths"); do
+    state=$(pane_state "$(jq -c --arg id "$id" '.[] | select(.pane_id == $id)' <<<"$berths")")
+    states=$(jq -c --arg id "$id" --arg state "$state" '.[$id] = $state' <<<"$states")
+  done
+  jq --argjson states "$states" '
+    [.[] | {
       id: .pane_id,
       label: (.label // null),
       relationship: .tokens.berth_relationship,
       parent: (.tokens.berth_parent // null),
-      state: port_state
-    }]'
+      state: $states[.pane_id]
+    }]' <<<"$berths"
 }
 
 state() {
@@ -227,7 +253,7 @@ state() {
   id=$(berth_id "$1")
   pane=$(pane_get "$id") || status=$?
   case $status in
-    0) jq -r "$port_state port_state" <<<"$pane" ;;
+    0) pane_state "$pane" ;;
     3) echo gone ;;
     *) exit "$status" ;;
   esac
