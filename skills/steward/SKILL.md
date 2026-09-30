@@ -139,7 +139,7 @@ Some repos take a commit on the default branch. Others take a pull request. That
 
 **The brief does not carry the mode.** A worker is born in the repo with that repo's instructions loaded, so it reads how work lands there just as you do. A copy in the brief is a second one to go stale. Where a repo declares nothing, get a policy written into that repo rather than a paragraph into a brief.
 
-**Read the project's own statement first.** A repo's `CLAUDE.md`, or the `CLAUDE.local.md` beside it, may say how work lands there. That statement decides the mode, and no probe overrules it. It cannot be overruled: a private repo on a free plan can hold no branch protection at all, so a project that delivers by policy looks direct to every probe.
+**Read the project's own statement first.** A repo's `CLAUDE.md`, or the `CLAUDE.local.md` beside it, may say how work lands there. That statement decides the mode, and no probe overrules it, because a private repo on a free plan can hold no branch protection at all, so a project that delivers by policy looks direct to every probe.
 
 Only where no project file says anything, probe **both** endpoints:
 
@@ -165,7 +165,7 @@ The worker reads the rest from the repo: whether a pull request opens as a draft
 
 The worker opens the pull request, sets its bead `blocked` with `delivery_pr=<owner>/<repo>#<n>`, and leaves. **You close that bead, and only once the pull request merges.**
 
-That rule is the mechanism. A bead that is not closed blocks its dependents, so none of them reaches `bd ready` until the code it needs is on the default branch. Close a bead when its pull request opens and dependents can start against unmerged work, which is how an effort becomes a tower of stacked pull requests that can only be reviewed bottom up.
+A bead that is not closed blocks its dependents, so none of them reaches `bd ready` until the code it needs is on the default branch. Close a bead when its pull request opens and dependents can start against unmerged work, which is how an effort becomes a tower of stacked pull requests that can only be reviewed bottom up.
 
 The same rule tells you how to wire new work. A bead that needs another bead's unlanded code gets a `bd dep add`, never a branch based on the other's pull request. A bead that merely has to land later, or would edit the same file, gets no edge. Where the cap holds back more than one ready bead, choose which goes next at each wake rather than wiring the choice into the graph, because the graph cannot tell a real dependency from a preference.
 
@@ -184,8 +184,7 @@ Drop beads outside this effort, and drop any whose pull request has closed or me
 
 **The cap governs new work, not rework.** A worker started on a bead that already holds a `delivery_pr`, for a rebase or a round of review comments, opens no new pull request and is always allowed. Without that exception, two pull requests that both need changes deadlock.
 
-The cap exists because review is one human's serial attention. An effort that opens pull requests faster than they merge does not deliver sooner. It only turns the review queue into a backlog nobody can clear.
-
+The cap exists because review is one human's serial attention.
 ### A pull request in another project
 
 The foreign-born worker sets its own home bead `blocked` with `delivery_pr`, in its home tracker, and reports the pull request into your working topic. Your `bd list` cannot see that metadata, so count the pull request against that repo's cap from the report. When it merges, post to the foreign project's channel so its concierge closes the bead. Never reach into another project's tracker to do it yourself.

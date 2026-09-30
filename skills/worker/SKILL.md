@@ -79,15 +79,13 @@ You will most often stall on something only the human can do: supply a credentia
 - **Only your bead, only your repo.** Don't wander into adjacent work, other beads or other repos, even to read them.
 - **Scope grows upward, not sideways.** If the work turns out bigger than the bead, or you spot related work, tell the steward in the working topic. Don't widen your own scope, and don't go around the steward to the human.
 - **A `cd` outlives the command you ran it for.** Your shell's directory persists between tool calls, so a `cd` changes state even inside a read-only lookup, and every later relative path lands in the tree it moved you to. Set `WT=<your worktree>` once and address every edit and every search under `$WT`. Where a command must run elsewhere, put it in a subshell, `(cd <dir> && <command>)`, which cannot leak.
-- **Kill only what you started, and only by its process id.** Capture the id when you start the process and kill that id. `pkill`, `killall`, and a name-matched `pgrep` piped into a kill all reach every process of that name that your user owns, including ones you never started. Write the fallback path as carefully as the main one, because it runs only after something has already gone wrong.
-- **Start a session-scoped process beside the live session, not inside it.** A test that brings up a compositor, a login shell or a session daemon must run in a nested or separate session. Starting one inside the desktop the human is using can take that desktop's surfaces, and no teardown gives them back. Post the teardown to the working topic before you start the process, and make it kill by process id.
+- **Kill only what you started, and only by its process id.** Capture the id when you start the process and kill that id. `pkill`, `killall`, and a name-matched `pgrep` piped into a kill all reach every process of that name that your user owns, including ones you never started.- **Start a session-scoped process beside the live session, not inside it.** A test that brings up a compositor, a login shell or a session daemon must run in a nested or separate session. Starting one inside the desktop the human is using can take that desktop's surfaces, and no teardown gives them back. Post the teardown to the working topic before you start the process, and make it kill by process id.
 - **Shared working trees.** Where another agent may edit the same repo at the same time, follow that project's worktree rules: commit work in progress early, and use a worktree for substantial edits.
 
 ## Deliver
 
-**Read how this repo takes work** from the `CLAUDE.md` and `CLAUDE.local.md` you were born with, and the documents they point at. Your brief leaves this out on purpose, because the repo's own statement is the one its owners keep current.
-
-Where the repo says nothing, deliver directly and push. A protected branch rejects the push loudly, which is a cheap way to find out. Then report the repo as undeclared in the working topic.
+**Read how this repo takes work** from the `CLAUDE.md` and `CLAUDE.local.md` you were born with, and the documents they point at.
+Where the repo says nothing, deliver directly and push. A protected branch rejects the push. Either way, report the repo as undeclared in the working topic.
 
 **Direct to the default branch.** Commit and push by the project's conventions. The work is delivered when it is pushed, and your bead closes in *Finish*. Nothing else in this section applies.
 
@@ -132,8 +130,7 @@ When the deliverable meets the brief's definition of done, wind the seat down in
 2. **Tear down.** Remove the worktree you made, by the project's rules.
 3. **Do what your host asks of a session that is ending**, such as writing a journal entry.
 4. **Unsubscribe from every topic you subscribed to**, normally just your working topic.
-5. **Sign off.** Post a terse outcome to the working topic and say plainly that you are done and leaving. Then react `wave` to the brief, the first message of your topic, as the machine-readable form of the same thing. Use `check` for a finished step, never `wave`.
-6. **Close your berth** with a bare `berth close`, in the same response as the wave or as your very next action. A worker that waves and stops looks exactly like one that crashed. Close only on success: a worker asleep on a human's answer keeps its berth open until it is woken.
+5. **Sign off.** Post a terse outcome to the working topic and say plainly that you are done and leaving. Then react `wave` to the brief, the first message of your topic, as the machine-readable form of the same thing.6. **Close your berth** with a bare `berth close`, in the same response as the wave or as your very next action. A worker that waves and stops looks exactly like one that crashed. Close only on success: a worker asleep on a human's answer keeps its berth open until it is woken.
 
 ## Boundaries
 
