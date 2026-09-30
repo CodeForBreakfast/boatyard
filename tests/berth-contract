@@ -154,7 +154,7 @@ cat >"$work/stand-in" <<'EOF'
 prompt_box() { printf '\n────────\n❯ \n────────\n'; }
 screen=rest
 while :; do
-  clear
+  printf '\e[H\e[2J\e[3J'
   case $screen in
     rest) printf '\e]0;✳ Claude\a'; prompt_box ;;
     turn) printf '\e]0;⠂ Claude\a✻ Thinking… (esc to interrupt)\n' ;;
