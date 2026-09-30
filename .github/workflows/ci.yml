@@ -1,0 +1,73 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+    # `edited` is not one of the default activity types, which all move the
+    # head. A title is not the head: without this, a title edited after a green
+    # run is never read, and the old success stays on the commit through the
+    # squash.
+    types: [opened, synchronize, reopened, edited]
+
+permissions:
+  contents: read
+
+# A push to a pull request's branch supersedes the run on its old head. A push
+# to main is never superseded, so those group by sha.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: true
+
+# Both jobs are reachable from a fork's pull request, and such a run executes
+# the fork's own code. So they run on runners GitHub owns rather than on ones
+# this org owns.
+#
+# Actions are pinned by commit because a tag is mutable and an action runs with
+# this repository's token.
+jobs:
+  conventional-subject:
+    name: conventional subject
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    # Only a pull request has a title.
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: DeterminateSystems/nix-installer-action@3138316df39ed29be04236d7ffc686fa525866aa # v23
+
+      # The rule and its test live in the flake. Through the environment rather
+      # than into the `run:` line: the title is written by whoever opened the
+      # pull request, and `${{ }}` would paste it into the script before bash
+      # ever saw it.
+      - name: the subject main will carry
+        env:
+          TITLE: ${{ github.event.pull_request.title }}
+        run: nix run .#conventional-subject -- "$TITLE"
+
+  flake-check:
+    name: nix flake check
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # Upstream Nix rather than Determinate Nix, for the cache step below.
+      # With determinate-nixd present the cache daemon uploads every derivation
+      # the run realises, substituted or built. Without it the daemon falls
+      # back to nix's post-build-hook, which does not run on substituted paths.
+      - uses: DeterminateSystems/nix-installer-action@3138316df39ed29be04236d7ffc686fa525866aa # v23
+        with:
+          determinate: false
+
+      # Build results go into this repository's own Actions cache, which needs
+      # no account and no secret and is scoped per branch.
+      - uses: DeterminateSystems/magic-nix-cache-action@84c0677f58dcedf3b91f8223ce36a9ea5b3c84b7 # v15
+        with:
+          use-flakehub: false
+
+      # Every check comes from the flake's `checks` output, so a check added
+      # there is a check this runs.
+      - run: nix flake check -L
