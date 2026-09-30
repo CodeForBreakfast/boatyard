@@ -1,0 +1,82 @@
+#!/usr/bin/env bash
+# berth: the backend-neutral port. See docs/design.md, "The port: berth".
+#
+# This front end reads the arguments and hands each verb to the adapter that
+# BERTH_BACKEND names, `berth-<backend>` beside this script. An adapter takes
+# the verbs already parsed:
+#
+#   open <independent|worker|tender> <cwd> <label> <opener> <command>...
+#   name <id> <label>
+#   list <yard>
+#   state <id>
+#   close <id>
+#
+# <opener> is BERTH_ID, and so is <id> when the caller gave none. Either is
+# empty when BERTH_ID is unset too, and the adapter then resolves the calling
+# berth from its backend's own variables. <label> and <yard> may be empty.
+#
+# Needs: bash, coreutils, and whatever the adapter needs.
+set -euo pipefail
+
+usage() {
+  cat >&2 <<'EOF'
+usage: berth open --as independent|worker|tender --cwd <dir> [--label <text>] -- <command>...
+       berth name [<id>] <label>
+       berth list [<yard>]
+       berth state [<id>]
+       berth close [<id>]
+EOF
+  exit 2
+}
+
+die() {
+  echo "berth: $1" >&2
+  exit 1
+}
+
+[ $# -gt 0 ] || usage
+verb=$1
+shift
+
+[ -n "${BERTH_BACKEND:-}" ] ||
+  die "no backend named. Set BERTH_BACKEND, for example to herdr."
+adapter="$(dirname "$(readlink -f "$0")")/berth-$BERTH_BACKEND"
+[ -x "$adapter" ] || die "there is no adapter for the backend '$BERTH_BACKEND'."
+
+case "$verb" in
+  open)
+    as="" cwd="" label=""
+    while [ $# -gt 0 ]; do
+      case "$1" in
+        --as) as=${2:-}; shift 2 || usage ;;
+        --cwd) cwd=${2:-}; shift 2 || usage ;;
+        --label) label=${2:-}; shift 2 || usage ;;
+        --) shift; break ;;
+        *) usage ;;
+      esac
+    done
+    case "$as" in independent | worker | tender) ;; *) usage ;; esac
+    [ -n "$cwd" ] && [ $# -gt 0 ] || usage
+    [ -d "$cwd" ] || die "--cwd $cwd is not a directory."
+    exec "$adapter" open "$as" "$(cd "$cwd" && pwd)" "$label" "${BERTH_ID:-}" "$@"
+    ;;
+  name)
+    case $# in
+      1) exec "$adapter" name "${BERTH_ID:-}" "$1" ;;
+      2) exec "$adapter" name "$1" "$2" ;;
+      *) usage ;;
+    esac
+    ;;
+  list)
+    [ $# -le 1 ] || usage
+    exec "$adapter" list "${1:-}"
+    ;;
+  state | close)
+    case $# in
+      0) exec "$adapter" "$verb" "${BERTH_ID:-}" ;;
+      1) exec "$adapter" "$verb" "$1" ;;
+      *) usage ;;
+    esac
+    ;;
+  *) usage ;;
+esac

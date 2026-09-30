@@ -1,0 +1,84 @@
+#!/usr/bin/env bash
+# The herdr adapter's layout rules, which the port contract leaves to each
+# adapter. See docs/design.md, "The herdr adapter".
+#
+# Run it under with-herdr-yard.
+#
+# Needs: bash, coreutils, herdr, jq, berth.
+set -uo pipefail
+
+work=$(mktemp -d)
+failures=0
+
+check() { # <what> <want> <got>
+  if [ "$2" = "$3" ]; then
+    echo "ok: $1"
+  else
+    echo "FAIL: $1: wanted '$2', got '$3'"
+    failures=$((failures + 1))
+  fi
+}
+
+pane() { # <id> <field>
+  herdr --session "$BERTH_YARD" pane get "$1" | jq -r ".result.pane.$2"
+}
+
+workspace_label() { # <workspace id>
+  herdr --session "$BERTH_YARD" workspace get "$1" | jq -r .result.workspace.label
+}
+
+echo "# an independent berth becomes a workspace"
+
+first=$(berth open --as independent --cwd "$work" --label "first line" -- true)
+second=$(berth open --as independent --cwd "$work" -- true)
+workspace=$(pane "$first" workspace_id)
+check "each independent berth has its own workspace" false \
+  "$([ "$workspace" = "$(pane "$second" workspace_id)" ] && echo true || echo false)"
+check "the workspace takes the berth's label" "first line" "$(workspace_label "$workspace")"
+berth name "$first" "renamed line"
+check "naming the berth names its workspace" "renamed line" "$(workspace_label "$workspace")"
+
+echo "# workers share one tab in their opener's workspace"
+
+workers=()
+for _ in 1 2 3; do
+  workers+=("$(BERTH_ID=$first berth open --as worker --cwd "$work" -- true)")
+done
+tab=$(pane "${workers[0]}" tab_id)
+check "a worker opens in its opener's workspace" "$workspace" "$(pane "${workers[0]}" workspace_id)"
+check "a worker opens outside its opener's tab" false \
+  "$([ "$tab" = "$(pane "$first" tab_id)" ] && echo true || echo false)"
+for worker in "${workers[@]:1}"; do
+  check "worker $worker shares the first worker's tab" "$tab" "$(pane "$worker" tab_id)"
+done
+check "the workers' tab is labelled for them" workers \
+  "$(herdr --session "$BERTH_YARD" tab get "$tab" | jq -r .result.tab.label)"
+
+echo "# a split never takes a pane under the height floor"
+
+min_height=$(herdr --session "$BERTH_YARD" pane list --workspace "$workspace" |
+  jq --arg tab "$tab" '[.result.panes[] | select(.tab_id == $tab) | .scroll.viewport_rows] | min')
+check "every worker keeps 12 rows or more" true "$([ "$min_height" -ge 12 ] && echo true || echo false)"
+
+echo "# a tender splits beside its opener"
+
+tender=$(BERTH_ID=$first berth open --as tender --cwd "$work" -- true)
+check "a tender opens in its opener's tab" "$(pane "$first" tab_id)" "$(pane "$tender" tab_id)"
+
+echo "# the cascade takes the whole workspace"
+
+by_hand=$(herdr --session "$BERTH_YARD" pane split "$first" --direction right --no-focus |
+  jq -r .result.pane.pane_id)
+berth close "$first"
+check "the workspace is gone" workspace_not_found \
+  "$(herdr --session "$BERTH_YARD" workspace get "$workspace" 2>&1 | jq -r .error.code)"
+check "a pane opened by hand in it is gone" pane_not_found \
+  "$(herdr --session "$BERTH_YARD" pane get "$by_hand" 2>&1 | jq -r .error.code)"
+check "the other independent berth stays" "$second" "$(berth list | jq -r '.[].id')"
+
+echo
+if [ "$failures" -gt 0 ]; then
+  echo "$failures failed."
+  exit 1
+fi
+echo "The herdr layout rules hold."

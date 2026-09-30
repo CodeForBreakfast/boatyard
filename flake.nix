@@ -332,6 +332,14 @@ and a second line"
           checkBeforePush
           conventionalSubject
         ];
+
+        # Each directory under nix/ is one component, whose default.nix takes
+        # pkgs and returns its own packages and checks.
+        components = map
+          (name: import (./nix + "/${name}") { inherit pkgs; })
+          (builtins.attrNames (pkgs.lib.filterAttrs (_: type: type == "directory") (builtins.readDir ./nix)));
+        componentOutputs = output:
+          pkgs.lib.foldl' (merged: component: merged // component.${output} or { }) { } components;
       in
       {
         devShells.default = pkgs.mkShell {
@@ -378,11 +386,13 @@ and a second line"
           '';
         };
 
-        packages.conventional-subject = conventionalSubject;
+        packages = componentOutputs "packages" // {
+          conventional-subject = conventionalSubject;
+        };
 
         # `nix flake check` is the whole of CI. Anything CI should run belongs
         # here, not in the workflow that calls it.
-        checks = {
+        checks = componentOutputs "checks" // {
           check-before-push-test = checkBeforePushTest;
           conventional-subject-test = conventionalSubjectTest;
         };

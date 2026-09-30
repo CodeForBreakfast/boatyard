@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+# Runs a command against a throwaway herdr yard, with BERTH_BACKEND and
+# BERTH_YARD naming it.
+#
+# HOME is redirected and every HERDR_* variable unset, because an inherited
+# HERDR_SOCKET_PATH would otherwise drive the live session. The server is
+# stopped by the pid it was started with, and by nothing else.
+#
+# Needs: bash, coreutils, herdr, jq.
+set -euo pipefail
+
+[ $# -gt 0 ] || { echo "usage: with-herdr-yard <command>..." >&2; exit 2; }
+
+unset "${!HERDR_@}"
+
+# A unix socket path has to fit in about a hundred bytes, so HOME stays short.
+HOME=$(mktemp -d "${TMPDIR:-/tmp}/yard.XXXXXX")
+export HOME
+export SHELL=${BASH:-bash}
+
+if herdr status server --json | jq -e .running >/dev/null; then
+  echo "with-herdr-yard: a herdr server is already running at $HOME, so this is not a throwaway yard." >&2
+  exit 1
+fi
+
+herdr server >"$HOME/server.log" 2>&1 &
+server=$!
+stop_server() {
+  kill "$server" 2>/dev/null || true
+  wait "$server" 2>/dev/null || true
+}
+trap stop_server EXIT
+
+until herdr status server --json | jq -e .running >/dev/null; do
+  if ! kill -0 "$server" 2>/dev/null || [ "$SECONDS" -gt 30 ]; then
+    echo "with-herdr-yard: the herdr server did not come up." >&2
+    cat "$HOME/server.log" >&2
+    exit 1
+  fi
+  sleep 0.1
+done
+
+export BERTH_BACKEND=herdr BERTH_YARD=default
+"$@"
