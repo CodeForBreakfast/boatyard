@@ -1,0 +1,9 @@
+{
+  "name": "boatyard",
+  "description": "Skills for running several Claude Code agents through one backlog, coordinated over commy and recorded in beads.",
+  "author": {
+    "name": "Code For Breakfast"
+  },
+  "repository": "https://github.com/CodeForBreakfast/boatyard",
+  "license": "Apache-2.0"
+}
