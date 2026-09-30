@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+# bilge-pump-decide: whether bilge-pump compacts a berth this tick. It reads
+# nothing but its arguments, so it is tested without a berth.
+#
+# <free> is the berth's free context as a whole percentage, or empty when the
+# berth has no figure. Prints one of fire, skip:not-at-rest, skip:no-figure,
+# skip:threshold or skip:cooldown.
+#
+# Needs: bash.
+set -euo pipefail
+
+[ $# -eq 5 ] || {
+  echo "usage: bilge-pump-decide <state> <free> <seconds since the last fire> <threshold> <cooldown>" >&2
+  exit 2
+}
+state=$1 free=$2 since_fire=$3 threshold=$4 cooldown=$5
+
+if [ "$state" != at-rest ]; then
+  echo skip:not-at-rest
+else
+  case "$free" in
+    '' | *[!0-9]*) echo skip:no-figure ;;
+    *)
+      if [ "$free" -ge "$threshold" ]; then
+        echo skip:threshold
+      elif [ "$since_fire" -lt "$cooldown" ]; then
+        echo skip:cooldown
+      else
+        echo fire
+      fi
+      ;;
+  esac
+fi
