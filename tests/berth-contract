@@ -46,6 +46,7 @@ listed() { # <id>
 
 # Opens a berth whose command records the environment it was given.
 open_recording() { # <relationship> <label> <record>
+  # shellcheck disable=SC2016 # the berth's own shell expands it
   berth open --as "$1" --cwd "$work" --label "$2" -- \
     bash -c 'env >"$1.part" && mv "$1.part" "$1"' recorder "$3"
 }

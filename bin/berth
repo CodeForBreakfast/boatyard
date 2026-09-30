@@ -11,9 +11,9 @@
 #   state <id>
 #   close <id>
 #
-# <id> and <opener> are BERTH_ID when the caller gave none, and empty when
-# that is unset too; the adapter then resolves the calling berth from its
-# backend's own variables. <label> and <yard> may be empty.
+# <opener> is BERTH_ID, and so is <id> when the caller gave none. Either is
+# empty when BERTH_ID is unset too, and the adapter then resolves the calling
+# berth from its backend's own variables. <label> and <yard> may be empty.
 #
 # Needs: bash, coreutils, and whatever the adapter needs.
 set -euo pipefail

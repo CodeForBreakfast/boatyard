@@ -10,6 +10,7 @@
 set -euo pipefail
 
 yard=${BERTH_YARD:-${HERDR_SESSION:-default}}
+berth_env=(--env BERTH_BACKEND=herdr --env "BERTH_YARD=$yard")
 
 # A split never leaves either half of a pane under min_rows.
 min_rows=12
@@ -63,9 +64,9 @@ berth_id() {
 }
 
 port_state='
-  # ponytail: a straight mapping, so a pane parked on background work reads
-  # active and an agent herdr cannot classify reads active too. The four
-  # states and herdr'"'"'s corrections are yard-2wr.8.
+  # ponytail: a straight mapping of herdr states, without the corrections the
+  # spec asks for. A pane parked on background work reads active, and so does
+  # an agent herdr cannot classify.
   def port_state:
     if .agent == null then "gone"
     elif .agent_status == "blocked" then "blocked"
@@ -87,9 +88,9 @@ split_tallest() { # <cwd> <panes as a JSON array>
 open() {
   local as=$1 cwd=$2 label=$3 opener=$4 id opener_pane workspace panes tab
   shift 4
-  berth_env=(--env BERTH_BACKEND=herdr --env "BERTH_YARD=$yard")
 
   if [ "$as" = independent ]; then
+    # It starts its own line of work, so its opener is not its parent.
     opener=""
     id=$(herdr_result workspace create --cwd "$cwd" ${label:+--label "$label"} \
       "${berth_env[@]}" --no-focus | jq -r .root_pane.pane_id)

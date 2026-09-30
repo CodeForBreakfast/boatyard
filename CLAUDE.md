@@ -11,6 +11,10 @@ refuses a dirty tree rather than check a source nix cannot see all of.
 A check in the flake's `checks` output is a check CI runs. Adding one there is
 how you add one.
 
+Each component is a directory under `nix/`, and its `default.nix` returns that
+component's packages and checks. The flake reads every such directory, so a new
+component adds its own directory and edits nothing shared.
+
 ## PR policy
 
 Changes reach `main` through a pull request, squash-merged. Nothing is pushed
