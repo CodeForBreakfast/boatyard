@@ -3,7 +3,9 @@
 # input, so it is tested without a yard. See docs/design.md, "Agent states".
 #
 # Reads a pane as `herdr pane get` describes one, with `evaluated_rules` from
-# `herdr agent explain --json` added when herdr says the agent is working.
+# `herdr agent explain --json` added when herdr says the agent is working, and
+# `process_info` from `herdr pane process-info` when herdr has no agent but
+# still holds an agent session.
 # Prints active, at-rest, blocked or gone.
 #
 # Needs: bash, jq.
@@ -21,7 +23,17 @@ exec jq -r '
          or matched("background_shell_working")
          or matched("background_mcp_task_working"));
 
-  if .agent == null then "gone"
+  # Where a wrapper renames the Claude process, as the Nix one does, herdr
+  # names it from its argv, which herdr skips reading while the process waits
+  # on the disk, as under swap. Enough misses clear the agent until the screen
+  # next changes. The session Claude reported at start-up stays, and a live
+  # agent still holds the terminal foreground from the shell.
+  def lost:
+    .agent_session != null
+    and .process_info.foreground_process_group_id != null
+    and .process_info.foreground_process_group_id != .process_info.shell_pid;
+
+  if .agent == null then (if lost then "active" else "gone" end)
   elif .agent_status == "idle" or .agent_status == "done" then "at-rest"
   elif .agent_status == "blocked" then "blocked"
   elif .agent_status == "working" then (if parked then "at-rest" else "active" end)
