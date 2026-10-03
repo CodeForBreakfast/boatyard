@@ -101,6 +101,7 @@ It is written first. Its obligations beyond straight mapping:
 
 - **Layout.** An independent berth becomes a workspace. Workers share one tab in their opener's workspace and split it. A tender splits beside its opener. The choice of split direction lives here.
 - **The parked-on-background-work correction** described under Agent states.
+- **The lost-agent correction.** Where a wrapper renames Claude Code's process, as Nix's does, herdr names it from its argv, and skips reading argv while the process waits on the disk, as under swap. Enough misses clear the agent, and herdr may not look again for minutes. The session reported at Claude Code's start-up survives, so a pane with no agent, a session, and a foreground process other than its shell reads `active`, not `gone`.
 - **The cascade.** herdr keeps a workspace's other panes when its first pane closes, so the adapter closes them itself.
 - **Screen source.** `wait-text` matches herdr's recent output, not only the visible frame. A pane shorter than the text it waits for never shows all of it at once.
 - **Package parameter.** herdr's package is a parameter, so a host can supply a platform-specific build.
@@ -166,7 +167,7 @@ The skills contain no multiplexer syntax. They call only `sign-on` and `berth`. 
 - **Port contract suite.** One suite states what every adapter must do: open in each relationship, list, name, send-text, send-key, wait-text, read, state across all four states, close, and the cascade when an independent berth closes. It runs against every adapter.
   - For herdr, it runs a throwaway server with `HOME` redirected and every `HERDR_*` variable unset. An inherited `HERDR_SOCKET_PATH` would otherwise drive the live session. The server runs inside the nix build sandbox, so the suite is a flake check.
   - herdr treats a process named `claude` as an agent and reads its state from the screen. The suite drives the states with a stand-in process of that name, not with Claude Code.
-- **Unit tests.** The pure decisions have their own tests: `bilge-pump`'s compaction decision, and each adapter's mapping from backend states to the four port states, including the herdr parked-on-background-work correction.
+- **Unit tests.** The pure decisions have their own tests: `bilge-pump`'s compaction decision, and each adapter's mapping from backend states to the four port states, including the herdr parked-on-background-work and lost-agent corrections.
 - **End to end.** One real effort runs on `steward` and `worker` before any previous system is retired.
 
 ## Migration from an existing herdr-based setup

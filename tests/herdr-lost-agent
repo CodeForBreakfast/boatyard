@@ -1,0 +1,61 @@
+#!/usr/bin/env bash
+# The herdr adapter's correction for an agent herdr's detection has lost. See
+# docs/design.md, "The herdr adapter".
+#
+# herdr loses a live Claude Code when it cannot read the process's argv, as
+# while it waits on swap, and nothing here can make a process do that. So a
+# pane herdr never took for an agent stands in for one, with the session a
+# Claude Code start-up reports.
+#
+# Run it under with-herdr-yard.
+#
+# Needs: bash, coreutils, herdr, jq, berth.
+set -uo pipefail
+
+work=$(mktemp -d)
+failures=0
+
+check() { # <what> <want> <got>
+  if [ "$2" = "$3" ]; then
+    echo "ok: $1"
+  else
+    echo "FAIL: $1: wanted '$2', got '$3'"
+    failures=$((failures + 1))
+  fi
+}
+
+herdr_yard() {
+  herdr --session "$BERTH_YARD" "$@"
+}
+
+# herdr takes a moment to see a new foreground process, so a state is
+# awaited rather than read once.
+settles() { # <what> <id> <want>
+  local got _
+  for _ in $(seq 1 100); do
+    got=$(berth state "$2")
+    [ "$got" = "$3" ] && break
+    sleep 0.1
+  done
+  check "$1 reads $3" "$3" "$got"
+}
+
+lost=$(berth open --as independent --cwd "$work" -- sleep 600)
+herdr_yard pane report-agent-session "$lost" --source herdr:claude --agent claude \
+  --agent-session-id lost-session >/dev/null
+check "herdr has no agent in the pane" null \
+  "$(herdr_yard pane get "$lost" | jq -r .result.pane.agent)"
+settles "a session whose process holds the foreground" "$lost" active
+check "it is listed as active" active \
+  "$(berth list | jq -r --arg id "$lost" '.[] | select(.id == $id) | .state')"
+
+herdr_yard pane send-keys "$lost" C-c >/dev/null
+settles "a session whose process has left" "$lost" gone
+berth close "$lost"
+
+echo
+if [ "$failures" -gt 0 ]; then
+  echo "$failures failed."
+  exit 1
+fi
+echo "The lost-agent correction holds."

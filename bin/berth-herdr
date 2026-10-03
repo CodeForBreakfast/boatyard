@@ -96,23 +96,33 @@ berth_id() {
   printf '%s\n' "$id"
 }
 
+# Prints a pane with what one more herdr call answered about it.
+annotate() { # <pane> <jq filter over $answer> <call>...
+  local pane=$1 filter=$2 answer
+  shift 2
+  answer=$("$@") || return
+  jq -c --argjson answer "$answer" "$filter" <<<"$pane"
+}
+
 # Prints the port state of a pane herdr has described. herdr's rule trace
-# goes with a working agent, because that is where herdr's mistake lies.
+# goes with a working agent, and the pane's processes with an agent herdr has
+# lost, because that is where herdr's mistakes lie.
 pane_state() { # <pane>
-  local pane=$1 explained status=0
+  local pane=$1 id status=0
+  id=$(jq -r .pane_id <<<"$pane")
+  # shellcheck disable=SC2016 # jq expands $answer
   if [ "$(jq -r .agent_status <<<"$pane")" = working ]; then
-    explained=$(herdr_json agent explain "$(jq -r .pane_id <<<"$pane")" --json) || status=$?
-    case $status in
-      0) pane=$(jq -c --argjson explained "$explained" \
-        '.evaluated_rules = $explained.evaluated_rules' <<<"$pane") ;;
-      3)
-        echo gone
-        return
-        ;;
-      *) exit "$status" ;;
-    esac
+    pane=$(annotate "$pane" '.evaluated_rules = $answer.evaluated_rules' \
+      herdr_json agent explain "$id" --json) || status=$?
+  elif jq -e '.agent == null and .agent_session != null' <<<"$pane" >/dev/null; then
+    pane=$(annotate "$pane" '.process_info = $answer.process_info' \
+      herdr_result pane process-info --pane "$id") || status=$?
   fi
-  "$here/berth-herdr-state" <<<"$pane"
+  case $status in
+    0) "$here/berth-herdr-state" <<<"$pane" ;;
+    3) echo gone ;;
+    *) exit "$status" ;;
+  esac
 }
 
 # Splits the tallest of the given panes: down while both halves clear

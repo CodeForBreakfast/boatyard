@@ -55,6 +55,22 @@ maps active "a working agent with no trace" \
 maps blocked "a blocked agent with background work" \
   "$(pane claude blocked background_agents_working)"
 
+echo "# lost by herdr's detection"
+
+# A pane herdr has no agent for, which still holds the agent session herdr was
+# told of, with `herdr pane process-info` added.
+lost() { # <foreground process group> <shell pid>
+  jq -c --argjson fg "$1" --argjson shell "$2" '
+    .agent_session = {agent: "claude", kind: "id", source: "herdr:claude", value: "s1"}
+    | .process_info = {foreground_process_group_id: $fg, shell_pid: $shell}' <<<"$(pane "" unknown)"
+}
+
+maps active "a session whose process holds the foreground" "$(lost 200 100)"
+maps gone "a session whose shell is back in the foreground" "$(lost 100 100)"
+maps gone "a session with no foreground group" "$(lost null 100)"
+maps gone "a session with no process info" \
+  "$(jq -c 'del(.process_info)' <<<"$(lost 200 100)")"
+
 echo "# what it does not know"
 
 err=$(pane claude snoozing | berth-herdr-state 2>&1 >/dev/null) && status=0 || status=$?
