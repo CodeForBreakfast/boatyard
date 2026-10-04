@@ -8,7 +8,7 @@
 #   serve <yard>
 #   stop <yard>
 #   yard
-#   open <independent|worker|tender> <cwd> <label> <opener> <command>...
+#   open <independent|worker|tender> <focus|no-focus> <cwd> <label> <opener> <command>...
 #   name <id> <label>
 #   list <yard>
 #   send-text <id> <text>
@@ -34,7 +34,8 @@ usage() {
 usage: berth serve <yard>
        berth stop <yard>
        berth yard
-       berth open --as independent|worker|tender --cwd <dir> [--label <text>] -- <command>...
+       berth open --as independent|worker|tender --cwd <dir> [--label <text>] [--focus]
+                  -- <command>...
        berth name [<id>] <label>
        berth list [<yard>]
        berth send-text [<id>] <text>
@@ -67,12 +68,13 @@ case "$verb" in
     exec "$adapter" "$verb" "$1"
     ;;
   open)
-    as="" cwd="" label=""
+    as="" cwd="" label="" focus=no-focus
     while [ $# -gt 0 ]; do
       case "$1" in
         --as) as=${2:-}; shift 2 || usage ;;
         --cwd) cwd=${2:-}; shift 2 || usage ;;
         --label) label=${2:-}; shift 2 || usage ;;
+        --focus) focus=focus; shift ;;
         --) shift; break ;;
         *) usage ;;
       esac
@@ -80,7 +82,7 @@ case "$verb" in
     case "$as" in independent | worker | tender) ;; *) usage ;; esac
     [ -n "$cwd" ] && [ $# -gt 0 ] || usage
     [ -d "$cwd" ] || die "--cwd $cwd is not a directory."
-    exec "$adapter" open "$as" "$(cd "$cwd" && pwd)" "$label" "${BERTH_ID:-}" "$@"
+    exec "$adapter" open "$as" "$focus" "$(cd "$cwd" && pwd)" "$label" "${BERTH_ID:-}" "$@"
     ;;
   name | send-text | send-key)
     case $# in

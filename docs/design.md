@@ -64,7 +64,7 @@ Each adapter maps its backend's states onto these four and corrects its backend'
 | `berth serve <yard>` | Runs the backend for a yard in the foreground, so a service manager can supervise the real process. |
 | `berth stop <yard>` | Stops a yard. |
 | `berth yard` | Prints the yard the caller acts in, resolved as the adapter resolves it for every other verb. |
-| `berth open --as independent\|worker\|tender --cwd <dir> [--label <text>] -- <command>` | Opens a berth and prints its id. |
+| `berth open --as independent\|worker\|tender --cwd <dir> [--label <text>] [--focus] -- <command>` | Opens a berth and prints its id. With `--focus`, the person watching the yard lands on the new berth. Without it, their focus stays where it was. |
 | `berth name [<id>] <label>` | Labels a berth. On an independent berth, the label also names whatever the adapter groups under it. |
 | `berth list [<yard>]` | Prints the berths as JSON: id, label, relationship, parent and state. |
 | `berth send-text [<id>] <text>` | Types text into a berth. |
@@ -123,7 +123,7 @@ The host supplies the site-specific parts as configuration:
 - the MCP start-up timeout;
 - how long an agent may take to show its gate, or to show at all.
 
-Each launch states its own relationship, working directory, label and prompt. It may add a model, an effort level, an extra working directory, environment variables, a settings file and a compaction threshold. A steward's settings file lets it run `sign-on`, and a worker gets none.
+Each launch states its own relationship, working directory, label and prompt. It may ask for focus, so that a caller such as a desktop shortcut lands the person on the seat as soon as it opens. It may add a model, an effort level, an extra working directory, environment variables, a settings file and a compaction threshold. A steward's settings file lets it run `sign-on`, and a worker gets none.
 
 A seat is born in its repository's main checkout, never in a linked worktree. Claude Code reads its instructions, skills and trust state from the launch directory and cannot re-read them after a `cd`.
 
