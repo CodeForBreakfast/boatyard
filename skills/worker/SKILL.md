@@ -61,18 +61,36 @@ Post to the working topic at meaningful moments: a milestone reached, a plan cha
 
 ## Block and sleep
 
-You will most often stall on something only the human can do: supply a credential, make a decision, trigger a deploy. When that happens, **don't exit and don't spin.** Starting a seat again costs the human work, and sleeping costs nothing.
+You will most often stall on something only the human can give you: an answer to a question, a credential, a deploy. When that happens, **don't exit and don't spin.** Starting a seat again costs the human work, and sleeping costs nothing.
 
-1. **Record it on the bead.** Note what is done, what is left, and the **specific ask**, worded so it can be acted on in one read. Then mark the bead blocked on a human:
+1. **Record it on your bead, and mark the bead as a sleeping seat.** Note what is done and what is left, then:
 
    ```bash
    bd update <id> --status blocked --set-metadata blocked_on=human
    ```
 
-   The metadata tells the steward that a live seat is asleep here. Without it, a rework seat looks the same as the pull request it is reworking, because both are `blocked` and both carry `delivery_pr`. The steward would then poll the pull request instead of relaying your answer. Clear it with `--unset-metadata blocked_on` when you wake.
-2. **Post the ask to the working topic.** The steward lifts it into the effort's decisions queue. Never ask the human directly, and never ask with `AskUserQuestion` or any prompt in your terminal. Nobody watches a worker's berth.
-3. **Sleep.** Stay open to inbound messages, with no scheduled re-check. Commy delivers the steward's relay reliably, and that message is your wake signal.
-4. **Resume on wake.** Re-check whatever fact you were waiting on, such as a secret now existing or a commit having landed, then continue in place.
+   `blocked_on=human` says only that a live seat is asleep here. Without it, a rework seat looks the same as the pull request it is reworking, because both are `blocked` and both carry `delivery_pr`, and the steward would poll the pull request instead of waking you. Clear it with `--unset-metadata blocked_on` when you wake.
+2. **If it is a question, put it on its own bead, labelled `human`.** That label is the human's queue, which `bd human list` reads. Where your host has you review a question before it goes out, do that first, and if the review lets you settle the question yourself, settle it and record why instead of asking. The bead carries one question, worded so the human can answer it cold. File it in your own tracker, and make your bead wait on it:
+
+   ```bash
+   q=$(bd create --silent --labels human --title "<the question>" --description "<what they need to answer it>")
+   bd dep add <id> "$q"
+   ```
+
+   The human answers by closing the question bead, and the answer stays on it. Keep the bead true while you wait: edit it if the question changes, and dismiss it with `bd human dismiss` if the question goes away.
+3. **Post to your working topic.** For a question, post a one-line pointer to its bead, because the question lives on the bead and never only in the post. An action only the human can take, such as supplying a credential, is not a question and gets no question bead: post the action itself, and the steward takes it to the human. Never ask the human directly, and never ask with `AskUserQuestion` or any prompt in your terminal. Nobody watches a worker's berth.
+4. **Sleep.** Stay open to inbound messages, with no scheduled re-check. The steward watches your question bead and posts to your topic when it closes, or relays the human's word on an action. That message is your wake signal.
+5. **Resume on wake.** Read the answer on the closed question bead with `bd show`. An answer that does not settle the question is still an answer: file a fresh question only if you still need one. Re-check whatever fact you were waiting on, such as a secret now existing or a commit having landed, then clear `blocked_on` and continue in place.
+
+## Getting the human's permission
+
+Permission is the one thing you ever need from the human in your berth. When your host's permission mode refuses a command you need, only the human can let it through, and they have to do it in your berth. A permission classifier judges a command by the conversation of the seat that runs it, so an approval given on a bead or on commy never reaches it. An approval typed in your berth clears it only if it names the action.
+
+1. **Mark your bead as a sleeping seat,** as step 1 of *Block and sleep* says. File no question bead for a permission.
+2. **Post the ask to your working topic:** the exact command, why the work needs it, and how to reach your berth. The steward takes it to the human.
+3. **Sleep.** The human types their approval into your berth and names the action, such as "go ahead and copy the key". A bare "I approve" does not clear it. Or they run the command there themselves, which always works, and tell you to carry on. Run the command if they approved it, or check its result if they ran it. Then clear `blocked_on` and continue.
+
+When a command stops at an approval prompt instead, you cannot post. Stay at the prompt. `berth state` reads `blocked`, and the steward sends the human to it.
 
 ## Stay in lane
 
@@ -132,12 +150,12 @@ When the deliverable meets the brief's definition of done, wind the seat down in
 3. **Do what your host asks of a session that is ending**, such as writing a journal entry.
 4. **Unsubscribe from every topic you subscribed to**, normally just your working topic.
 5. **Sign off.** Post a terse outcome to the working topic and say plainly that you are done and leaving. Then react `wave` to the brief, the first message of your topic, as the machine-readable form of the same thing.
-6. **Close your berth** with a bare `berth close`, in the same response as the wave or as your very next action. A worker that waves and stops looks exactly like one that crashed. Close only on success: a worker asleep on a human's answer keeps its berth open until it is woken.
+6. **Close your berth** with a bare `berth close`, in the same response as the wave or as your very next action. A worker that waves and stops looks exactly like one that crashed. Close only on success: a worker asleep on the human keeps its berth open until it is woken.
 
 ## Boundaries
 
 - **The terminal is not a channel.** Never read another berth's screen or type into it to coordinate. Coordination state travels in beads and commy only.
 - **This skill owns lifecycle and communication. The brief owns the task.**
 - **Don't speak for the project or make commitments.** Surfacing information is fine. Deciding the human's calls is not.
-- **Don't work around permission prompts.** A denied command is a real gap: block and sleep with it as the ask. An approval prompt is different. Your berth then reads `blocked` until the human clears it in place, so stay at the prompt.
+- **Don't work around permission prompts.** A command you need that is refused, or that stops at a prompt, goes to the human as *Getting the human's permission* says.
 - **Don't bootstrap or re-initialise the tracker when `bd` fails.** Report the failure in the working topic.

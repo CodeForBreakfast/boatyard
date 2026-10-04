@@ -25,7 +25,7 @@ That is also why you must be miserly with your own context. The effort outlives 
 
 ## You own the human's attention for this effort
 
-Anything across the effort that needs the human surfaces in **one place**, the decisions topic, and you keep it current. Workers never ping the human. You do.
+Workers never ping the human. A question that a seat waits on goes on its own bead labelled `human`, in the tracker of the project whose work waits on it, and the waiting bead depends on it. That label is the human's queue, so a question needs no post and no mention. A permission goes to the human in your berth. Every other ask across the effort surfaces in **one place**, the decisions topic, and you keep it current.
 
 ## Topics
 
@@ -34,7 +34,7 @@ Every topic you use is named from the anchor's `effort_slug` metadata. Never inv
 | Topic | Carries |
 |---|---|
 | `#<project>/<effort>` | Coordination: your announcements and wrap-up. |
-| `#<project>/<effort>-decisions` | Asks for the human, and nothing else. |
+| `#<project>/<effort>-decisions` | Actions only the human can take, and nothing else. |
 | `#<project>/<effort>-<bead>` | One worker's brief and its reports. A rework seat gets `-r2`, then `-r3`. |
 | `#<project>/boatyard` | The project's index of live efforts, one line each. |
 
@@ -80,12 +80,13 @@ This holds because a steward acquires its commy identity lazily, on its first po
    A foreign dependency that is not closed puts the bead in push-gate state 6.
 5. **Find the beads parked by status, and sort them in this order:**
 
-   1. **`blocked_on=human` means a live seat is asleep there**, waiting for an answer you relay. This wins even when the bead also carries a `delivery_pr`, which is exactly the case for a rework seat that hit a question mid-rebase. Relay to it. Don't poll its pull request.
+   1. **`blocked_on=human` means a live seat is asleep there.** It waits on the open `human` bead it depends on, which is its question. With no such bead, it waits on a permission or an action. This wins even when the bead also carries a `delivery_pr`, which is exactly the case for a rework seat that hit a question mid-rebase. Wake it when its wait ends. Don't poll its pull request.
    2. **Otherwise `delivery_pr` means the bead is in delivery.** No seat is on it, so never relay to it and never start a worker on it. Poll its pull request.
 
    ```bash
    bd list --has-metadata-key blocked_on --limit 0 --json
    bd list --has-metadata-key delivery_pr --limit 0 --json
+   bd human list --json
    ```
 
    `--limit 0` matters. The default is 50 rows, and a truncated list quietly turns a sleeping worker's bead into one you might start over.
@@ -101,7 +102,7 @@ The wake ritual tells you the state. The push gate is what you owe before you re
 2. **Staffed and live.** An accountable worker is on it and has reported recently, through a post, a commit or a bead update. A worker that has gone dark is not this state, and neither is a bead handed to a channel nobody picked up.
 
    **Nor is a foreign bead that another project accepted, filed, and promised to report back on.** It looks like everything you wanted: a fast reply, a real bead id, a named owner. It is still a place in a queue, and it moves on that project's priorities rather than your effort's. The question is not whether someone accepted it. The question is whether a seat is running on it right now. If not, start one born in that project, and say so in that project's channel so its concierge can stand it down if it would rather own the scheduling.
-3. **A surfaced ask.** It sits in the decisions topic, mentions the human, and waits only on them.
+3. **A surfaced ask.** It waits only on the human, as an open question bead labelled `human` that the strand depends on, or as an action in the decisions topic.
 4. **In delivery.** The bead carries a `delivery_pr` whose pull request is open. It has no seat, correctly. What you owe it is the watch in *Watching your pull requests*, not a new worker.
 5. **Capped.** The strand could start, but its repo already holds this effort's limit of unmerged pull requests. Only a merge releases it.
 6. **Blocked by a dependency.** `bd` shows an unmet blocker, or `bdi` reads a foreign dependency as not closed. A worker started here would build on code that is not on the default branch yet.
@@ -117,7 +118,7 @@ You bloat, and force expensive compaction, by pulling detail of the work into yo
 - **Don't read large artefacts yourself**: source files, transcripts, long logs. When you need a conclusion from a pile of material, give the reading to a throwaway subagent and keep only its answer. Work that owns a bead goes to a worker in its own berth. A one-off read goes to your own subagent.
 - **Sleep between events, but only once the push gate is clean.** Use `ScheduleWakeup` only for a specific future event you care about: a worker's declared checkpoint, which is the watch for its death because a dead worker sends nothing, or a re-check of a blocked dependency. Otherwise commy delivers inbound messages reliably, so don't poll on a tight interval.
 
-  **Pull requests are the exception.** A merge sends no commy message, so an effort with any strand in delivery or capped may have no inbound wake source at all. Schedule the pull request poll explicitly, on the timescale a review really takes: hours, not minutes.
+  **Pull requests and question beads are the exceptions.** A merge sends no commy message, and neither does the human answering a question bead, so an effort waiting on either may have no inbound wake source at all. Schedule the poll explicitly. A pull request poll runs on the timescale a review really takes, hours rather than minutes. A question bead poll runs within the hour, because a worker sleeps on it.
 - **You act; you don't report.** The wake ritual's output is for you. Never narrate your orientation or your plan into the terminal, where it reaches no one. What you emit is actions: a brief, an ask, a bead update.
 
 ## One bead, one worker, one context
@@ -230,8 +231,8 @@ Starting workers is a **loop**, not a kickoff. Start one at each ready bead, and
 ### Watching the berths you started
 
 - **What ties a seat to its bead** is the `agent_pane` the worker writes on its bead when it claims it. `sign-on` labels the berth with the bead, and you set neither yourself.
-- **`berth state <id>` reads `blocked` when a worker is waiting at a permission prompt.** That prompt waits in the worker's own terminal and never reaches its topic. Only the human can clear it, so raise it in the decisions topic.
-- **Reclaim a berth that did not close itself.** On the success path a finished worker posts its sign-off, reacts `wave` to its brief, and closes its own berth. A worker that crashed first leaves its berth open. If a berth is still open after its worker waved, or `berth state` reads it `at-rest` long after the worker went dark without waving, close it with `berth close <id>`. **Never close the berth of a bead that is `blocked` with `blocked_on=human`.** That worker is asleep on purpose, waiting for your relay. The exception is a worker you have confirmed dark: you relayed, and it never acknowledged by its checkpoint. A dead worker cannot clear its own `blocked_on`, so close its berth, and brief the replacement to clear the stale key on arrival.
+- **`berth state <id>` reads `blocked` when a worker is waiting at a permission prompt.** Only the human can clear it, so take it to them as *A worker's permission goes to the human in your berth* says.
+- **Reclaim a berth that did not close itself.** On the success path a finished worker posts its sign-off, reacts `wave` to its brief, and closes its own berth. A worker that crashed first leaves its berth open. If a berth is still open after its worker waved, or `berth state` reads it `at-rest` long after the worker went dark without waving, close it with `berth close <id>`. **Never close the berth of a bead that is `blocked` with `blocked_on=human`.** That worker is asleep on purpose, waiting for you to wake it. The exception is a worker you have confirmed dark: you relayed, and it never acknowledged by its checkpoint. A dead worker cannot clear its own `blocked_on`, so close its berth, and brief the replacement to clear the stale key on arrival.
 - **The terminal is not a channel.** Relay answers by posting to the working topic, which is what a sleeping worker listens on. Read a worker's progress from its topic. Never type into its berth to coordinate, and use `berth read` only to diagnose a stalled worker. Coordination state that travels through a screen breaks the principle that makes seats restartable.
 - **Seats are a real cost.** Each worker draws on the account's usage limits. Start what the critical path needs, not a worker for every ready bead by reflex.
 
@@ -241,16 +242,23 @@ Starting workers is a **loop**, not a kickoff. Start one at each ready bead, and
 
 **Don't hand the bead to that project's concierge and wait.** A concierge answers read-only questions and files beads. It is not a worker, so an implementation request parked in its channel fails push-gate state 2 as soon as no seat is on it. The moment a strand is real work, it is a seat you start.
 
-## The decisions topic is your one surface to the human
+## The decisions topic carries the human's actions
 
 One topic per effort, `#<project>/<effort>-decisions`:
 
-- **Only actionable asks go in it**: decide this, provide this credential, trigger this deploy, clear this prompt. Everything in it is waiting on the human. No status, no chatter, no acknowledgements.
-- **Mention the human**, so an ask is pushed to them rather than waiting to be found. Commy's `list_humans` gives their name.
-- **Shape every ask as `using-commy` describes.** A choice between options is numbered, one per line, so the human can answer with a single reaction.
-- **Keep it current.** When the human answers, edit or close that item with `edit_message`, so the topic never shows a stale ask.
-- **You are its only writer.** Workers post their blockers to their working topics, and you lift them in.
-- **The terminal is not a channel, even when the human is watching it.** A question typed into your terminal is lost the moment they look away. If it needs the human, it goes in the decisions topic.
+- **A question never goes in it.** A question that you need the human to settle, such as architecture, money, an external commitment or a pull request nobody will merge, goes on its own bead labelled `human`, filed as a worker files one. The anchor, or the bead the question holds up, depends on it.
+- **Only actions the human must take go in it**: provide this credential, trigger this deploy, review this pull request. Everything in it is waiting on the human. No status, no chatter, no acknowledgements.
+- **Mention the human**, so an action is pushed to them rather than waiting to be found. Commy's `list_humans` gives their name.
+- **Shape every ask as `using-commy` describes.**
+- **Keep it current.** When the human acts, edit or close that item with `edit_message`, so the topic never shows a stale ask.
+- **You are its only writer.** Workers post their actions to their working topics, and you lift them in.
+- **The terminal is not a channel, apart from a worker's permission, even when the human is watching it.** A question typed into your terminal is lost the moment they look away. If it needs the human, it goes on a question bead or in the decisions topic.
+
+### A worker's permission goes to the human in your berth
+
+A permission is the one ask that does not go in the decisions topic. A worker that needs the human's approval for a command posts the command and how to reach its berth to its working topic. A worker stuck at an approval prompt reads `blocked` in `berth state` instead, and its berth id is the `agent_pane` on its bead.
+
+Tell the human in your own berth: which worker, the command, why the work needs it, and how to reach the worker's berth. They approve in the worker's berth and name the action. Or they run the command there themselves, which always works, and tell the worker to carry on. An approval they give anywhere else never reaches the worker, because a permission classifier judges a command by the conversation of the seat that runs it. So don't relay an approval they give you, and don't file a question bead for it.
 
 ## The boatyard index
 
@@ -270,14 +278,14 @@ Restate your line only on those changes, never on progress. Those lines are the 
 
 A stall is work that has stopped moving, and restarting it is your job. Work out which kind it is, then act on the same wake:
 
-- **Staffed and waiting on the human.** A live worker has posted an ask in its working topic. Lift it into the decisions topic.
+- **Staffed and waiting on the human.** A live worker sleeps on a question bead, or has posted an action or a permission in its working topic. A question bead needs nothing from you until it closes. Lift an action into the decisions topic, and take a permission to the human in your berth.
 - **Unstaffed.** The work has no accountable worker at all: a question you assumed someone else owned, a handover a channel never answered, a newly unblocked bead nobody is on. Start a worker for it now. **A bead holding an open `delivery_pr` is not this.** It has no seat by design, and a second worker on it duplicates a change already in a reviewer's queue.
 - **Dark.** A worker has gone silent past its checkpoint. Nudge its working topic once. If it is still dark at the next wake, start a replacement.
 
 Judge liveness by work product, meaning recent posts, commits and bead updates, and not by commy's presence, which can be wrong. Your loop:
 
-- **Lift blockers up.** When a worker posts an ask, add it to the decisions topic, deduplicated and ranked.
-- **Relay answers down.** When the human answers in the decisions topic, post the answer into the blocked worker's working topic. That message wakes it.
+- **Lift actions up.** When a worker posts an action, add it to the decisions topic, deduplicated and ranked.
+- **Wake workers when the human answers.** When a sleeping worker's question bead closes, post its answer, quoted from the bead, into that worker's working topic. That message wakes it. When the human acts on a decisions-topic item, relay that the same way. An answer the human gives you anywhere else goes onto the question bead in their words, with `bd human respond`, before you relay it.
 - **Confirm the relay landed.** A sleeping worker and a dead one both post nothing. Ask for an acknowledgement by a checkpoint time. No acknowledgement by then means dark.
 - **Stand a worker down when its bead stops being workable.** The usual cause is a dependency discovered mid-flight. Post `stand down: <why>` to its working topic. It hands the bead back and closes its own berth, and the bead returns to your graph as work blocked by a dependency. A seat held against a merge is a seat you cannot spend elsewhere.
 - **Move a worker up when steering does not move it.** An undersized worker shows up as your own posts piling into its topic after the brief. When correcting it has stopped working, post `stand down: restarting on a larger model`. Once it has handed the bead back, start the bead one step up, `sonnet` to the default or the default at a higher effort. Record the new `seat_model` and `seat_effort` on the bead, and brief the new seat into a fresh `-r2` topic with what the last one got wrong.
@@ -305,7 +313,7 @@ Then act on `state` first:
 | `OPEN`, `reviewDecision: CHANGES_REQUESTED`, or a failing check | Start a rework seat on the same bead, with the review comments in the brief. |
 | `OPEN`, `mergeStateStatus: BEHIND` or `DIRTY` | Start a rework seat on the same bead to rebase. |
 | `MERGED` | Run `bd update <id> --unset-metadata delivery_pr`, close the bead, fast-forward the main checkout as *Advancing the chain* says, then re-check `bd ready`. |
-| `CLOSED` | Nobody will merge it. Ask in the decisions topic whether to reopen it, redo it, or drop the bead. A bead holding a `delivery_pr` for a dead pull request blocks its dependents for ever. |
+| `CLOSED` | Nobody will merge it. File a question bead, asking whether to reopen it, redo it, or drop the bead. A bead holding a `delivery_pr` for a dead pull request blocks its dependents for ever. |
 
 **The age rule is what stops a capped effort sleeping for ever.** With every strand capped or in delivery, the gate is satisfied and you sleep, while the one person who can release the cap may not know they are the blocker. Raise it **once** per pull request. A queue that repeats itself trains the human to stop reading it.
 
@@ -340,11 +348,11 @@ When the anchor's work is complete:
 ## Boundaries
 
 - **You coordinate. You do not execute, in any project.** A task you grab because it is quick is the failure. For every strand, start a worker in the project the work lives in, then brief it, watch it and unblock it. A throwaway subagent for your own reading is fine, because it is not a seat.
-- **You start seats yourself.** What goes to the decisions topic is the action only the human can take: a credential, a decision, a deploy.
-- **You don't decide the human's calls.** Architecture, money and external commitments go to the decisions topic.
+- **You start seats yourself.** What goes to the decisions topic is the action only the human can take: a credential, a review, a deploy.
+- **You don't decide the human's calls.** Architecture, money and external commitments go on a question bead.
 - **One effort, possibly across projects.** You are anchored where the anchor bead lives. Work in another tracker is wired into your graph by an edge on its home-project id, and its readiness is read through `bdi`.
 - **Concierges are not part of your effort.** Never route anything to the human through a concierge, and read your workers' state from your own working topics.
-- **Don't work around permission prompts.** If the simplest form of a command you need is denied, that is a real gap. Ask the human in the decisions topic.
+- **Don't work around permission prompts.** If a command you need yourself is refused, ask the human for it in your own berth, as for a worker's permission.
 
 ## Before a compaction
 
