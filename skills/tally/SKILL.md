@@ -5,11 +5,11 @@ description: Read-only roll-up of every live boatyard effort across projects, an
 
 # Tally
 
-One screen that answers one question: **across every project, which efforts are live, and what does each need from the human right now?** Each steward drives one effort and surfaces its asks in that effort's own decisions topic. This skill gathers those scattered surfaces into one ranked list. It reads commy and never posts.
+One screen that answers one question: **across every project, which efforts are live, and what does each need from the human right now?** An effort's asks sit in two places: its own decisions topic, and question beads labelled `human` in the trackers its work runs in. This skill gathers those scattered surfaces into one ranked list. It reads commy and `bdi`, and never posts or writes.
 
 ## Where the index lives
 
-Each project channel has a **`boatyard` topic**, `#<project>/boatyard`, which is the index of that project's efforts. Each steward keeps one line there for its effort. It posts the line when it binds and strikes it with `✓` when the anchor finishes. A steward with a seat in another project also posts a pointer line in that project's index. Beads are not the source here, because each project's tracker is separate and cannot be queried with the others.
+Each project channel has a **`boatyard` topic**, `#<project>/boatyard`, which is the index of that project's efforts. Each steward keeps one line there for its effort. It posts the line when it binds and strikes it with `✓` when the anchor finishes. A steward with a seat in another project also posts a pointer line in that project's index. The index lives on commy rather than in the trackers, because no tracker knows which of its beads anchor an effort.
 
 A live line carries the anchor bead's id, the effort's home topic `#<project>/<effort>`, and one line saying what the effort is. The effort's ask queue is `#<project>/<effort>-decisions`, which follows from the home topic.
 
@@ -22,7 +22,17 @@ Efforts started by the system boatyard replaces are indexed the same way, in a `
    - **Key on the anchor id across channels, not per channel.** A pointer line in a foreign project repeats an anchor its home channel already lists.
    - **Take the latest line per anchor id and ignore the earlier ones.** A steward whose seat cannot use `edit_message` restates its line by posting a new one, so one anchor can appear several times, and only the last is current.
    - Of those latest lines, the ones without `✓` are the live set.
-2. **Read each live effort's ask queue.** For each live line, `read_thread` its `#<project>/<effort>-decisions` topic. The latest unresolved item is what that effort needs from the human. An empty or fully answered queue means it runs unblocked.
+2. **Read each live effort's asks.** An effort has an open ask if either of these holds. It runs unblocked only when neither does.
+   - **Its decisions topic.** `read_thread` the `#<project>/<effort>-decisions` topic. The latest unresolved item is an open ask.
+   - **Its question beads.** A seat that waits on the human files its question as a bead labelled `human`, and the waiting work depends on that bead. Read every project's unfinished beads once for the whole tally with `bdi --beads --all-projects`, which carries each bead's labels. Then read each effort's tree, whose beads carry no labels, and take the ids in it together with the ids those beads are `blocked_by`. Each `human` bead whose id is in that set is an open ask:
+
+     ```bash
+     bdi --json --all --project <project> <project>:<anchor> \
+       | jq '[.. | objects | select(has("id") and has("status")) | .id, (.blocked_by // [])[]] | unique' > effort.json
+     bdi --beads --all-projects \
+       | jq -c --slurpfile effort effort.json \
+           '.beads[] | select((.labels | index("human")) and (.id | IN($effort[0][]))) | {project, id, title}'
+     ```
 3. **Roll up, the efforts that need the human first.** Give one line per effort. Lead with efforts that have an open ask. Then list any whose line carries a `⏳ capped` suffix, because those wait on a merge, which is usually a review only the human can move. The efforts running clean come last.
 
 ## Output
@@ -31,12 +41,12 @@ A compact list, most urgent first:
 
 ```
 🔴 ex-4k2 · #shipwright/hull-survey   · waiting on you: choose the survey window
-🔴 ex-9q7 · #chandlery/stock-sync     · waiting on you: supply the supplier API key
+🔴 ex-9q7 · #chandlery/stock-sync     · waiting on you: ex-9q7.4, which supplier feed to trust
 🟡 ex-3m1 · #shipwright/rigging-rules · ⏳ capped: 2 PRs awaiting merge in sail-loft
 🟢 ex-7d5 · #chandlery/price-feed     · running clean (last worker checkpoint 20m ago)
 ```
 
-Keep each to one line: the anchor id, the effort's topic, and either the open ask or "running clean". The human reads this to decide where to spend attention, then opens the relevant decisions topic to act.
+Keep each to one line: the anchor id, the effort's topic, and either the open ask or "running clean". Name a question bead by its id and title. Where an effort has several asks, give the count and name one. The human reads this to decide where to spend attention, then opens the decisions topic or the question bead to act.
 
 ## Caveats
 
@@ -49,5 +59,5 @@ Keep each to one line: the anchor id, the effort's topic, and either the open as
 
 ## When not to use it
 
-- To check a single effort you already know, read its decisions topic directly.
+- To check a single effort you already know, read its decisions topic and its tree in `bdi` directly.
 - For detail about the workers within one effort, read that effort's working topics. That is the steward's job, not this roll-up's.
