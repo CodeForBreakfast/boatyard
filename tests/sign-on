@@ -174,6 +174,15 @@ PATH=$work/recorder:$PATH SIGN_ON_CLAUDE=$(seat focused rest 0) \
   sign-on --as independent --focus --cwd "$work/project" "$prompt" >/dev/null
 check "--focus opens the seat with focus" true "$(opened_with_focus independent)"
 
+echo "# a seat a person works in starts a steward beside itself"
+
+PATH=$work/recorder:$PATH BERTH_ID=$opener SIGN_ON_CLAUDE=$(seat beside rest 0) \
+  sign-on --as independent --beside --cwd "$work/project" "$prompt" >/dev/null
+check "--beside opens the seat beside its caller" true \
+  "$(grep -q -- "^open --as independent --beside " "$work/opens" && echo true || echo false)"
+check "a seat opens apart from its caller by default" true \
+  "$(grep -q -- "^open --as independent --cwd " "$work/opens" && echo true || echo false)"
+
 echo "# a seat is born in the main checkout"
 
 export GIT_AUTHOR_NAME=fixture GIT_AUTHOR_EMAIL=fixture@example.invalid
@@ -228,7 +237,13 @@ fails "a gate that does not clear" "$gate" \
   SIGN_ON_CLAUDE="$(seat stuck rest 100)" SIGN_ON_GATE="$gate" \
   sign-on --as independent --cwd "$work/project" "$prompt"
 
+fails "a seat beside a caller in no pane" pane \
+  SIGN_ON_CLAUDE="$(seat nowhere rest 0)" sign-on --as independent --beside --cwd "$work/project" "$prompt"
+check "and no berth opens for it" false "$(test -f "$work/nowhere/args" && echo true || echo false)"
+
 fails "a launch with no prompt" usage sign-on --as independent --cwd "$work/project"
+fails "a worker beside its caller" usage \
+  BERTH_ID="$opener" sign-on --as worker --beside --cwd "$work/project" "$prompt"
 fails "a launch with two prompts" usage sign-on --as independent --cwd "$work/project" one two
 fails "a launch with no working directory" usage sign-on --as independent "$prompt"
 fails "an --env that is not an assignment" usage \

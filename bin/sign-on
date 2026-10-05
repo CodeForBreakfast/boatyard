@@ -19,14 +19,15 @@ set -euo pipefail
 usage() {
   cat >&2 <<'EOF'
 usage: sign-on --as independent|worker|tender --cwd <dir> [--label <text>]
-               [--focus] [--model <model>] [--effort <level>] [--add-dir <dir>]
-               [--env <name>=<value>]... [--settings <file>] [--threshold <free %>]
-               <prompt>
+               [--beside] [--focus] [--model <model>] [--effort <level>]
+               [--add-dir <dir>] [--env <name>=<value>]... [--settings <file>]
+               [--threshold <free %>] <prompt>
 
 An independent seat starts its own line of work, so it opens apart from its
 caller, where the backend keeps a line of work: in herdr, a workspace of its
-own. A worker opens beside its opener's other workers, and a tender beside its
-opener.
+own. With --beside, it opens beside its caller instead, in herdr a split of
+the caller's pane, and it still outlives the caller. A worker opens beside its
+opener's other workers, and a tender beside its opener.
 
 A seat opens without focus, so the person at the screen stays where they are.
 With --focus, they land on the seat as soon as it opens, before sign-on gets
@@ -40,12 +41,13 @@ die() {
   exit 1
 }
 
-as="" cwd="" label="" focus="" threshold="" prompt="" flags=() env=()
+as="" cwd="" label="" beside="" focus="" threshold="" prompt="" flags=() env=()
 while [ $# -gt 0 ]; do
   case "$1" in
     --as) as=${2:-}; shift 2 || usage ;;
     --cwd) cwd=${2:-}; shift 2 || usage ;;
     --label) label=${2:-}; shift 2 || usage ;;
+    --beside) beside=1; shift ;;
     --focus) focus=1; shift ;;
     --model | --effort | --add-dir | --settings)
       [ -n "${2:-}" ] || usage
@@ -67,6 +69,7 @@ while [ $# -gt 0 ]; do
   esac
 done
 [ -n "$as" ] && [ -n "$cwd" ] && [ -n "$prompt" ] || usage
+[ -z "$beside" ] || [ "$as" = independent ] || usage
 
 claude=${SIGN_ON_CLAUDE:-claude}
 gate=${SIGN_ON_GATE:-}
@@ -87,7 +90,7 @@ if top=$(git -C "$cwd" rev-parse --show-toplevel 2>/dev/null); then
 fi
 
 command=(env ${SIGN_ON_MCP_TIMEOUT:+"MCP_TIMEOUT=$SIGN_ON_MCP_TIMEOUT"} "${env[@]}" "$claude" "${flags[@]}" -- "$prompt")
-id=$(berth open --as "$as" ${focus:+--focus} --cwd "$cwd" ${label:+--label "$label"} -- "${command[@]}")
+id=$(berth open --as "$as" ${beside:+--beside} ${focus:+--focus} --cwd "$cwd" ${label:+--label "$label"} -- "${command[@]}")
 
 stuck() {
   die "the berth $id $1. It is left open to read: berth read $id, then berth close $id."

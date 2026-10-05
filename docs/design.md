@@ -44,6 +44,8 @@ The port knows only terminal mechanics. It knows nothing about Claude Code. The 
 
   Closing an independent berth closes its workers and tenders with it.
 
+  An independent berth opens apart from its opener by default, in a place of its own. It may open **beside** its opener instead, so that a line of work started from a seat a person works in opens next to them. A berth beside its opener is still independent, so closing either one leaves the other.
+
 ### Agent states
 
 A consumer needs only these four states:
@@ -64,7 +66,7 @@ Each adapter maps its backend's states onto these four and corrects its backend'
 | `berth serve <yard>` | Runs the backend for a yard in the foreground, so a service manager can supervise the real process. |
 | `berth stop <yard>` | Stops a yard. |
 | `berth yard` | Prints the yard the caller acts in, resolved as the adapter resolves it for every other verb. |
-| `berth open --as independent\|worker\|tender --cwd <dir> [--label <text>] [--focus] -- <command>` | Opens a berth and prints its id. With `--focus`, the person watching the yard lands on the new berth. Without it, their focus stays where it was. |
+| `berth open --as independent\|worker\|tender --cwd <dir> [--label <text>] [--beside] [--focus] -- <command>` | Opens a berth and prints its id. With `--beside`, an independent berth opens beside its opener rather than apart. With `--focus`, the person watching the yard lands on the new berth. Without it, their focus stays where it was. |
 | `berth name [<id>] <label>` | Labels a berth. On an independent berth, the label also names whatever the adapter groups under it. |
 | `berth list [<yard>]` | Prints the berths as JSON: id, label, relationship, parent and state. |
 | `berth send-text [<id>] <text>` | Types text into a berth. |
@@ -90,6 +92,8 @@ A berth opened from inside another inherits `BERTH_BACKEND` and `BERTH_YARD`. An
 
 A caller that is not itself a berth has none of the three: a service manager's unit, or a pane a person opened by hand. The host's environment then names the backend, and the adapter resolves the yard and the calling pane from its backend's own variables. With no backend named, `berth` exits non-zero.
 
+Where a verb needs the caller, such as a worker's opener or the opener a berth opens beside, the calling pane stands in for a caller that is not a berth. It stands in only within its own yard. A caller in no pane, or whose pane is in another yard than the one named, is refused with a message that says which.
+
 ### Errors
 
 - A berth that no longer exists reports state `gone` and exits 0. That is an answer, not a failure.
@@ -100,10 +104,10 @@ A caller that is not itself a berth has none of the three: a service manager's u
 
 It is written first. Its obligations beyond straight mapping:
 
-- **Layout.** An independent berth becomes a workspace. Workers share one tab in their opener's workspace and split it. A tender splits beside its opener. The choice of split direction lives here.
+- **Layout.** An independent berth becomes a workspace. One opened beside its opener splits the opener's pane instead, and shares its workspace. Workers share one tab in their opener's workspace and split it. A tender splits beside its opener. The choice of split direction lives here.
 - **The parked-on-background-work correction** described under Agent states.
 - **The lost-agent correction.** Where a wrapper renames Claude Code's process, as Nix's does, herdr names it from its argv, and skips reading argv while the process waits on the disk, as under swap. Enough misses clear the agent, and herdr may not look again for minutes. The session reported at Claude Code's start-up survives, so a pane with no agent, a session, and a foreground process other than its shell reads `active`, not `gone`.
-- **The cascade.** herdr keeps a workspace's other panes when its first pane closes, so the adapter closes them itself.
+- **The cascade.** herdr keeps a workspace's other panes when its first pane closes, so the adapter closes them itself. It closes a whole workspace only for the independent berth that opened it, and only while no other independent berth lives there. Any other berth closes its own pane.
 - **Screen source.** `wait-text` matches herdr's recent output, not only the visible frame. A pane shorter than the text it waits for never shows all of it at once.
 - **Package parameter.** herdr's package is a parameter, so a host can supply a platform-specific build.
 
@@ -123,7 +127,7 @@ The host supplies the site-specific parts as configuration:
 - the MCP start-up timeout;
 - how long an agent may take to show its gate, or to show at all.
 
-Each launch states its own relationship, working directory, label and prompt. It may ask for focus, so that a caller such as a desktop shortcut lands the person on the seat as soon as it opens. It may add a model, an effort level, an extra working directory, environment variables, a settings file and a compaction threshold. A steward's settings file lets it run `sign-on`, and a worker gets none.
+Each launch states its own relationship, working directory, label and prompt. An independent launch may ask to open beside its caller. It may ask for focus, so that a caller such as a desktop shortcut lands the person on the seat as soon as it opens. It may add a model, an effort level, an extra working directory, environment variables, a settings file and a compaction threshold. A steward's settings file lets it run `sign-on`, and a worker gets none.
 
 A seat is born in its repository's main checkout, never in a linked worktree. Claude Code reads its instructions, skills and trust state from the launch directory and cannot re-read them after a `cd`.
 

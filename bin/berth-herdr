@@ -91,10 +91,16 @@ existing_pane() { # <id> <what the verb could not do>
   on_berth "$1" "$2" pane_get "$1"
 }
 
-# The given berth, or the calling pane.
-berth_id() {
-  local id=${1:-${HERDR_PANE_ID:-}}
-  [ -n "$id" ] || die "no berth was given, and the caller is not a berth."
+# The given berth, or the calling pane. A pane id is unique only within its
+# session, so the calling pane stands for the caller only in its own yard.
+berth_id() { # <id> [<what the verb could not do>]
+  local id=$1 what=${2:-there is no berth to act on} own
+  if [ -z "$id" ]; then
+    [ -n "${HERDR_PANE_ID:-}" ] || die "the caller is neither a berth nor in a herdr pane, so $what."
+    own=${HERDR_SESSION:-default}
+    [ "$own" = "$yard" ] || die "the caller's herdr pane is in the yard $own, not in $yard, so $what."
+    id=$HERDR_PANE_ID
+  fi
   printf '%s\n' "$id"
 }
 
@@ -140,16 +146,22 @@ split_tallest() { # <focus|no-focus> <cwd> <panes as a JSON array>
 }
 
 open() {
-  local as=$1 focus=$2 cwd=$3 label=$4 opener=$5 id opener_pane workspace panes tab
-  shift 5
+  local as=$1 place=$2 focus=$3 cwd=$4 label=$5 opener=$6 id opener_pane workspace panes tab
+  shift 6
 
   if [ "$as" = independent ]; then
+    if [ "$place" = beside ]; then
+      opener=$(berth_id "$opener" "there is nothing to open beside")
+      opener_pane=$(existing_pane "$opener" "there is nothing to open beside")
+      id=$(split_tallest "$focus" "$cwd" "[$opener_pane]")
+    else
+      id=$(herdr_result workspace create --cwd "$cwd" ${label:+--label "$label"} \
+        "${berth_env[@]}" "--$focus" | jq -r .root_pane.pane_id)
+    fi
     # It starts its own line of work, so its opener is not its parent.
     opener=""
-    id=$(herdr_result workspace create --cwd "$cwd" ${label:+--label "$label"} \
-      "${berth_env[@]}" "--$focus" | jq -r .root_pane.pane_id)
   else
-    opener=$(berth_id "$opener")
+    opener=$(berth_id "$opener" "there is nothing to open a $as beside")
     opener_pane=$(existing_pane "$opener" "there is nothing to open a $as beside")
     workspace=$(jq -r .workspace_id <<<"$opener_pane")
 
@@ -173,7 +185,7 @@ open() {
 
   [ -z "$label" ] || herdr_result pane rename "$id" "$label" >/dev/null
   herdr_result pane report-metadata "$id" --source berth --token "berth_relationship=$as" \
-    ${opener:+--token "berth_parent=$opener"} >/dev/null
+    --token "berth_place=$place" ${opener:+--token "berth_parent=$opener"} >/dev/null
 
   # herdr gives a pane its id only once it exists, so BERTH_ID reaches the
   # command rather than the pane's shell.
@@ -271,9 +283,20 @@ state() {
   esac
 }
 
+# Is the berth an independent one that opened its workspace and shares it
+# with no other line of work?
+owns_workspace() { # <pane>
+  local pane=$1 panes
+  jq -e '.tokens.berth_relationship == "independent" and .tokens.berth_place != "beside"' \
+    <<<"$pane" >/dev/null || return 1
+  panes=$(herdr_result pane list --workspace "$(jq -r .workspace_id <<<"$pane")") || exit
+  jq -e --arg id "$(jq -r .pane_id <<<"$pane")" '
+    all(.panes[]; .pane_id == $id or .tokens.berth_relationship != "independent")' <<<"$panes" >/dev/null
+}
+
 # Closing a berth closes the berths it opened first. herdr keeps a
 # workspace's other panes when its first pane closes, so an independent berth
-# closes its whole workspace.
+# that owns its workspace closes the whole of it.
 close() {
   local id pane panes child status=0
   id=$(berth_id "$1")
@@ -289,7 +312,7 @@ close() {
     close "$child"
   done
 
-  if [ "$(jq -r '.tokens.berth_relationship // empty' <<<"$pane")" = independent ]; then
+  if owns_workspace "$pane"; then
     herdr_result workspace close "$(jq -r .workspace_id <<<"$pane")" >/dev/null
   else
     herdr_result pane close "$id" >/dev/null

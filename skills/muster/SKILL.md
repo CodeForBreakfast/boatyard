@@ -98,16 +98,19 @@ For a graph that is not trivial, give **one** throwaway subagent an adversarial 
 
 ## Start the steward
 
-Start the steward yourself, with one call, from the project where the anchor lives:
+Start the steward yourself, with one call, from the project where the anchor lives. Where it opens depends on who you are:
+
+- **A seat a person works in** starts the steward beside itself, so the effort opens next to the person who asked for it. Pass `--beside`.
+- **A persistent agent, such as a concierge,** keeps its place in the terminal layout as its own. Leave `--beside` out, and the steward opens apart.
 
 ```bash
-sign-on --as independent --cwd <this project's checkout> --label <effort> \
+sign-on --as independent [--beside] --cwd <this project's checkout> --label <effort> \
   "/boatyard:steward <anchor>"
 ```
 
-`sign-on` opens a berth for the steward that is independent of yours, so the effort gets its own place in the terminal layout and never crowds your seat. It starts Claude Code there, gets it past its startup gate, attaches the compactor, and prints the new berth's id. It births the seat in the project's main checkout, where the anchor's tracker and instructions are.
+Either way the steward's berth is independent of yours, so closing your seat leaves the steward running. `sign-on` starts Claude Code there, gets it past its startup gate, attaches the compactor, and prints the new berth's id. It births the seat in the project's main checkout, where the anchor's tracker and instructions are.
 
-If `sign-on` fails, report its message. Where it failed before a berth opened, for example because your seat is not in a yard, give the human the line `/boatyard:steward <anchor>` to start by hand, and say which project the anchor lives in. Where it opened a berth and then got stuck, its message names that berth, so pass the name on for the human to read and close.
+If `sign-on` fails, report its message. Where the message says your seat is in no multiplexer, because no backend is named or your seat is in no pane, give the human the line `/boatyard:steward <anchor>` to start by hand, and say which project the anchor lives in. Where it opened a berth and then got stuck, its message names that berth, so pass the name on for the human to read and close.
 
 **You do not close your own seat.** A concierge that musters an effort from its own seat has to outlive the preparation. Sign off, and whatever role you had before carries on.
 
