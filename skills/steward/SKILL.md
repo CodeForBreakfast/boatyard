@@ -37,7 +37,7 @@ Every topic you use is named from the anchor's `effort_slug` metadata. Never inv
 |---|---|
 | `#<project>/<effort>` | Coordination: your announcements and wrap-up. |
 | `#<project>/<effort>-decisions` | Actions only the human can take, and nothing else. |
-| `#<project>/<effort>-<bead>` | One worker's brief and its reports. A rework seat gets `-r2`, then `-r3`. |
+| `#<project>/<effort>-<bead>` | One worker's brief and its reports. Each later seat on the bead gets `-r2`, then `-r3`. |
 | `#<project>/boatyard` | The project's index of live efforts, one line each. |
 
 ## The wake ritual
@@ -82,7 +82,18 @@ This holds because a steward acquires its commy identity lazily, on its first po
    A foreign dependency that is not closed puts the bead in push-gate state 6.
 5. **Find the beads parked by status, and sort them in this order:**
 
-   1. **`blocked_on=human` means a live seat is asleep there.** It waits on the open `human` bead it depends on, which is its question. With no such bead, it waits on a permission or an action. This wins even when the bead also carries a `delivery_pr`, which is exactly the case for a rework seat that hit a question mid-rebase. The seat watches the bead its wait ends on, and that watch wakes it. Don't poll its pull request.
+   1. **`blocked_on=human` means a seat went to sleep there, not that it is still alive.** A seat that dies asleep leaves the key behind. Read the berth named in the bead's `agent_pane` with `berth state <id>`.
+
+      **Any state but `gone` means a live seat is asleep there.** It waits on the open `human` bead it depends on, which is its question. With no such bead, it waits on a permission or an action. This wins even when the bead also carries a `delivery_pr`, which is exactly the case for a rework seat that hit a question mid-rebase. The seat watches the bead its wait ends on, and that watch wakes it. Don't poll its pull request.
+
+      **`gone` means the seat died asleep, and nothing will wake it.** Hand the bead back to the graph, with `--status blocked` in place of `open` where it carries a `delivery_pr`:
+
+      ```bash
+      bd update <id> --status open --unset-metadata blocked_on \
+                     --unset-metadata agent_pane --unset-metadata working_topic
+      ```
+
+      Its dependency on its question bead keeps it out of `bd ready` until the human answers. Then start a fresh worker on it in the next `-r` topic, with the answer quoted from the question bead in its brief. A bead that waited on a permission or an action is ready at once, and its fresh worker asks again.
    2. **Otherwise a pull request means the bead is in delivery**, whether `delivery_pr` sits on the bead or on a merge action it depends on, as *A bead closes on merge* says. No seat is on it, so never relay to it and never start a worker on it. Poll its pull request.
 
    ```bash
@@ -113,6 +124,12 @@ The wake ritual tells you the state. The push gate is what you owe before you re
 States 4, 5 and 6 are all waits, and in an effort that delivers through pull requests most strands sit in one of them at any moment.
 
 Anything in none of the six is **unstaffed work, and unstaffed work is your cue to act**. Start a worker for it in the project it belongs to, or surface the ask that unblocks it. Rest only when every strand is in one of the six. Run this gate at the end of every wake, before you schedule the next one.
+
+### Staffed strands can still spoil each other
+
+**Before you release a gate or authorise an action with side effects, list the live seats and ask what each is observing.** Releasing a hold on starting seats, merging, or letting a worker run something that touches shared state can spoil a measurement another seat is in the middle of, such as a round trip, a baseline or a probe. Workers cannot see each other, so only you can check this.
+
+If the action spoils a seat's measurement, either sequence around it or tell that seat in its working topic that its window is dirty. Going ahead anyway is usually the right decision. A spoiled measurement costs one repeat, while holding the action costs something real. So go ahead and warn. Silence is the failure.
 
 ## Keep your context small
 
@@ -220,17 +237,18 @@ The foreign-born worker sets its own home bead `blocked` with `delivery_pr`, in 
 
 ## Starting a worker
 
-A worker needs its own berth, its own commy identity and its own context, and **you start it yourself** with `sign-on`. The **brief comes first**, because the worker orients from it on arrival.
+A worker needs its own berth, its own commy identity and its own context, and **you start it yourself** with `sign-on`. **Start the seat before you post its brief**, so the brief can name the seat's berth and no other reader takes it.
 
 For each bead that is ready:
 
-1. **Post the brief, then subscribe to its topic.** Post the brief as the first message of the bead's working topic, `#<project>/<effort>-<bead>`, then `subscribe <project>/<effort>-<bead>`. The brief is the worker's entire orientation, so it must be complete before the seat starts. It carries:
+1. **Write the brief.** It will be the first message of the bead's working topic, `#<project>/<effort>-<bead>`. The brief is the worker's entire orientation, so write it complete before the seat starts. It carries:
    - **Bead**: the id the worker owns.
    - **Repo**: the repo the work happens in, by its remote, such as `<owner>/<repo>`, and never by an absolute path, which holds on one host only. `sign-on` births every seat in the project's main checkout, so say whether the project takes a worktree per seat. `EnterWorktree` moves the whole session, while `git worktree add` and a `cd` move only its shell.
    - **Deliverable**: the concrete outcome, in the project's terms.
    - **Definition of done**: how the worker, and you, know it is finished.
    - **Out of scope**: the edges of the lane, stated as explicit negatives.
    - **Report in**: this working topic.
+   - **Seat**: the berth id `sign-on` prints in step 3.
 2. **Size the seat.** Choose the worker's model and effort level from how demanding the bead is.
 
    - **The default model is the ceiling.** It is the model you run on.
@@ -253,6 +271,7 @@ For each bead that is ready:
    Leave out `--model` for a seat on the default model. `sign-on` opens a berth kept with your other workers, starts Claude Code in it, gets it past its startup gate, and attaches the compactor that keeps its context lean across a long sleep. It prints the new berth's id.
 
    **`--cwd` is the project the seat is born in**, which decides its `CLAUDE.md`, its tracker, its skills and its lane. For a single-project effort that is your own project. For a strand in another project it is that project's main checkout, so the seat claims that project's bead directly. The repo the worker works in is a separate thing, carried in the brief.
+4. **Post the brief, then subscribe to its topic.** Fill in **Seat** with the berth id, post the brief to the working topic straight away, then `subscribe <project>/<effort>-<bead>`. A worker that reads the topic before the brief lands waits for it.
 
 Starting workers is a **loop**, not a kickoff. Start one at each ready bead, and again whenever an unblock makes another bead ready.
 
@@ -260,7 +279,7 @@ Starting workers is a **loop**, not a kickoff. Start one at each ready bead, and
 
 - **What ties a seat to its bead** is the `agent_pane` the worker writes on its bead when it claims it. `sign-on` labels the berth with the bead, and you set neither yourself.
 - **`berth state <id>` reads `blocked` when a worker is waiting at a permission prompt.** Only the human can clear it, so take it to them as *A worker's permission goes to the human in your berth* says.
-- **Reclaim a berth that did not close itself.** On the success path a finished worker posts its sign-off, reacts `wave` to its brief, and closes its own berth. A worker that crashed first leaves its berth open. If a berth is still open after its worker waved, or `berth state` reads it `at-rest` long after the worker went dark without waving, close it with `berth close <id>`. **Never close the berth of a bead that is `blocked` with `blocked_on=human`.** That worker is asleep on purpose, waiting for you to wake it. The exception is a worker you have confirmed dark: you relayed, and it never acknowledged by its checkpoint. A dead worker cannot clear its own `blocked_on`, so close its berth, and brief the replacement to clear the stale key on arrival.
+- **Reclaim a berth that did not close itself.** On the success path a finished worker posts its sign-off, reacts `wave` to its brief, and closes its own berth. A worker that crashed first leaves its berth open. If a berth is still open after its worker waved, or `berth state` reads it `at-rest` long after the worker went dark without waving, close it with `berth close <id>`. **Never close the berth of a bead that is `blocked` with `blocked_on=human`.** That worker is asleep on purpose, waiting for you to wake it. The exception is a worker you have confirmed dark: you relayed, and it never acknowledged by its checkpoint. A dead worker cannot clear its own `blocked_on`, so close its berth and hand its bead back as *Reconstruct* says for a seat that reads `gone`.
 - **The terminal is not a channel.** Relay answers by posting to the working topic, which is what a sleeping worker listens on. Read a worker's progress from its topic. Never type into its berth to coordinate, and use `berth read` only to diagnose a stalled worker. Coordination state that travels through a screen breaks the principle that makes seats restartable.
 - **Seats are a real cost.** Each worker draws on the account's usage limits. Start what the critical path needs, not a worker for every ready bead by reflex.
 
