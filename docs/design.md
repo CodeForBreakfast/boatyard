@@ -38,7 +38,7 @@ The port knows only terminal mechanics. It knows nothing about Claude Code. The 
 - **Yard.** One backend session that holds berths, such as a herdr server session.
 - **Berth.** One terminal in which a process runs, usually an agent. A berth id is opaque to consumers. An adapter may use its backend's native id, and the herdr adapter does, returning herdr's pane id verbatim.
 - **Relationship.** Every berth is opened in a relationship to its opener:
-  - **independent**: it starts its own line of work, as an orchestrator or a persistent agent does.
+  - **independent**: it starts its own line of work, as a steward or a persistent agent does.
   - **worker**: it does part of the opener's work. The adapter keeps an opener's workers together.
   - **tender**: an auxiliary view beside the opener, such as a bead-graph viewer. It is usually not an agent.
 
@@ -78,7 +78,7 @@ Each adapter maps its backend's states onto these four and corrects its backend'
 
 A verb given no id acts on `BERTH_ID`, the calling berth. So a worker closes itself with a bare `berth close`.
 
-`read` is for diagnosis only, for example an orchestrator checking on a stalled worker. Coordination state never travels through a screen. The skills state that rule, because the port cannot enforce it.
+`read` is for diagnosis only, for example a steward checking on a stalled worker. Coordination state never travels through a screen. The skills state that rule, because the port cannot enforce it.
 
 ### Environment
 
