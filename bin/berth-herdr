@@ -298,6 +298,7 @@ verb=$1
 shift
 case "$verb" in
   serve | stop | open | name | list | state | close) "$verb" "$@" ;;
+  yard) echo "$yard" ;;
   send-text) send_text "$@" ;;
   send-key) send_key "$@" ;;
   wait-text) wait_text "$@" ;;

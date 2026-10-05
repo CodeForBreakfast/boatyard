@@ -7,6 +7,7 @@
 #
 #   serve <yard>
 #   stop <yard>
+#   yard
 #   open <independent|worker|tender> <cwd> <label> <opener> <command>...
 #   name <id> <label>
 #   list <yard>
@@ -32,6 +33,7 @@ usage() {
   cat >&2 <<'EOF'
 usage: berth serve <yard>
        berth stop <yard>
+       berth yard
        berth open --as independent|worker|tender --cwd <dir> [--label <text>] -- <command>...
        berth name [<id>] <label>
        berth list [<yard>]
@@ -101,6 +103,10 @@ case "$verb" in
       2) exec "$adapter" wait-text "${args[0]}" "${args[1]}" "$timeout" ;;
       *) usage ;;
     esac
+    ;;
+  yard)
+    [ $# = 0 ] || usage
+    exec "$adapter" yard
     ;;
   list)
     [ $# -le 1 ] || usage
