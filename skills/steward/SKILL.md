@@ -82,7 +82,7 @@ This holds because a steward acquires its commy identity lazily, on its first po
    A foreign dependency that is not closed puts the bead in push-gate state 6.
 5. **Find the beads parked by status, and sort them in this order:**
 
-   1. **`blocked_on=human` means a live seat is asleep there.** It waits on the open `human` bead it depends on, which is its question. With no such bead, it waits on a permission or an action. This wins even when the bead also carries a `delivery_pr`, which is exactly the case for a rework seat that hit a question mid-rebase. Wake it when its wait ends. Don't poll its pull request.
+   1. **`blocked_on=human` means a live seat is asleep there.** It waits on the open `human` bead it depends on, which is its question. With no such bead, it waits on a permission or an action. This wins even when the bead also carries a `delivery_pr`, which is exactly the case for a rework seat that hit a question mid-rebase. The seat watches the bead its wait ends on, and that watch wakes it. Don't poll its pull request.
    2. **Otherwise a pull request means the bead is in delivery**, whether `delivery_pr` sits on the bead or on a merge action it depends on, as *A bead closes on merge* says. No seat is on it, so never relay to it and never start a worker on it. Poll its pull request.
 
    ```bash
@@ -92,7 +92,8 @@ This holds because a steward acquires its commy identity lazily, on its first po
    ```
 
    `--limit 0` matters. The default is 50 rows, and a truncated list quietly turns a sleeping worker's bead into one you might start over.
-6. **Read the topics.** Read the decisions topic and each active worker's working topic: who is mid-flight, who is blocked, and what has been asked of the human. After a compaction you are still subscribed to every topic an earlier you created. The only subscription you might still owe is to a topic someone else created.
+6. **Match your watches to the effort's waits.** Every open question bead a sleeping worker depends on, and every foreign dependency that holds a bead in push-gate state 6, gets a beady-eye `watch`. Name the project for a foreign bead. Compare beady-eye's `watching` list against those waits. Watch what is missing, which after a fresh start is all of them, and `unwatch` what no longer holds anything up.
+7. **Read the topics.** Read the decisions topic and each active worker's working topic: who is mid-flight, who is blocked, and what has been asked of the human. After a compaction you are still subscribed to every topic an earlier you created. The only subscription you might still owe is to a topic someone else created.
 
 You are now bound, reachable, and hold the whole state. Reconstruct from these reads, never from memory.
 
@@ -118,9 +119,13 @@ Anything in none of the six is **unstaffed work, and unstaffed work is your cue 
 You bloat, and force expensive compaction, by pulling detail of the work into your own context. Don't.
 
 - **Don't read large artefacts yourself**: source files, transcripts, long logs. When you need a conclusion from a pile of material, give the reading to a throwaway subagent and keep only its answer. Work that owns a bead goes to a worker in its own berth. A one-off read goes to your own subagent.
-- **Sleep between events, but only once the push gate is clean.** Use `ScheduleWakeup` only for a specific future event you care about: a worker's declared checkpoint, which is the watch for its death because a dead worker sends nothing, or a re-check of a blocked dependency. Otherwise commy delivers inbound messages reliably, so don't poll on a tight interval.
+- **Sleep between events, but only once the push gate is clean.** Use `ScheduleWakeup` only for a specific future event you care about: a worker's declared checkpoint, which is the watch for its death because a dead worker sends nothing. Otherwise commy and beady-eye deliver inbound messages reliably, so don't poll on a tight interval.
 
-  **Pull requests and question beads are the exceptions.** A merge sends no commy message, and neither does the human answering a question bead, so an effort waiting on either may have no inbound wake source at all. Schedule the poll explicitly. A pull request poll runs on the timescale a review really takes, hours rather than minutes. A question bead poll runs within the hour, because a worker sleeps on it.
+  **A bead you wait on wakes you through your watch on it.** A closed question bead or foreign dependency ends a wait, so `unwatch` it and run the wake ritual. A comment, or any change that leaves the bead open, is nothing to act on unless it is a question for you.
+
+  **Pull requests are the exception.** A merge sends no message, so an effort waiting on one may have no inbound wake source at all. Schedule the poll explicitly, on the timescale a review really takes, hours rather than minutes.
+
+  **While beady-eye says its watcher is down, your watches wake no one.** Until it says the watcher is answering again, poll the beads you watch within the hour, because workers sleep on them, and when a question bead closes, post its answer, quoted from the bead, into its worker's working topic.
 - **You act; you don't report.** The wake ritual's output is for you. Never narrate your orientation or your plan into the terminal, where it reaches no one. What you emit is actions: a brief, an ask, a bead update.
 
 ## One bead, one worker, one context
@@ -304,8 +309,8 @@ A stall is work that has stopped moving, and restarting it is your job. Work out
 Judge liveness by work product, meaning recent posts, commits and bead updates, and not by commy's presence, which can be wrong. Your loop:
 
 - **Lift actions up.** When a worker posts an action, file it where your host keeps the human's actions, or in the decisions topic where it keeps none, deduplicated and ranked.
-- **Wake workers when the human answers.** When a sleeping worker's question bead closes, post its answer, quoted from the bead, into that worker's working topic. That message wakes it. When the human acts on a decisions-topic item, relay that the same way. An answer the human gives you anywhere else goes onto the question bead in their words, with `bd human respond`, before you relay it.
-- **Confirm the relay landed.** A sleeping worker and a dead one both post nothing. Ask for an acknowledgement by a checkpoint time. No acknowledgement by then means dark.
+- **Wake workers when the human acts.** A worker's own watch wakes it when its question bead closes, so you relay nothing for a question. When the human acts on a decisions-topic item, post their word into that worker's working topic. That message wakes it. An answer the human gives you anywhere else goes onto the question bead in their words, with `bd human respond`, before you relay it.
+- **Confirm the worker woke.** A sleeping worker and a dead one both post nothing. When its question bead closes, or you relay to it, expect its post saying it is resuming, and schedule a wake to check for it. No post by then means dark.
 - **Stand a worker down when its bead stops being workable.** The usual cause is a dependency discovered mid-flight. Post `stand down: <why>` to its working topic. It hands the bead back and closes its own berth, and the bead returns to your graph as work blocked by a dependency. A seat held against a merge is a seat you cannot spend elsewhere.
 - **Move a worker up when steering does not move it.** An undersized worker shows up as your own posts piling into its topic after the brief. When correcting it has stopped working, post `stand down: restarting on a larger model`. Once it has handed the bead back, start the bead one step up, `sonnet` to the default or the default at a higher effort. Record the new `seat_model` and `seat_effort` on the bead, and brief the new seat into a fresh `-r2` topic with what the last one got wrong.
 - **Schedule against checkpoints.** A worker declares a checkpoint time when it claims its bead. Schedule a wake near it. **Check the declared time against the clock first.** A seat often gets the zone or the hour wrong, and a checkpoint already past wakes you onto a seat that is fine.
@@ -360,7 +365,7 @@ When the anchor's work is complete:
 1. Post a short wrap-up to the coordination topic.
 2. Make sure every effort bead reflects reality.
 3. Strike your line in `#<project>/boatyard` with `✓`.
-4. Clear your berth from the anchor with `bd update <anchor> --unset-metadata agent_pane`, then close the anchor.
+4. Clear your berth from the anchor with `bd update <anchor> --unset-metadata agent_pane`, then close the anchor. `unwatch` every bead that beady-eye's `watching` still lists.
 5. Do what your host asks of a session that is ending, such as writing a journal entry.
 6. Close your berth with a bare `berth close`, as your last act. Closing it also closes every berth you opened: the bead viewer, and any worker still open. So close only when no worker is asleep on an answer. Between events, sleep with your berth open, just as a worker does.
 
