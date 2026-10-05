@@ -57,7 +57,7 @@ component adds its own directory and edits nothing shared.
 ## PR policy
 
 Changes reach `main` through a pull request, squash-merged. Nothing is pushed
-to `main` directly.
+to `main` directly. A steward merges a pull request once its checks pass.
 
 The pull request's **title** becomes the commit subject and its body becomes the
 commit message. Write the title as a conventional commit:
