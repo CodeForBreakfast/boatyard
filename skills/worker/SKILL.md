@@ -61,7 +61,7 @@ Post to the working topic at meaningful moments: a milestone reached, a plan cha
 
 ## Block and sleep
 
-You will most often stall on something only the human can give you: an answer to a question, a credential, a deploy. When that happens, **don't exit and don't spin.** Starting a seat again costs the human work, and sleeping costs nothing.
+You will most often stall on something only the human can give you: an answer to a question, a credential, a deploy. When that happens, **don't exit and don't spin.** Starting a seat again costs the human work, and sleeping costs nothing. Where your host's `CLAUDE.md`, or a document it names, says how a seat reaches the human, that rule wins over this section.
 
 1. **Record it on your bead, and mark the bead as a sleeping seat.** Note what is done and what is left, then:
 
@@ -69,7 +69,7 @@ You will most often stall on something only the human can give you: an answer to
    bd update <id> --status blocked --set-metadata blocked_on=human
    ```
 
-   `blocked_on=human` says only that a live seat is asleep here. Without it, a rework seat looks the same as the pull request it is reworking, because both are `blocked` and both carry `delivery_pr`, and the steward would poll the pull request instead of waking you. Clear it with `--unset-metadata blocked_on` when you wake.
+   `blocked_on=human` says only that a live seat is asleep here. Without it, a rework seat looks the same as the pull request it is reworking, because both are `blocked` and both have a pull request, and the steward would poll the pull request instead of waking you. Clear it with `--unset-metadata blocked_on` when you wake.
 2. **If it is a question, put it on its own bead, labelled `human`.** That label is the human's queue, which `bd human list` reads. Where your host has you review a question before it goes out, do that first, and if the review lets you settle the question yourself, settle it and record why instead of asking. The bead carries one question, worded so the human can answer it cold. File it in your own tracker, and make your bead wait on it:
 
    ```bash
@@ -130,16 +130,16 @@ If that push is rejected because the branch is protected, the repo's statement w
    bd note <id> "PR opened: <url>. Closes on merge."
    ```
 
-   **Don't close the bead.** A closed bead tells the steward the work is delivered. While the bead stays open it blocks its dependents, so nothing starts against code that has not landed.
+   **Don't close the bead.** A closed bead tells the steward the work is delivered. While the bead stays open it blocks its dependents, so nothing starts against code that has not landed. Where the human merges and your host files the merge as their action, the steward moves `delivery_pr` onto that action and makes your bead depend on it.
 4. **Post the pull request's address to the working topic**, then finish. Don't wait for the review. The steward watches the pull request from here, and starts a fresh seat on your bead if the reviewers ask for changes.
 
-**If your brief says your bead already carries a `delivery_pr`, you are a rework seat.** Move that pull request rather than replacing it: push to its existing branch, and never open a second pull request for the same bead. When you finish, put the bead back as you found it with `bd update <id> --status blocked`. Your claim cleared that status, and a bead left claimed with no seat on it reads to the steward as unstaffed work.
+**If your brief says your bead already has a pull request, you are a rework seat.** Move that pull request rather than replacing it: push to its existing branch, and never open a second pull request for the same bead. When you finish, put the bead back as you found it with `bd update <id> --status blocked`. Your claim cleared that status, and a bead left claimed with no seat on it reads to the steward as unstaffed work.
 
 ## Finish
 
 When the deliverable meets the brief's definition of done, wind the seat down in this order. The steward can reclaim your berth the moment it sees your sign-off, so everything else comes first.
 
-1. **Bring the bead up to date.** With direct delivery, close it by your project's conventions. With a pull request, leave it open and `blocked` with its `delivery_pr`, because the steward closes it on merge. Either way, clear the berth you are about to leave:
+1. **Bring the bead up to date.** With direct delivery, close it by your project's conventions. With a pull request, leave it open and `blocked`, because the steward closes it on merge. Either way, clear the berth you are about to leave:
 
    ```bash
    bd update <id> --unset-metadata agent_pane
