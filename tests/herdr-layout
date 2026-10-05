@@ -76,6 +76,18 @@ check "a pane opened by hand in it is gone" pane_not_found \
   "$(herdr --session "$BERTH_YARD" pane get "$by_hand" 2>&1 | jq -r .error.code)"
 check "the other independent berth stays" "$second" "$(berth list | jq -r '.[].id')"
 
+echo "# a berth takes focus only when asked to"
+
+landed=$(berth open --as independent --focus --cwd "$work" -- true)
+check "an independent berth opened with --focus has focus" true "$(pane "$landed" focused)"
+behind=$(BERTH_ID=$landed berth open --as worker --cwd "$work" -- true)
+check "a berth opened without --focus does not have focus" false "$(pane "$behind" focused)"
+check "a berth opened without --focus leaves focus where it was" true "$(pane "$landed" focused)"
+for as in worker tender; do
+  beside=$(BERTH_ID=$landed berth open --as "$as" --focus --cwd "$work" -- true)
+  check "a $as opened with --focus has focus" true "$(pane "$beside" focused)"
+done
+
 echo
 if [ "$failures" -gt 0 ]; then
   echo "$failures failed."

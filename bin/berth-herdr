@@ -129,32 +129,32 @@ pane_state() { # <pane>
 
 # Splits the tallest of the given panes: down while both halves clear
 # min_rows, otherwise right. Prints the new pane's id.
-split_tallest() { # <cwd> <panes as a JSON array>
+split_tallest() { # <focus|no-focus> <cwd> <panes as a JSON array>
   local target
   target=$(jq -r --argjson floor "$min_rows" --argjson divider "$divider_rows" '
     sort_by(.scroll.viewport_rows) | last
     | "\(.pane_id) \(if (.scroll.viewport_rows - $divider) / 2 | floor >= $floor
-                     then "down" else "right" end)"' <<<"$2")
-  herdr_result pane split "${target% *}" --direction "${target#* }" --cwd "$1" \
-    "${berth_env[@]}" --no-focus | jq -r .pane.pane_id
+                     then "down" else "right" end)"' <<<"$3")
+  herdr_result pane split "${target% *}" --direction "${target#* }" --cwd "$2" \
+    "${berth_env[@]}" "--$1" | jq -r .pane.pane_id
 }
 
 open() {
-  local as=$1 cwd=$2 label=$3 opener=$4 id opener_pane workspace panes tab
-  shift 4
+  local as=$1 focus=$2 cwd=$3 label=$4 opener=$5 id opener_pane workspace panes tab
+  shift 5
 
   if [ "$as" = independent ]; then
     # It starts its own line of work, so its opener is not its parent.
     opener=""
     id=$(herdr_result workspace create --cwd "$cwd" ${label:+--label "$label"} \
-      "${berth_env[@]}" --no-focus | jq -r .root_pane.pane_id)
+      "${berth_env[@]}" "--$focus" | jq -r .root_pane.pane_id)
   else
     opener=$(berth_id "$opener")
     opener_pane=$(existing_pane "$opener" "there is nothing to open a $as beside")
     workspace=$(jq -r .workspace_id <<<"$opener_pane")
 
     if [ "$as" = tender ]; then
-      id=$(split_tallest "$cwd" "[$opener_pane]")
+      id=$(split_tallest "$focus" "$cwd" "[$opener_pane]")
     else
       # One tab holds an opener's workers.
       panes=$(herdr_result pane list --workspace "$workspace")
@@ -163,10 +163,10 @@ open() {
                                 and .tokens.berth_relationship == "worker"))
         | .tab_id' <<<"$panes")
       if [ -n "$tab" ]; then
-        id=$(split_tallest "$cwd" "$(jq -c --arg tab "$tab" '[.panes[] | select(.tab_id == $tab)]' <<<"$panes")")
+        id=$(split_tallest "$focus" "$cwd" "$(jq -c --arg tab "$tab" '[.panes[] | select(.tab_id == $tab)]' <<<"$panes")")
       else
         id=$(herdr_result tab create --workspace "$workspace" --cwd "$cwd" --label workers \
-          "${berth_env[@]}" --no-focus | jq -r .root_pane.pane_id)
+          "${berth_env[@]}" "--$focus" | jq -r .root_pane.pane_id)
       fi
     fi
   fi

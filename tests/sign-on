@@ -153,6 +153,27 @@ id=$(BERTH_ID=$opener SIGN_ON_CLAUDE=$(seat worker rest 0) \
 check "a worker is opened beside its opener" "$opener" \
   "$(berth list | jq -r --arg id "$id" '.[] | select(.id == $id) | .parent')"
 
+echo "# a caller can land on the seat"
+
+# The herdr layout suite proves that berth honours --focus, so here a berth
+# that records its arguments shows only that sign-on asks for it.
+mkdir -p "$work/recorder"
+cat >"$work/recorder/berth" <<EOF
+#!$BASH
+[ "\$1" != open ] || printf '%s\n' "\$*" >>"$work/opens"
+exec $(command -v berth) "\$@"
+EOF
+chmod +x "$work/recorder/berth"
+opened_with_focus() { # <relationship>
+  grep -q -- "^open --as $1 --focus " "$work/opens" 2>/dev/null && echo true || echo false
+}
+PATH=$work/recorder:$PATH SIGN_ON_CLAUDE=$(seat unfocused rest 0) \
+  sign-on --as independent --cwd "$work/project" "$prompt" >/dev/null
+check "a seat opens without focus by default" false "$(opened_with_focus independent)"
+PATH=$work/recorder:$PATH SIGN_ON_CLAUDE=$(seat focused rest 0) \
+  sign-on --as independent --focus --cwd "$work/project" "$prompt" >/dev/null
+check "--focus opens the seat with focus" true "$(opened_with_focus independent)"
+
 echo "# a seat is born in the main checkout"
 
 export GIT_AUTHOR_NAME=fixture GIT_AUTHOR_EMAIL=fixture@example.invalid
