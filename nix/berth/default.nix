@@ -18,6 +18,7 @@ in
     berth-contract-herdr = herdrSuite "berth-contract";
     berth-herdr-layout = herdrSuite "herdr-layout";
     berth-herdr-lost-agent = herdrSuite "herdr-lost-agent";
+    berth-herdr-caller = herdrSuite "herdr-caller";
 
     berth-herdr-state = pkgs.runCommand "berth-herdr-state"
       { nativeBuildInputs = [ berth pkgs.bash pkgs.jq ]; } ''
@@ -29,7 +30,7 @@ in
       { nativeBuildInputs = [ pkgs.shellcheck ]; } ''
       shellcheck ${../../bin/berth} ${../../bin/berth-herdr} ${../../bin/berth-herdr-state} \
         ${../../tests/with-herdr-yard} ${../../tests/berth-contract} ${../../tests/herdr-layout} \
-        ${../../tests/herdr-state} ${../../tests/herdr-lost-agent}
+        ${../../tests/herdr-state} ${../../tests/herdr-lost-agent} ${../../tests/herdr-caller}
       touch $out
     '';
   };

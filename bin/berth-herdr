@@ -10,6 +10,8 @@
 set -euo pipefail
 
 here=$(dirname "$(readlink -f "$0")")
+# herdr sets HERDR_SESSION in a pane of a named session, and not in one of the
+# default session, so a caller that is not a berth still finds its own yard.
 yard=${BERTH_YARD:-${HERDR_SESSION:-default}}
 berth_env=(--env BERTH_BACKEND=herdr --env "BERTH_YARD=$yard")
 
