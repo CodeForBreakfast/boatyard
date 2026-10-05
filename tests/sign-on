@@ -101,7 +101,7 @@ recorded() { # <name> <variable>
 
 export SIGN_ON_START_TIMEOUT=30
 mkdir -p "$work/project" "$work/extra"
-prompt="/boatyard:worker #project/effort-bead"
+prompt="/boatyard:worker #project/effort-bead, then read this project's \"brief\" \$HOME \`id\` &"
 
 echo "# a configured gate"
 
@@ -115,7 +115,7 @@ check "it opens the berth in the relationship given" independent \
   "$(berth list | jq -r --arg id "$id" '.[] | select(.id == $id) | .relationship')"
 check "it labels the berth" "a seat" \
   "$(berth list | jq -r --arg id "$id" '.[] | select(.id == $id) | .label')"
-check "the command gets the launch's flags, then the prompt" \
+check "the command gets the launch's flags, then the prompt whole" \
   "--model a-model --effort high --add-dir $work/extra --settings $work/settings.json -- $prompt" \
   "$(tr '\n' ' ' <"$work/gated/args" | sed 's/ $//')"
 check "the command starts in the working directory given" "$work/project" "$(cat "$work/gated/pwd")"
