@@ -177,7 +177,7 @@ echo "# a caller that is not a berth"
 
 # A pane a person opened by hand has no BERTH_ID or BERTH_YARD, so the yard
 # is whatever berth resolves for it.
-id=$(env -u BERTH_ID -u BERTH_YARD SIGN_ON_CLAUDE=$(seat plain rest 0) \
+id=$(env -u BERTH_ID -u BERTH_YARD SIGN_ON_CLAUDE="$(seat plain rest 0)" \
   sign-on --as independent --cwd "$work/project" "$prompt" 2>"$work/plain.err")
 check "sign-on succeeds with no BERTH_YARD" 0 "$?"
 check "the berth opens in the yard berth resolves" true \
