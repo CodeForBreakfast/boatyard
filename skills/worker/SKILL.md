@@ -22,7 +22,7 @@ You are an ephemeral seat. If your berth dies mid-task, a fresh worker starts on
 ## Orient
 
 1. **Read your brief.** `read_thread` the `<channel>/<topic>` you were started with. Its first message is your brief. It names the **bead** you own, the **repo** to work in, the **deliverable**, the **definition of done**, what is **out of scope**, and the **working topic** to report in, which is this topic. It does not say how the repo takes delivery. You read that from the repo itself, as *Deliver* describes.
-2. **Get into your work directory.** You are born in your project's main checkout, which is usually not where you work. Where the brief names a repo, work there. **Where the project has you take a worktree, take it with `EnterWorktree`**, which is a deferred tool, so load it with `ToolSearch("select:EnterWorktree")` first. One call makes the worktree, branches it off the default branch, moves the session into it, and registers it for cleanup. A `git worktree add` followed by a `cd` is not the same thing: it moves your shell while the session stays where you were born, so anything that reads the session's directory still points at the main checkout.
+2. **Get into your work directory.** You are born in your project's main checkout, which is usually not where you work. Where the brief names a repo, work in its checkout on this host. **Where the project has you take a worktree, take it with `EnterWorktree`**, which is a deferred tool, so load it with `ToolSearch("select:EnterWorktree")` first. One call makes the worktree, branches it off the default branch, moves the session into it, and registers it for cleanup. A `git worktree add` followed by a `cd` is not the same thing: it moves your shell while the session stays where you were born, so anything that reads the session's directory still points at the main checkout.
 
    **Pass `name`, and treat `path` as a last resort.** An absolute `path` is judged on its shape, not on where it points, so it can raise a permission prompt even when it sits inside `.claude/worktrees/`. That prompt leaves you silent, and your berth looks exactly like one that is thinking hard. If you genuinely must use `path`, post in your topic before the call so someone knows where to look.
 3. **Start the language server where you are going to work.** The `LSP` tool is deferred too. A server takes its root from the session's working directory when it starts, and nothing re-roots it afterwards, so make your first call after you are in your worktree. With the wrong root, every question that needs the project graph comes back empty, while `documentSymbol` keeps answering because it reads one file alone. If a server is already up at the wrong root, find its process id, read what matched, and kill that id. It respawns at the current directory.
@@ -57,6 +57,8 @@ A claimed bead with no posted assessment looks exactly like a crashed worker. Al
 
 Post to the working topic at meaningful moments: a milestone reached, a plan changed, a finding that affects the effort, and by your declared checkpoint time.
 
+**Predict a checkpoint, don't pad it.** Set it to when you expect your next milestone to land, judged from what is left. A padded time keeps a dead seat looking alive for longer, because the steward waits it out before it looks. If you will miss a checkpoint, post a new one before it passes.
+
 **Do not narrate.** Commy gets state changes, decisions, blockers and done. "Running the build now… it passed… editing the file…" belongs in your own terminal, where it reaches no one.
 
 ## Block and sleep
@@ -80,9 +82,9 @@ You will most often stall on something only the human can give you: an answer to
    The human answers by closing the question bead, and the answer stays on it. Keep the bead true while you wait: edit it if the question changes, and dismiss it with `bd human dismiss` if the question goes away.
 3. **Watch the bead your wait ends on** with beady-eye's `watch` tool. For a question, that is the question bead. For a dependency on another bead, in your tracker or another project's, it is that bead, and you name its project.
 4. **Post to your working topic.** For a question, post a one-line pointer to its bead, because the question lives on the bead and never only in the post. An action only the human can take, such as supplying a credential, is not a question and gets no question bead: post the action itself, and the steward takes it to the human. Never ask the human directly, and never ask with `AskUserQuestion` or any prompt in your terminal. Nobody watches a worker's berth.
-5. **Sleep.** Stay open to inbound messages, with no scheduled re-check. Your watch wakes you when the bead changes. The steward relays the human's word on an action, and relays a closed question bead while beady-eye says its watcher is down.
+5. **Sleep.** Stay open to inbound messages, with no scheduled re-check. Your watch wakes you when the bead changes. The steward relays the human's word on an action, and relays a closed question bead while beady-eye says its watcher is down. Each relay also mentions you, and a mention reaches you even after your subscription has lapsed.
 6. **On a message from beady-eye, act on the bead it names.** A comment, or any change that leaves the bead open, does not end your wait. Read it with `bd show`, answer on the bead if the human asked you something there, and sleep again. A bead that closed, or went from its tracker, ends the wait. `unwatch` it, then resume.
-7. **Resume.** Read the answer on the closed question bead with `bd show`. An answer that does not settle the question is still an answer: file a fresh question only if you still need one. Re-check whatever fact you were waiting on, such as a secret now existing or a commit having landed, then clear `blocked_on`. Post to your working topic that you are awake and resuming, because the steward is waiting for that post, and continue in place.
+7. **Resume.** Rebuild your context first, because the compactor may have compacted you while you slept. Re-read your brief, `bd show` your bead and its notes, and read your working topic since your last post. Then read the answer on the closed question bead with `bd show`. An answer that does not settle the question is still an answer: file a fresh question only if you still need one. Re-check whatever fact you were waiting on, such as a secret now existing or a commit having landed, then clear `blocked_on`. Post to your working topic that you are awake and resuming, because the steward is waiting for that post, and continue in place.
 
 ## Getting the human's permission
 
@@ -140,22 +142,22 @@ If that push is rejected because the branch is protected, the repo's statement w
 
 ## Finish
 
-When the deliverable meets the brief's definition of done, wind the seat down in this order. The steward can reclaim your berth the moment it sees your sign-off, so everything else comes first.
+When the deliverable meets the brief's definition of done, wind the seat down in this order. The steward can reclaim your berth the moment it sees your sign-off, so steps 4 to 6 go in one response.
 
-1. **Bring the bead up to date.** With direct delivery, close it by your project's conventions. With a pull request, leave it open and `blocked`, because the steward closes it on merge. Either way, clear the berth you are about to leave:
+1. **Bring the bead up to date.** With direct delivery, close it by your project's conventions. With a pull request, leave it open and `blocked`, because the steward closes it on merge. Either way, clear every key that says a seat is on it:
 
    ```bash
-   bd update <id> --unset-metadata agent_pane
+   bd update <id> --unset-metadata agent_pane --unset-metadata working_topic
    ```
 
-   `bd close` takes no metadata flags, so this is its own update before the close.
+   The steward reads a bead holding `working_topic` as one with a live worker. `bd close` takes no metadata flags, so this is its own update before the close.
 
    **If the steward has pointed you at a follow-up bead, stop finishing here and take it.** Read its brief, the first message of the topic the steward named. Unsubscribe from your old working topic, then claim the new bead as *Claim* says, with its own topic and your berth, and work it as you worked your first. You finish once, after your last bead.
 2. **Tear down.** Remove the worktree you made, by the project's rules.
 3. **Do what your host asks of a session that is ending**, such as writing a journal entry.
-4. **Unsubscribe from every topic you subscribed to**, normally just your working topic, **and `unwatch` every bead that `watching` still lists.** A watch lasts until it is unwatched.
-5. **Sign off.** Post a terse outcome to the working topic and say plainly that you are done and leaving. Then react `wave` to the brief, the first message of your topic, as the machine-readable form of the same thing.
-6. **Close your berth** with a bare `berth close`, in the same response as the wave or as your very next action. A worker that waves and stops looks exactly like one that crashed. Close only on success: a worker asleep on the human keeps its berth open until it is woken.
+4. **Sign off.** Post a terse outcome to the working topic and say plainly that you are done and leaving. Then react `wave` to the brief, the first message of your topic, as the machine-readable form of the same thing.
+5. **Unsubscribe from every topic you subscribed to**, normally just your working topic, **and `unwatch` every bead that `watching` still lists.** A post or a reaction subscribes you to its topic again, so this comes after the sign-off. A watch lasts until it is unwatched.
+6. **Close your berth** with a bare `berth close`. A worker that waves and stops looks exactly like one that crashed. Close only on success: a worker asleep on the human keeps its berth open until it is woken.
 
 ## Boundaries
 
