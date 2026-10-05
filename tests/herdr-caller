@@ -1,0 +1,81 @@
+#!/usr/bin/env bash
+# A caller that is not a berth, run from a herdr pane, acts on that pane's own
+# yard. See docs/design.md, "The port: berth".
+#
+# Run it under with-herdr-yard. It serves a second yard of its own, so that
+# the default yard and a named one each hold a pane with the same id, and a
+# caller sent to the wrong yard renames the wrong pane.
+#
+# Needs: bash, coreutils, herdr, jq, berth.
+set -uo pipefail
+
+: "${BERTH_BACKEND:?}"
+yard=named
+work=$(mktemp -d)
+failures=0
+
+check() { # <what> <want> <got>
+  if [ "$2" = "$3" ]; then
+    echo "ok: $1"
+  else
+    echo "FAIL: $1: wanted '$2', got '$3'"
+    failures=$((failures + 1))
+  fi
+}
+
+# The host's environment names the backend and nothing else.
+unset BERTH_YARD BERTH_ID
+berth serve "$yard" >"$work/serve.log" 2>&1 &
+serving=$!
+trap 'kill "$serving" 2>/dev/null' EXIT
+for _ in $(seq 1 100); do
+  berth list "$yard" >/dev/null 2>&1 && break
+  sleep 0.1
+done
+
+new_pane() { # <session>
+  herdr --session "$1" workspace create --cwd "$work" --no-focus | jq -r .result.root_pane.pane_id
+}
+
+label() { # <session> <pane>
+  herdr --session "$1" pane get "$2" | jq -r '.result.pane.label // "none"'
+}
+
+# Has the pane's own shell run `berth name`, with the backend named and
+# nothing else but what herdr gave it?
+renames() { # <session> <pane> <label>
+  local done_file="$work/$1-$2.done" _
+  herdr --session "$1" pane run "$2" \
+    "BERTH_BACKEND=$BERTH_BACKEND berth name '$3'; touch '$done_file'" >/dev/null
+  for _ in $(seq 1 100); do
+    [ -f "$done_file" ] && break
+    sleep 0.1
+  done
+}
+
+default_pane=$(new_pane default)
+named_pane=$(new_pane "$yard")
+check "the two yards each hold a pane with the same id" "$default_pane" "$named_pane"
+
+echo "# a caller in a named yard"
+
+renames "$yard" "$named_pane" "named caller"
+check "it acts on its own yard" "named caller" "$(label "$yard" "$named_pane")"
+check "it leaves the default yard's pane alone" none "$(label default "$default_pane")"
+
+echo "# a caller in the default yard"
+
+renames default "$default_pane" "default caller"
+check "it acts on its own yard" "default caller" "$(label default "$default_pane")"
+check "it leaves the named yard's pane alone" "named caller" "$(label "$yard" "$named_pane")"
+
+berth stop "$yard"
+wait "$serving"
+trap - EXIT
+
+echo
+if [ "$failures" -gt 0 ]; then
+  echo "$failures failed."
+  exit 1
+fi
+echo "A caller outside a berth acts on its own yard."
