@@ -232,6 +232,22 @@ for id in "$independent" "$another" "$tender"; do
 done
 check "the yard holds no berths" 0 "$(berth list | jq length)"
 
+echo "# an independent berth beside its caller"
+
+caller=$(berth open --as independent --cwd "$work" -- true)
+beside=$(BERTH_ID=$caller berth open --as independent --beside --cwd "$work" -- true)
+check "it is listed as independent" independent "$(field "$beside" relationship)"
+check "it has no parent" null "$(field "$beside" parent)"
+berth close "$caller"
+check "closing its caller leaves it" true "$(listed "$beside")"
+
+caller=$(berth open --as independent --cwd "$work" -- true)
+other=$(BERTH_ID=$caller berth open --as independent --beside --cwd "$work" -- true)
+berth close "$other"
+check "closing it leaves its caller" true "$(listed "$caller")"
+berth close "$caller"
+berth close "$beside"
+
 echo "# serve and stop"
 
 served="$BERTH_YARD-served"
@@ -262,6 +278,9 @@ refused "a backend with no adapter is refused" env BERTH_BACKEND=no-such-backend
 refused "a worker needs an opener" berth open --as worker --cwd "$work" -- true
 refused "a tender needs an opener" berth open --as tender --cwd "$work" -- true
 refused "a worker's opener has to exist" env BERTH_ID="$independent" berth open --as worker --cwd "$work" -- true
+refused "a berth beside its caller needs a caller" berth open --as independent --beside --cwd "$work" -- true
+refused "only an independent berth opens beside its caller" \
+  env BERTH_ID="$caller" berth open --as tender --beside --cwd "$work" -- true
 refused "a gone berth cannot be named" berth name "$independent" "too late"
 refused "a gone berth cannot take text" berth send-text "$independent" "too late"
 refused "a gone berth cannot take a key" berth send-key "$independent" Enter

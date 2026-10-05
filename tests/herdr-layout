@@ -76,6 +76,44 @@ check "a pane opened by hand in it is gone" pane_not_found \
   "$(herdr --session "$BERTH_YARD" pane get "$by_hand" 2>&1 | jq -r .error.code)"
 check "the other independent berth stays" "$second" "$(berth list | jq -r '.[].id')"
 
+exists() { # <pane id>
+  herdr --session "$BERTH_YARD" pane get "$1" >/dev/null 2>&1 && echo true || echo false
+}
+
+echo "# a seat a person works in starts an effort beside itself"
+
+# A pane a person opened by hand is not a berth, so berth knows it only from
+# herdr's own variables.
+seat=$(herdr --session "$BERTH_YARD" workspace create --cwd "$work" --label "a person's seat" --no-focus |
+  jq -r .result.root_pane.pane_id)
+steward=$(HERDR_PANE_ID=$seat berth open --as independent --beside --cwd "$work" -- true)
+check "it splits the seat's tab" "$(pane "$seat" tab_id)" "$(pane "$steward" tab_id)"
+steward_worker=$(BERTH_ID=$steward berth open --as worker --cwd "$work" -- true)
+check "its workers share the seat's workspace" "$(pane "$seat" workspace_id)" "$(pane "$steward_worker" workspace_id)"
+berth close "$steward"
+check "closing it leaves the seat" true "$(exists "$seat")"
+check "closing it closes its workers" false "$(exists "$steward_worker")"
+
+# A seat that sign-on started is a berth with a workspace of its own.
+seat=$(berth open --as independent --cwd "$work" -- true)
+steward=$(BERTH_ID=$seat berth open --as independent --beside --cwd "$work" -- true)
+check "beside a berth, it splits the berth's tab" "$(pane "$seat" tab_id)" "$(pane "$steward" tab_id)"
+berth close "$seat"
+check "closing the seat leaves it" true "$(exists "$steward")"
+berth close "$steward"
+
+echo "# a concierge starts an effort apart from itself"
+
+concierge=$(berth open --as independent --cwd "$work" --label concierge -- true)
+steward=$(BERTH_ID=$concierge berth open --as independent --cwd "$work" --label effort -- true)
+check "it opens a workspace of its own" false \
+  "$([ "$(pane "$concierge" workspace_id)" = "$(pane "$steward" workspace_id)" ] && echo true || echo false)"
+check "the concierge's workspace keeps its label" concierge \
+  "$(workspace_label "$(pane "$concierge" workspace_id)")"
+berth close "$steward"
+check "closing it leaves the concierge" true "$(exists "$concierge")"
+berth close "$concierge"
+
 echo "# a berth takes focus only when asked to"
 
 landed=$(berth open --as independent --focus --cwd "$work" -- true)

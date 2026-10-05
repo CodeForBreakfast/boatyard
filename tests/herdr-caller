@@ -41,16 +41,21 @@ label() { # <session> <pane>
   herdr --session "$1" pane get "$2" | jq -r '.result.pane.label // "none"'
 }
 
-# Has the pane's own shell run `berth name`, with the backend named and
-# nothing else but what herdr gave it?
-renames() { # <session> <pane> <label>
-  local done_file="$work/$1-$2.done" _
+# Runs a command in the pane's own shell, with the backend named and nothing
+# else but what herdr gave it, and waits for it to finish. Its output, errors
+# and exit status land in <name>.out, <name>.err and <name>.status.
+runs() { # <session> <pane> <name> <command>
+  local _
   herdr --session "$1" pane run "$2" \
-    "BERTH_BACKEND=$BERTH_BACKEND berth name '$3'; touch '$done_file'" >/dev/null
+    "BERTH_BACKEND=$BERTH_BACKEND $4 >'$work/$3.out' 2>'$work/$3.err'; echo \$? >'$work/$3.status'" >/dev/null
   for _ in $(seq 1 100); do
-    [ -f "$done_file" ] && break
+    [ -s "$work/$3.status" ] && break
     sleep 0.1
   done
+}
+
+renames() { # <session> <pane> <label>
+  runs "$1" "$2" "$1-$2-name" "berth name '$3'"
 }
 
 default_pane=$(new_pane default)
@@ -68,6 +73,25 @@ echo "# a caller in the default yard"
 renames default "$default_pane" "default caller"
 check "it acts on its own yard" "default caller" "$(label default "$default_pane")"
 check "it leaves the named yard's pane alone" "named caller" "$(label "$yard" "$named_pane")"
+
+tab_of() { # <session> <pane>
+  herdr --session "$1" pane get "$2" | jq -r .result.pane.tab_id
+}
+
+echo "# a caller beside which a berth opens"
+
+runs "$yard" "$named_pane" beside "berth open --as independent --beside --cwd '$work' -- true"
+check "it opens beside the caller's own pane" "$(tab_of "$yard" "$named_pane")" \
+  "$(tab_of "$yard" "$(cat "$work/beside.out")")"
+
+echo "# a caller sent to a yard it is not in"
+
+runs "$yard" "$named_pane" elsewhere "BERTH_YARD=default berth open --as worker --cwd '$work' -- true"
+check "it is refused" true "$([ "$(cat "$work/elsewhere.status")" != 0 ] && echo true || echo false)"
+check "the reason names both yards" true \
+  "$(grep -q "$yard" "$work/elsewhere.err" && grep -q default "$work/elsewhere.err" && echo true || echo false)"
+check "the reason does not call the caller gone" false \
+  "$(grep -q gone "$work/elsewhere.err" && echo true || echo false)"
 
 berth stop "$yard"
 wait "$serving"
