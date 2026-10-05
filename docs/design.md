@@ -63,6 +63,7 @@ Each adapter maps its backend's states onto these four and corrects its backend'
 |---|---|
 | `berth serve <yard>` | Runs the backend for a yard in the foreground, so a service manager can supervise the real process. |
 | `berth stop <yard>` | Stops a yard. |
+| `berth yard` | Prints the yard the caller acts in, resolved as the adapter resolves it for every other verb. |
 | `berth open --as independent\|worker\|tender --cwd <dir> [--label <text>] -- <command>` | Opens a berth and prints its id. |
 | `berth name [<id>] <label>` | Labels a berth. On an independent berth, the label also names whatever the adapter groups under it. |
 | `berth list [<yard>]` | Prints the berths as JSON: id, label, relationship, parent and state. |
@@ -110,7 +111,7 @@ It is written first. Its obligations beyond straight mapping:
 
 `sign-on` launches Claude Code in a berth:
 
-1. It opens a berth through `berth open`.
+1. It asks `berth yard` which yard it is in, so that it works from a pane that is not a berth, then opens a berth through `berth open`.
 2. It starts the configured Claude Code command in that berth.
 3. It gets past the startup gate: `berth wait-text` for the gate's text, then `berth send-key Enter`, repeated until `berth read` no longer shows the gate. `wait-text` cannot tell when the gate has gone, because it searches recent output.
 4. It attaches `bilge-pump` to the berth.

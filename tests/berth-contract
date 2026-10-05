@@ -90,6 +90,13 @@ check "a tender's command learns its own BERTH_ID" "$tender" "$(recorded "$work/
 check "every id is distinct" 4 "$(printf '%s\n' "$independent" "$worker" "$second_worker" "$tender" | sort -u | wc -l)"
 check "the list is JSON with the port's fields" true "$(berth list | jq 'all(.[]; keys == ["id", "label", "parent", "relationship", "state"])')"
 
+echo "# yard"
+
+check "yard prints the yard the caller is in" "$BERTH_YARD" "$(berth yard)"
+check "yard prints the yard of a caller that is not a berth" "$BERTH_YARD" \
+  "$(env -u BERTH_ID -u BERTH_YARD berth yard)"
+refused "yard takes no argument" berth yard "$BERTH_YARD"
+
 echo "# name"
 
 berth name "$worker" "renamed"

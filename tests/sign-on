@@ -173,6 +173,18 @@ SIGN_ON_CLAUDE=$(seat sub rest 0) \
 check "a directory inside the main checkout stays as given" "$work/repo/sub" "$(cat "$work/sub/pwd")"
 check "and sign-on says nothing of it" "" "$(cat "$work/sub.err")"
 
+echo "# a caller that is not a berth"
+
+# A pane a person opened by hand has no BERTH_ID or BERTH_YARD, so the yard
+# is whatever berth resolves for it.
+id=$(env -u BERTH_ID -u BERTH_YARD SIGN_ON_CLAUDE=$(seat plain rest 0) \
+  sign-on --as independent --cwd "$work/project" "$prompt" 2>"$work/plain.err")
+check "sign-on succeeds with no BERTH_YARD" 0 "$?"
+check "the berth opens in the yard berth resolves" true \
+  "$(berth list | jq -r --arg id "$id" 'any(.[]; .id == $id)')"
+check "the command learns that BERTH_YARD" "$BERTH_YARD" "$(recorded plain BERTH_YARD)"
+check "bilge-pump is attached to the berth" true "$(pumping "$id" && echo true || echo false)"
+
 echo "# failures"
 
 fails() { # <what> <word the reason has> <sign-on's environment and arguments>...
@@ -195,8 +207,6 @@ fails "a gate that does not clear" "$gate" \
   SIGN_ON_CLAUDE="$(seat stuck rest 100)" SIGN_ON_GATE="$gate" \
   sign-on --as independent --cwd "$work/project" "$prompt"
 
-fails "a caller with no yard" BERTH_YARD \
-  -u BERTH_YARD sign-on --as independent --cwd "$work/project" "$prompt"
 fails "a launch with no prompt" usage sign-on --as independent --cwd "$work/project"
 fails "a launch with two prompts" usage sign-on --as independent --cwd "$work/project" one two
 fails "a launch with no working directory" usage sign-on --as independent "$prompt"

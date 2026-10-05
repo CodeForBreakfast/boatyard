@@ -62,7 +62,7 @@ claude=${SIGN_ON_CLAUDE:-claude}
 gate=${SIGN_ON_GATE:-}
 start_timeout=${SIGN_ON_START_TIMEOUT:-180}
 
-[ -n "${BERTH_YARD:-}" ] || die "BERTH_YARD is not set, and bilge-pump needs it to watch the new berth."
+BERTH_YARD=$(berth yard)
 export BERTH_YARD
 
 # Claude Code reads its instructions, skills and trust state from the launch
