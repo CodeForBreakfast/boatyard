@@ -13,11 +13,9 @@ Each project channel has a **`boatyard` topic**, `#<project>/boatyard`, which is
 
 A live line carries the anchor bead's id, the effort's home topic `#<project>/<effort>`, and one line saying what the effort is. The effort's ask queue is `#<project>/<effort>-decisions`, which follows from the home topic.
 
-Efforts started by the system boatyard replaces are indexed the same way, in a `fleet` topic in each project channel. Read those topics too, until the last such effort closes.
-
 ## Steps
 
-1. **Read every index.** Run `list_channels`, then `read_thread` the `boatyard` topic and the `fleet` topic in each channel. A channel without one of those topics returns nothing for it, so skip it.
+1. **Read every index.** Run `list_channels`, then `read_thread` the `boatyard` topic in each channel. A channel without one returns nothing, so skip it.
    - **Read only the lines shaped as index lines,** `<anchor-id> · #<project>/<effort> · <what>`. An index topic can carry other posts, such as an effort's own coordination when its slug is the topic's name.
    - **Key on the anchor id across channels, not per channel.** A pointer line in a foreign project repeats an anchor its home channel already lists.
    - **Take the latest line per anchor id and ignore the earlier ones.** A steward whose seat cannot use `edit_message` restates its line by posting a new one, so one anchor can appear several times, and only the last is current.
