@@ -26,8 +26,7 @@
 # empty when BERTH_ID is unset too, and the adapter then resolves the calling
 # berth from its backend's own variables. <label> and <yard> may be empty.
 # <apart|beside> is beside only for an independent berth that opens next to
-# its opener rather than in a place of its own. A worker's and a tender's
-# place follows from their relationship, so theirs is always apart.
+# its opener rather than in a place of its own.
 #
 # Needs: bash, coreutils, and whatever the adapter needs.
 set -euo pipefail
