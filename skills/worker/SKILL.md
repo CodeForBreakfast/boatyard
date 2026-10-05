@@ -78,9 +78,11 @@ You will most often stall on something only the human can give you: an answer to
    ```
 
    The human answers by closing the question bead, and the answer stays on it. Keep the bead true while you wait: edit it if the question changes, and dismiss it with `bd human dismiss` if the question goes away.
-3. **Post to your working topic.** For a question, post a one-line pointer to its bead, because the question lives on the bead and never only in the post. An action only the human can take, such as supplying a credential, is not a question and gets no question bead: post the action itself, and the steward takes it to the human. Never ask the human directly, and never ask with `AskUserQuestion` or any prompt in your terminal. Nobody watches a worker's berth.
-4. **Sleep.** Stay open to inbound messages, with no scheduled re-check. The steward watches your question bead and posts to your topic when it closes, or relays the human's word on an action. That message is your wake signal.
-5. **Resume on wake.** Read the answer on the closed question bead with `bd show`. An answer that does not settle the question is still an answer: file a fresh question only if you still need one. Re-check whatever fact you were waiting on, such as a secret now existing or a commit having landed, then clear `blocked_on` and continue in place.
+3. **Watch the bead your wait ends on** with beady-eye's `watch` tool. For a question, that is the question bead. For a dependency on another bead, in your tracker or another project's, it is that bead, and you name its project.
+4. **Post to your working topic.** For a question, post a one-line pointer to its bead, because the question lives on the bead and never only in the post. An action only the human can take, such as supplying a credential, is not a question and gets no question bead: post the action itself, and the steward takes it to the human. Never ask the human directly, and never ask with `AskUserQuestion` or any prompt in your terminal. Nobody watches a worker's berth.
+5. **Sleep.** Stay open to inbound messages, with no scheduled re-check. Your watch wakes you when the bead changes. The steward relays the human's word on an action, and relays a closed question bead while beady-eye says its watcher is down.
+6. **On a message from beady-eye, act on the bead it names.** A comment, or any change that leaves the bead open, does not end your wait. Read it with `bd show`, answer on the bead if the human asked you something there, and sleep again. A bead that closed, or went from its tracker, ends the wait. `unwatch` it, then resume.
+7. **Resume.** Read the answer on the closed question bead with `bd show`. An answer that does not settle the question is still an answer: file a fresh question only if you still need one. Re-check whatever fact you were waiting on, such as a secret now existing or a commit having landed, then clear `blocked_on`. Post to your working topic that you are awake and resuming, because the steward is waiting for that post, and continue in place.
 
 ## Getting the human's permission
 
@@ -114,7 +116,7 @@ If that push is rejected because the branch is protected, the repo's statement w
 
 1. **Base your branch on the default branch, never on another unmerged branch.** A stack of pull requests can only be reviewed bottom up, and one stale base rots every branch above it.
 
-   If your bead turns out to need code from a bead whose pull request has not merged, that is a missing dependency. Post it to the working topic and block and sleep. The steward wires the dependency and either wakes you when the base lands or stands you down. If you are stood down, record where you got to on the bead, hand it back, and close your seat as *Finish* describes, without claiming the deliverable is done:
+   If your bead turns out to need code from a bead whose pull request has not merged, that is a missing dependency. Post it to the working topic and block and sleep, watching the bead you need. It closes when its pull request merges, and that wakes you. The steward wires the dependency, or stands you down instead. If you are stood down, record where you got to on the bead, hand it back, and close your seat as *Finish* describes, without claiming the deliverable is done:
 
    ```bash
    bd update <id> --status open --unset-metadata blocked_on \
@@ -148,7 +150,7 @@ When the deliverable meets the brief's definition of done, wind the seat down in
    `bd close` takes no metadata flags, so this is its own update before the close.
 2. **Tear down.** Remove the worktree you made, by the project's rules.
 3. **Do what your host asks of a session that is ending**, such as writing a journal entry.
-4. **Unsubscribe from every topic you subscribed to**, normally just your working topic.
+4. **Unsubscribe from every topic you subscribed to**, normally just your working topic, **and `unwatch` every bead that `watching` still lists.** A watch lasts until it is unwatched.
 5. **Sign off.** Post a terse outcome to the working topic and say plainly that you are done and leaving. Then react `wave` to the brief, the first message of your topic, as the machine-readable form of the same thing.
 6. **Close your berth** with a bare `berth close`, in the same response as the wave or as your very next action. A worker that waves and stops looks exactly like one that crashed. Close only on success: a worker asleep on the human keeps its berth open until it is woken.
 
