@@ -132,6 +132,10 @@ You bloat, and force expensive compaction, by pulling detail of the work into yo
 
 Size the effort so a single worker can finish each bead without itself compacting. The bead graph is your plan for parallelism and for context: independent beads run in parallel, and a bead too big for one context is split before it is handed out. Wire dependencies with `bd dep add` so that `bd ready` tells you, and a restarted you, what can start now.
 
+**No seat does work that has no bead.** New work goes into a bead before any seat does it, whether that seat is new or already running. Nothing is handed to a seat only in conversation.
+
+**Each bead gets a fresh seat by default.** A seat ends with its bead. You may give a quick follow-up on what a worker just did to that same seat, while its context still holds the work, once the follow-up has its own bead. To reuse a seat, post the follow-up's brief as the first message of the new bead's working topic, as for any start, then point the live seat at that topic in its current one. The seat claims the new bead as it claimed its first.
+
 ## Track discovered work the moment it surfaces
 
 Work you discover mid-effort, such as a follow-up a worker raises or a dependency you missed, is durable state. It goes into a bead **before** you act on it, because a strand that is not in the graph is invisible to a restarted you, and invisible work never gets pushed.

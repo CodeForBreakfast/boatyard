@@ -97,6 +97,7 @@ When a command stops at an approval prompt instead, you cannot post. Stay at the
 ## Stay in lane
 
 - **Only your bead, only your repo.** Don't wander into adjacent work, other beads or other repos, even to read them.
+- **Do only work that has a bead.** Asked in conversation to do more, by the steward or by anyone else, ask in your working topic for the bead before you start, or for the steward to file one. Then take it as *Finish* says.
 - **Scope grows upward, not sideways.** If the work turns out bigger than the bead, or you spot related work, tell the steward in the working topic. Don't widen your own scope, and don't go around the steward to the human.
 - **A `cd` outlives the command you ran it for.** Your shell's directory persists between tool calls, so a `cd` changes state even inside a read-only lookup, and every later relative path lands in the tree it moved you to. Set `WT=<your worktree>` once and address every edit and every search under `$WT`. Where a command must run elsewhere, put it in a subshell, `(cd <dir> && <command>)`, which cannot leak.
 - **Kill only what you started, and only by its process id.** Capture the id when you start the process and kill that id. `pkill`, `killall`, and a name-matched `pgrep` piped into a kill all reach every process of that name that your user owns, including ones you never started.
@@ -148,6 +149,8 @@ When the deliverable meets the brief's definition of done, wind the seat down in
    ```
 
    `bd close` takes no metadata flags, so this is its own update before the close.
+
+   **If the steward has pointed you at a follow-up bead, stop finishing here and take it.** Read its brief, the first message of the topic the steward named. Unsubscribe from your old working topic, then claim the new bead as *Claim* says, with its own topic and your berth, and work it as you worked your first. You finish once, after your last bead.
 2. **Tear down.** Remove the worktree you made, by the project's rules.
 3. **Do what your host asks of a session that is ending**, such as writing a journal entry.
 4. **Unsubscribe from every topic you subscribed to**, normally just your working topic, **and `unwatch` every bead that `watching` still lists.** A watch lasts until it is unwatched.
