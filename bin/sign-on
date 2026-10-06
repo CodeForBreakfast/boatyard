@@ -6,7 +6,7 @@
 #
 #   SIGN_ON_CLAUDE         the Claude Code command, with any wrapper and flags
 #                          baked in. sign-on appends the launch's flags, then
-#                          `--` and the prompt.
+#                          `--` and the prompt if there is one.
 #   SIGN_ON_GATE           the startup gate's text. Unset, sign-on waits only
 #                          for the agent to show.
 #   SIGN_ON_MCP_TIMEOUT    Claude Code's MCP start-up timeout, in milliseconds.
@@ -21,7 +21,7 @@ usage() {
 usage: sign-on --as independent|worker|tender --cwd <dir> [--label <text>]
                [--beside | --tab] [--focus] [--model <model>] [--effort <level>]
                [--add-dir <dir>] [--env <name>=<value>]... [--settings <file>]
-               [--threshold <free %>] <prompt>
+               [--threshold <free %>] [<prompt>]
 
 An independent seat starts its own line of work, so it opens apart from its
 caller, where the backend keeps a line of work: in herdr, a workspace of its
@@ -34,6 +34,8 @@ its opener.
 A seat opens without focus, so the person at the screen stays where they are.
 With --focus, they land on the seat as soon as it opens, before sign-on gets
 it past its startup gate.
+
+With no prompt, the seat takes no turn and waits at its prompt for a person.
 EOF
   exit 2
 }
@@ -43,7 +45,7 @@ die() {
   exit 1
 }
 
-as="" cwd="" label="" place="" focus="" threshold="" prompt="" flags=() env=()
+as="" cwd="" label="" place="" focus="" threshold="" prompt=() flags=() env=()
 while [ $# -gt 0 ]; do
   case "$1" in
     --as) as=${2:-}; shift 2 || usage ;;
@@ -68,13 +70,13 @@ while [ $# -gt 0 ]; do
     --threshold) threshold=${2:-}; shift 2 || usage ;;
     -*) usage ;;
     *)
-      [ -z "$prompt" ] || usage
-      prompt=$1
+      [ ${#prompt[@]} -eq 0 ] && [ -n "$1" ] || usage
+      prompt=(-- "$1")
       shift
       ;;
   esac
 done
-[ -n "$as" ] && [ -n "$cwd" ] && [ -n "$prompt" ] || usage
+[ -n "$as" ] && [ -n "$cwd" ] || usage
 [ -z "$place" ] || [ "$as" = independent ] || usage
 
 claude=${SIGN_ON_CLAUDE:-claude}
@@ -95,7 +97,7 @@ if top=$(git -C "$cwd" rev-parse --show-toplevel 2>/dev/null); then
   fi
 fi
 
-command=(env ${SIGN_ON_MCP_TIMEOUT:+"MCP_TIMEOUT=$SIGN_ON_MCP_TIMEOUT"} "${env[@]}" "$claude" "${flags[@]}" -- "$prompt")
+command=(env ${SIGN_ON_MCP_TIMEOUT:+"MCP_TIMEOUT=$SIGN_ON_MCP_TIMEOUT"} "${env[@]}" "$claude" "${flags[@]}" "${prompt[@]}")
 id=$(berth open --as "$as" ${place:+"$place"} ${focus:+--focus} --cwd "$cwd" ${label:+--label "$label"} -- "${command[@]}")
 
 stuck() {
