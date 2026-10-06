@@ -80,29 +80,44 @@ This holds because a steward acquires its commy identity lazily, on its first po
    ```
 
    A foreign dependency that is not closed puts the bead in push-gate state 6.
+
+   **A ready bead may already be delivered.** Whoever runs `bd gate check` closes the gate of every merged pull request in the tracker, and the bead behind it goes ready. Before you start a ready bead, list its closed pull-request gates. Where `gh pr view` says one's pull request merged, the bead's work has landed, so close the bead rather than start it:
+
+   ```bash
+   bd gate list <bead> --all --json \
+     | jq -r '.[]? | select(.await_type == "gh:pr" and .status == "closed") | "\(.metadata.repo)#\(.await_id)"'
+   ```
 5. **Find the beads parked by status, and sort them in this order:**
 
    1. **`blocked_on=human` means a seat went to sleep there, not that it is still alive.** A seat that dies asleep leaves the key behind. Read the berth named in the bead's `agent_pane` with `berth state <id>`.
 
-      **Any state but `gone` means a live seat is asleep there.** It waits on the open `human` bead it depends on, which is its question. With no such bead, it waits on a permission or an action. This wins even when the bead also carries a `delivery_pr`, which is exactly the case for a rework seat that hit a question mid-rebase. The seat watches the bead its wait ends on, and that watch wakes it. Don't poll its pull request.
+      **Any state but `gone` means a live seat is asleep there.** It waits on the open `human` bead it depends on, which is its question. With no such bead, it waits on a permission or an action. This wins even when the bead also sits behind an open pull-request gate, which is exactly the case for a rework seat that hit a question mid-rebase. The seat watches the bead its wait ends on, and that watch wakes it. Don't poll its pull request.
 
-      **`gone` means the seat died asleep, and nothing will wake it.** Hand the bead back to the graph, with `--status blocked` in place of `open` where it carries a `delivery_pr`:
+      **`gone` means the seat died asleep, and nothing will wake it.** Hand the bead back to the graph:
 
       ```bash
       bd update <id> --status open --unset-metadata blocked_on \
                      --unset-metadata agent_pane --unset-metadata working_topic
       ```
 
-      Its dependency on its question bead keeps it out of `bd ready` until the human answers. Then start a fresh worker on it in the next `-r` topic, with the answer quoted from the question bead in its brief. A bead that waited on a permission or an action is ready at once, and its fresh worker asks again.
-   2. **Otherwise a pull request means the bead is in delivery**, whether `delivery_pr` sits on the bead or on a merge action it depends on, as *A bead closes on merge* says. No seat is on it, so never relay to it and never start a worker on it. Poll its pull request.
+      Its dependency on its question bead keeps it out of `bd ready` until the human answers, and an open pull-request gate keeps it out until the merge. Then start a fresh worker on it in the next `-r` topic, with the answer quoted from the question bead in its brief. A bead that waited on a permission or an action is ready at once, and its fresh worker asks again.
+   2. **Otherwise an open `gh:pr` gate means the bead is in delivery**, as *A bead closes on merge* says. No seat is on it, so never relay to it and never start a worker on it. Poll its pull request.
 
    ```bash
    bd list --has-metadata-key blocked_on --limit 0 --json
-   bd list --has-metadata-key delivery_pr --limit 0 --json
    bd human list --json
    ```
 
    `--limit 0` matters. The default is 50 rows, and a truncated list quietly turns a sleeping worker's bead into one you might start over.
+
+   The beads in delivery are the ones `bd blocked` lists behind an open `gh:pr` gate. List each with its pull request and its gate:
+
+   ```bash
+   bd blocked --json | jq -r --argjson gates "$(bd gate list --limit 0 --json)" '
+     .[] as $b | ($gates // [])[]
+     | select(.await_type == "gh:pr" and (.id as $g | $b.blocked_by | index($g)))
+     | "\($b.id) \(.metadata.repo)#\(.await_id) gate \(.id)"'
+   ```
 6. **Match your watches to the effort's waits.** Every open question bead a sleeping worker depends on, and every foreign dependency that holds a bead in push-gate state 6, gets a beady-eye `watch`. Name the project for a foreign bead. Compare beady-eye's `watching` list against those waits. Watch what is missing, which after a fresh start is all of them, and `unwatch` what no longer holds anything up.
 7. **Read the topics.** Read the decisions topic and each active worker's working topic: who is mid-flight, who is blocked, and what has been asked of the human. After a compaction you are still subscribed to every topic an earlier you created. The only subscription you might still owe is to a topic someone else created.
 
@@ -117,9 +132,9 @@ The wake ritual tells you the state. The push gate is what you owe before you re
 
    **Nor is a foreign bead that another project accepted, filed, and promised to report back on.** It looks like everything you wanted: a fast reply, a real bead id, a named owner. It is still a place in a queue, and it moves on that project's priorities rather than your effort's. The question is not whether someone accepted it. The question is whether a seat is running on it right now. If not, start one born in that project, and say so in that project's channel so its concierge can stand it down if it would rather own the scheduling.
 3. **A surfaced ask.** It waits only on the human, as an open question bead labelled `human` that the strand depends on, or as an action filed where your host keeps the human's actions, or in the decisions topic where it keeps none.
-4. **In delivery.** The bead's pull request is open. It has no seat, correctly. What you owe it is the watch in *Watching your pull requests*, not a new worker.
+4. **In delivery.** The bead sits behind an open `gh:pr` gate. It has no seat, correctly. What you owe it is the watch in *Watching your pull requests*, not a new worker.
 5. **Capped.** The strand could start, but its repo already holds this effort's limit of unmerged pull requests. Only a merge releases it.
-6. **Blocked by a dependency.** `bd` shows an unmet blocker, or `bdi` reads a foreign dependency as not closed. A worker started here would build on code that is not on the default branch yet.
+6. **Blocked by a dependency.** `bd` shows an unmet blocker other than a pull-request gate, or `bdi` reads a foreign dependency as not closed. A worker started here would build on code that is not on the default branch yet.
 
 States 4, 5 and 6 are all waits, and in an effort that delivers through pull requests most strands sit in one of them at any moment.
 
@@ -192,24 +207,9 @@ The worker reads the rest from the repo: whether a pull request opens as a draft
 
 ### A bead closes on merge, never when its pull request opens
 
-The worker opens the pull request, sets its bead `blocked` with `delivery_pr=<owner>/<repo>#<n>`, and leaves. **You close that bead, and only once the pull request merges.**
+The worker opens the pull request, blocks its bead on it with a `gh:pr` gate that names the repo, leaves the bead `open`, and leaves. The gate keeps the bead out of `bd ready`. **You close that bead, and only once the pull request merges.** The merge closes the gate and the bead goes ready, but its work is finished, so close it rather than start a worker on it.
 
-**`delivery_pr` belongs on the bead the merge finishes.** Where a seat merges, that is the work bead, and the key stays there. Where the human merges and your host files the human's actions in a tracker of its own, the merge is an action like any other. File it there as your host says, carrying the same `delivery_pr`, then make the work bead depend on it and take the key off the work bead:
-
-```bash
-bd dep add <bead> <merge-action>
-bd update <bead> --unset-metadata delivery_pr
-```
-
-A bead in delivery is then one of two kinds: it carries `delivery_pr` itself, or it depends on an open merge action that carries it. `bdi` shows a foreign bead's `delivery_pr` as a badge whose link is the pull request:
-
-```bash
-bdi --json --all --project <project> <project>:<merge-action> \
-  | jq -r '[.. | objects | select(.id? == "<merge-action>")] | first
-           | .badges[] | select(.key == "metadata.delivery_pr") | .link'
-```
-
-`bdi` passes on no raw metadata, so that badge exists only where the host's `bdi` config declares one for `metadata.delivery_pr`. A merge action with no badge means the config lacks it. Say so in the decisions topic rather than read it as a merge with no pull request.
+Where the human merges and your host files the human's actions in a tracker of its own, the merge is an action like any other. File it there, carrying the pull request, as your host says. The work bead still waits only on its gate, so add no edge from it to the merge action.
 
 A bead that is not closed blocks its dependents, so none of them reaches `bd ready` until the code it needs is on the default branch. Close a bead when its pull request opens and dependents can start against unmerged work, which is how an effort becomes a tower of stacked pull requests that can only be reviewed bottom up.
 
@@ -217,14 +217,7 @@ The same rule tells you how to wire new work. A bead that needs another bead's u
 
 ### The cap: two unmerged pull requests per repo
 
-Count **this effort's beads in delivery whose pull request is still `OPEN`**, grouped by repo. Count from your own beads, never from a repo-wide listing, which would include the human's own pull requests and other efforts':
-
-```bash
-bd list --has-metadata-key delivery_pr --limit 0 --json \
-  | jq -r '.[] | "\(.id) \(.metadata.delivery_pr)"'
-```
-
-Add each bead that depends on an open merge action, with the pull request read from that action's badge. Drop beads outside this effort, and drop any whose pull request has closed or merged.
+Count **this effort's beads in delivery whose pull request is still `OPEN`**, grouped by the repo on each gate. Count from your own beads, as the listing in *Reconstruct* gives them, never from a repo-wide listing, which would include the human's own pull requests and other efforts'. Drop beads outside this effort, and drop any whose pull request has closed or merged.
 
 **At two, don't start a new bead's first pull request in that repo.** Note the cap on the anchor, **skip that strand, and carry on down the gate.** Other repos and other strands may still be able to start.
 
@@ -233,7 +226,7 @@ Add each bead that depends on an open merge action, with the pull request read f
 The cap exists because review is one human's serial attention.
 ### A pull request in another project
 
-The foreign-born worker sets its own home bead `blocked` with `delivery_pr`, in its home tracker, and reports the pull request into your working topic. Your `bd list` cannot see that metadata, so count the pull request against that repo's cap from the report. When it merges, post to the foreign project's channel so its concierge closes the bead. Never reach into another project's tracker to do it yourself.
+The foreign-born worker gates its home bead on the pull request in the same way, in its home tracker, and reports the pull request into your working topic. Your `bd` cannot see that gate, so count the pull request against that repo's cap from the report. When it merges, post to the foreign project's channel so its concierge closes the bead. Never reach into another project's tracker to do it yourself.
 
 ## Starting a worker
 
@@ -340,7 +333,7 @@ Judge liveness by work product, meaning recent posts, commits and bead updates, 
 
 ## Watching your pull requests
 
-An open pull request is a live strand with no seat on it, so nothing moves it unless you do. At each wake, walk your own beads in delivery, reading each pull request from the bead or from its merge action, and ask about each one by number:
+An open pull request is a live strand with no seat on it, so nothing moves it unless you do. At each wake, run `bd gate check --type=gh:pr` to close the gate of every merged pull request. The beads behind those gates go ready, and *Reconstruct* closes them. Then walk your own beads in delivery, reading each pull request from its gate, and ask about each one by number:
 
 ```bash
 gh pr view "$N" -R "$OWNER/$REPO" \
@@ -359,8 +352,8 @@ Then act on `state` first:
 | `OPEN`, not a draft, no `reviewDecision`, **more than two days old** | Raise it once as holding up the effort, on its merge action where there is one, and in the decisions topic otherwise. |
 | `OPEN`, `reviewDecision: CHANGES_REQUESTED`, or a failing check | Start a rework seat on the same bead, with the review comments in the brief. |
 | `OPEN`, `mergeStateStatus: BEHIND` or `DIRTY` | Start a rework seat on the same bead to rebase. |
-| `MERGED` | Run `bd update <id> --unset-metadata delivery_pr` where the bead carries it, close the bead, fast-forward the main checkout as *Advancing the chain* says, then re-check `bd ready`. |
-| `CLOSED` | Nobody will merge it. File a question bead, asking whether to reopen it, redo it, or drop the bead. A bead in delivery on a dead pull request blocks its dependents for ever. |
+| `MERGED` | Close its gate with `bd gate resolve <gate>`, close the bead, fast-forward the main checkout as *Advancing the chain* says, then re-check `bd ready`. |
+| `CLOSED` | Nobody will merge it, and its gate stays open. File a question bead, asking whether to reopen it, redo it, or drop the bead. A bead in delivery on a dead pull request blocks its dependents for ever. Once the human answers, close the gate with `bd gate resolve <gate>`, unless they reopen the pull request. |
 
 **The age rule is what stops a capped effort sleeping for ever.** With every strand capped or in delivery, the gate is satisfied and you sleep, while the one person who can release the cap may not know they are the blocker. Raise it **once** per pull request. A queue that repeats itself trains the human to stop reading it.
 
@@ -371,7 +364,7 @@ Then act on `state` first:
 A rework seat is an ordinary start with two differences:
 
 - **Give it a fresh working topic**, `#<project>/<effort>-<bead>-r2`, then `-r3`. A worker's brief is the first message of its topic, so rework instructions posted into the old topic hand the new seat the old brief.
-- **Say in the brief that the bead already has a pull request**, and name it. The worker pushes to its branch instead of opening a second one, and puts the bead back to `blocked` when it finishes.
+- **Say in the brief that the bead already has a pull request**, and name it. The worker pushes to its branch instead of opening a second one, and puts the bead back to `open` behind its existing gate when it finishes.
 
 ## Advancing the chain
 
