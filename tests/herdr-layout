@@ -98,6 +98,33 @@ check "closing it closes its workers" false "$(exists "$steward_worker")"
 seat=$(berth open --as independent --cwd "$work" -- true)
 steward=$(BERTH_ID=$seat berth open --as independent --beside --cwd "$work" -- true)
 check "beside a berth, it splits the berth's tab" "$(pane "$seat" tab_id)" "$(pane "$steward" tab_id)"
+berth name "$steward" "the effort"
+check "naming it leaves the seat's workspace label" "$(workspace_label "$(pane "$seat" workspace_id)")" \
+  "$(workspace_label "$(pane "$steward" workspace_id)")"
+berth close "$seat"
+check "closing the seat leaves it" true "$(exists "$steward")"
+berth close "$steward"
+
+echo "# a seat starts an effort in a tab of its own workspace"
+
+seat=$(berth open --as independent --cwd "$work" --label "the seat" -- true)
+steward=$(BERTH_ID=$seat berth open --as independent --tab --cwd "$work" --label effort -- true)
+check "it opens in the seat's workspace" "$(pane "$seat" workspace_id)" "$(pane "$steward" workspace_id)"
+check "it opens outside the seat's tab" false \
+  "$([ "$(pane "$seat" tab_id)" = "$(pane "$steward" tab_id)" ] && echo true || echo false)"
+check "its tab takes its label" effort \
+  "$(herdr --session "$BERTH_YARD" tab get "$(pane "$steward" tab_id)" | jq -r .result.tab.label)"
+berth name "$steward" "renamed effort"
+check "naming it names its tab" "renamed effort" \
+  "$(herdr --session "$BERTH_YARD" tab get "$(pane "$steward" tab_id)" | jq -r .result.tab.label)"
+check "naming it leaves the seat's workspace label" "the seat" \
+  "$(workspace_label "$(pane "$seat" workspace_id)")"
+steward_tab=$(pane "$steward" tab_id)
+berth close "$steward"
+check "closing it closes its tab" tab_not_found \
+  "$(herdr --session "$BERTH_YARD" tab get "$steward_tab" 2>&1 | jq -r .error.code)"
+check "closing it leaves the seat" true "$(exists "$seat")"
+steward=$(BERTH_ID=$seat berth open --as independent --tab --cwd "$work" -- true)
 berth close "$seat"
 check "closing the seat leaves it" true "$(exists "$steward")"
 berth close "$steward"

@@ -8,7 +8,7 @@
 #   serve <yard>
 #   stop <yard>
 #   yard
-#   open <independent|worker|tender> <apart|beside> <focus|no-focus> <cwd> <label> <opener> <command>...
+#   open <independent|worker|tender> <apart|beside|tab> <focus|no-focus> <cwd> <label> <opener> <command>...
 #   name <id> <label>
 #   list <yard>
 #   send-text <id> <text>
@@ -25,8 +25,9 @@
 # <opener> is BERTH_ID, and so is <id> when the caller gave none. Either is
 # empty when BERTH_ID is unset too, and the adapter then resolves the calling
 # berth from its backend's own variables. <label> and <yard> may be empty.
-# <apart|beside> is beside only for an independent berth that opens next to
-# its opener rather than in a place of its own.
+# <apart|beside|tab> is apart for every berth but an independent one that
+# opens next to its opener, or in a view of its own near its opener, rather
+# than in a place of its own.
 #
 # Needs: bash, coreutils, and whatever the adapter needs.
 set -euo pipefail
@@ -37,7 +38,7 @@ usage: berth serve <yard>
        berth stop <yard>
        berth yard
        berth open --as independent|worker|tender --cwd <dir> [--label <text>] [--focus]
-                  [--beside] -- <command>...
+                  [--beside | --tab] -- <command>...
        berth name [<id>] <label>
        berth list [<yard>]
        berth send-text [<id>] <text>
@@ -77,7 +78,11 @@ case "$verb" in
         --cwd) cwd=${2:-}; shift 2 || usage ;;
         --label) label=${2:-}; shift 2 || usage ;;
         --focus) focus=focus; shift ;;
-        --beside) place=beside; shift ;;
+        --beside | --tab)
+          [ "$place" = apart ] || usage
+          place=${1#--}
+          shift
+          ;;
         --) shift; break ;;
         *) usage ;;
       esac

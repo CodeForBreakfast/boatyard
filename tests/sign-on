@@ -180,6 +180,10 @@ PATH=$work/recorder:$PATH BERTH_ID=$opener SIGN_ON_CLAUDE=$(seat beside rest 0) 
   sign-on --as independent --beside --cwd "$work/project" "$prompt" >/dev/null
 check "--beside opens the seat beside its caller" true \
   "$(grep -q -- "^open --as independent --beside " "$work/opens" && echo true || echo false)"
+PATH=$work/recorder:$PATH BERTH_ID=$opener SIGN_ON_CLAUDE=$(seat tabbed rest 0) \
+  sign-on --as independent --tab --cwd "$work/project" "$prompt" >/dev/null
+check "--tab opens the seat in a tab of its caller's" true \
+  "$(grep -q -- "^open --as independent --tab " "$work/opens" && echo true || echo false)"
 check "a seat opens apart from its caller by default" true \
   "$(grep -q -- "^open --as independent --cwd " "$work/opens" && echo true || echo false)"
 
@@ -244,6 +248,10 @@ check "and no berth opens for it" false "$(test -f "$work/nowhere/args" && echo 
 fails "a launch with no prompt" usage sign-on --as independent --cwd "$work/project"
 fails "a worker beside its caller" usage \
   BERTH_ID="$opener" sign-on --as worker --beside --cwd "$work/project" "$prompt"
+fails "a worker in a tab of its caller's" usage \
+  BERTH_ID="$opener" sign-on --as worker --tab --cwd "$work/project" "$prompt"
+fails "a seat both beside its caller and in a tab" usage \
+  BERTH_ID="$opener" sign-on --as independent --beside --tab --cwd "$work/project" "$prompt"
 fails "a launch with two prompts" usage sign-on --as independent --cwd "$work/project" one two
 fails "a launch with no working directory" usage sign-on --as independent "$prompt"
 fails "an --env that is not an assignment" usage \
