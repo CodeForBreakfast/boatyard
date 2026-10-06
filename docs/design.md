@@ -127,7 +127,7 @@ The host supplies the site-specific parts as configuration:
 - the MCP start-up timeout;
 - how long an agent may take to show its gate, or to show at all.
 
-Each launch states its own relationship, working directory, label and prompt. An independent launch may ask to open beside its caller, or in a tab near it. It may ask for focus, so that a caller such as a desktop shortcut lands the person on the seat as soon as it opens. It may add a model, an effort level, an extra working directory, environment variables, a settings file and a compaction threshold. A steward's settings file lets it run `sign-on`, and a worker gets none.
+Each launch states its own relationship, working directory, label and prompt. A launch with no prompt leaves the seat idle at its prompt, past its gate and with its compactor attached, until a person types. An independent launch may ask to open beside its caller, or in a tab near it. It may ask for focus, so that a caller such as a desktop shortcut lands the person on the seat as soon as it opens. It may add a model, an effort level, an extra working directory, environment variables, a settings file and a compaction threshold. A steward's settings file lets it run `sign-on`, and a worker gets none.
 
 A seat is born in its repository's main checkout, never in a linked worktree. Claude Code reads its instructions, skills and trust state from the launch directory and cannot re-read them after a `cd`.
 

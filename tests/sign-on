@@ -153,6 +153,16 @@ id=$(BERTH_ID=$opener SIGN_ON_CLAUDE=$(seat worker rest 0) \
 check "a worker is opened beside its opener" "$opener" \
   "$(berth list | jq -r --arg id "$id" '.[] | select(.id == $id) | .parent')"
 
+echo "# no prompt"
+
+id=$(SIGN_ON_CLAUDE=$(seat idle rest 2) SIGN_ON_GATE=$gate \
+  sign-on --as independent --cwd "$work/project" --model a-model 2>"$work/idle.err")
+check "sign-on succeeds with no prompt" 0 "$?"
+check "the command gets the launch's flags and no first message" "--model a-model" \
+  "$(tr '\n' ' ' <"$work/idle/args" | sed 's/ $//')"
+check "the gate is gone from the screen" false "$(contains "$(berth read "$id")" "$gate")"
+check "bilge-pump is attached to a seat with no prompt" true "$(pumping "$id" && echo true || echo false)"
+
 echo "# a caller can land on the seat"
 
 # The herdr layout suite proves that berth honours --focus, so here a berth
@@ -245,7 +255,7 @@ fails "a seat beside a caller in no pane" pane \
   SIGN_ON_CLAUDE="$(seat nowhere rest 0)" sign-on --as independent --beside --cwd "$work/project" "$prompt"
 check "and no berth opens for it" false "$(test -f "$work/nowhere/args" && echo true || echo false)"
 
-fails "a launch with no prompt" usage sign-on --as independent --cwd "$work/project"
+fails "a launch with an empty prompt" usage sign-on --as independent --cwd "$work/project" ""
 fails "a worker beside its caller" usage \
   BERTH_ID="$opener" sign-on --as worker --beside --cwd "$work/project" "$prompt"
 fails "a worker in a tab of its caller's" usage \
