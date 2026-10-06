@@ -81,11 +81,11 @@ This holds because a steward acquires its commy identity lazily, on its first po
 
    A foreign dependency that is not closed puts the bead in push-gate state 6.
 
-   **A ready bead may already be delivered.** Whoever runs `bd gate check` closes the gate of every merged pull request in the tracker, and the bead behind it goes ready. Before you start a ready bead, list its closed pull-request gates. Where `gh pr view` says one's pull request merged, the bead's work has landed, so close the bead rather than start it:
+   **A ready bead may already be delivered.** Whoever runs `bd gate check` closes the gate of every merged pull request in the tracker, and the bead behind it goes ready. Before you start a ready bead, list its closed pull-request gates. Where `gh pr view` says one's pull request merged, the bead's work has landed, so close the bead rather than start it. A gate on a pull request outside the effort only held the bead back, so this listing leaves it out:
 
    ```bash
    bd gate list <bead> --all --json \
-     | jq -r '.[]? | select(.await_type == "gh:pr" and .status == "closed") | "\(.metadata.repo)#\(.await_id)"'
+     | jq -r '.[]? | select(.await_type == "gh:pr" and .status == "closed" and .metadata.outside_effort != "true") | "\(.metadata.repo)#\(.await_id)"'
    ```
 
    A ready bead that depends on a closed delivery molecule is delivered too, so close it.
@@ -117,7 +117,7 @@ This holds because a steward acquires its commy identity lazily, on its first po
    ```bash
    bd blocked --json | jq -r --argjson gates "$(bd gate list --limit 0 --json)" '
      .[] as $b | ($gates // [])[]
-     | select(.await_type == "gh:pr" and (.id as $g | $b.blocked_by | index($g)))
+     | select(.await_type == "gh:pr" and .metadata.outside_effort != "true" and (.id as $g | $b.blocked_by | index($g)))
      | "\($b.id) \(.metadata.repo)#\(.await_id) gate \(.id)"'
    ```
 
@@ -136,9 +136,9 @@ The wake ritual tells you the state. The push gate is what you owe before you re
 
    **Nor is a foreign bead that another project accepted, filed, and promised to report back on.** It looks like everything you wanted: a fast reply, a real bead id, a named owner. It is still a place in a queue, and it moves on that project's priorities rather than your effort's. The question is not whether someone accepted it. The question is whether a seat is running on it right now. If not, start one born in that project, and say so in that project's channel so its concierge can stand it down if it would rather own the scheduling.
 3. **A surfaced ask.** It waits only on the human, as an open question bead labelled `human` that the strand depends on, or as an action filed where your host keeps the human's actions, or in the decisions topic where it keeps none.
-4. **In delivery.** The bead sits behind an open `gh:pr` gate, or behind an open delivery molecule whose ready steps are not the worker's. It has no seat, correctly. What you owe it is the watch in *Watching your pull requests*, or the reading in *A bead delivered by a formula*, not a new worker.
+4. **In delivery.** The bead sits behind the open `gh:pr` gate of its own pull request, or behind an open delivery molecule whose ready steps are not the worker's. It has no seat, correctly. What you owe it is the watch in *Watching your pull requests*, or the reading in *A bead delivered by a formula*, not a new worker.
 5. **Capped.** The strand could start, but its repo already holds this effort's limit of unmerged pull requests. Only a merge releases it.
-6. **Blocked by a dependency.** `bd` shows an unmet blocker other than a pull-request gate, or `bdi` reads a foreign dependency as not closed. A worker started here would build on code that is not on the default branch yet.
+6. **Blocked by a dependency.** `bd` shows an unmet blocker other than the bead's own pull-request gate, such as a gate on a pull request outside the effort, or `bdi` reads a foreign dependency as not closed. A worker started here would build on code that is not on the default branch yet.
 
 States 4, 5 and 6 are all waits, and in an effort that delivers through pull requests most strands sit in one of them at any moment.
 
@@ -219,7 +219,14 @@ Where the human merges and your host files the human's actions in a tracker of i
 
 A bead that is not closed blocks its dependents, so none of them reaches `bd ready` until the code it needs is on the default branch. Close a bead when its pull request opens and dependents can start against unmerged work, which is how an effort becomes a tower of stacked pull requests that can only be reviewed bottom up.
 
-The same rule tells you how to wire new work. A bead that needs another bead's unlanded code gets a `bd dep add`, never a branch based on the other's pull request. A bead that merely has to land later, or would edit the same file, gets no edge. Where the cap holds back more than one ready bead, choose which goes next at each wake rather than wiring the choice into the graph, because the graph cannot tell a real dependency from a preference.
+The same rule tells you how to wire new work. A bead that needs another bead's unlanded code gets a `bd dep add`, never a branch based on the other's pull request. A bead that needs a pull request from outside the effort, such as another person's, waits behind a `gh:pr` gate that names the repo, with the bead left `open`. Mark the gate `outside_effort`, so that nothing reads the bead as in delivery of its own pull request:
+
+```bash
+g=$(bd gate create --type=gh:pr --blocks <bead> --await-id=<n> --json | jq -r .id)
+bd update "$g" --set-metadata repo=<owner>/<repo> --set-metadata outside_effort=true
+```
+
+A bead that merely has to land later, or would edit the same file, gets no edge. Where the cap holds back more than one ready bead, choose which goes next at each wake rather than wiring the choice into the graph, because the graph cannot tell a real dependency from a preference.
 
 ### A bead delivered by a formula
 
