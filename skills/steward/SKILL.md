@@ -89,7 +89,33 @@ This holds because a steward acquires its commy identity lazily, on its first po
    ```
 
    A ready bead that depends on a closed delivery molecule is delivered too, so close it.
-5. **Find the beads parked by status, and sort them in this order:**
+5. **Review the graph for errors.** bdi reports every edge in the effort's tree that leads nowhere. First run `bd gate check --type=gh:pr`, so a merged pull request's gate is already closed. Then read the anchor's trees across every project, because an edge into a project bdi did not read would otherwise look missing:
+
+   ```bash
+   bdi --json --all --all-projects <project>:<anchor> | jq -r --arg p <project> '
+     .trees[] | select(.project == $p)
+     | (select(.tracker != "ok") | "tracker \(.tracker | tojson)"),
+       (.cycles[] | "cycle \(.)"),
+       (.nodes[] | . as $n
+         | (.orphaned_dependencies[] | "\($n.project):\($n.id) waits on \(.id): \(.reason)"),
+           (.anomalies[] | "\($n.project):\($n.id) \(.rule)"),
+           (select(.pull_request and .status != "closed"
+                   and (.pull_request.repo == null or .pull_request.await_id == null))
+            | "\($n.project):\($n.id) gate lacks its pull request"))' | sort -u
+   ```
+
+   Nothing printed means the graph is sound. Each line starts with the bead that holds the error, and its project says whose tracker that is. **Fix only what is in your own tracker.** For an error on another project's bead, post the bead and the edge in that project's channel, and edit nothing there.
+
+   In your own tracker:
+
+   - **`unconfigured` on an id written `<project>:<id>` is a malformed edge.** bd names another project's bead by its bare id. Remove the edge with `bd dep remove <bead> <project>:<id>`, then add it again with `bd dep add <bead> <id>`.
+   - **`not-held` means no tracker holds the id.** First `bd show` the id. If your tracker holds it, the edge is sound and bdi could not draw it, so leave it. Otherwise the bead was deleted, mistyped or never filed. Point the edge at the bead the waiting bead's description says it waits for, where you can find it. Remove the edge where that work is done or dropped. Where you cannot tell what the edge was for, file a question bead.
+   - **A gate that lacks its pull request never closes.** Give it what its bead's pull request says is missing, with `bd update <gate> --set-metadata repo=<owner>/<repo>` or `bd update <gate> --await-id <n>`.
+   - **A cycle means a bead waits on one of its own forebears.** Remove the edge the plan contradicts, where the plan makes clear which edge that is, and file a question bead where it does not.
+   - **`stale-pane` means a closed bead still names a berth.** Clear it with `bd update <bead> --unset-metadata agent_pane`. `orphan-claim` and `stale-claim` mean a seat went dark, which *Every stall is yours to break* covers.
+   - **`held-by-unread`, `not-read` or a `tracker` line means a tracker gave bdi no answer.** The edge is not at fault. Read again next wake, and if the same tracker still fails, post in its project's channel.
+   - **`held-by-several` means two projects share the id's prefix.** The fix is in the configuration bdi reads, not in the graph, so raise it with the human as an action.
+6. **Find the beads parked by status, and sort them in this order:**
 
    1. **`blocked_on=human` means a seat went to sleep there, not that it is still alive.** A seat that dies asleep leaves the key behind. Read the berth named in the bead's `agent_pane` with `berth state <id>`.
 
@@ -122,8 +148,8 @@ This holds because a steward acquires its commy identity lazily, on its first po
    ```
 
    Under a delivery formula, the bead this lists is a step of a molecule, and the bead in delivery is the work bead that depends on that molecule.
-6. **Match your watches to the effort's waits.** Every open question bead a sleeping worker depends on, and every foreign dependency that holds a bead in push-gate state 6, gets a beady-eye `watch`. Name the project for a foreign bead. Compare beady-eye's `watching` list against those waits. Watch what is missing, which after a fresh start is all of them, and `unwatch` what no longer holds anything up.
-7. **Read the topics.** Read the decisions topic and each active worker's working topic: who is mid-flight, who is blocked, and what has been asked of the human. After a compaction you are still subscribed to every topic an earlier you created. The only subscription you might still owe is to a topic someone else created.
+7. **Match your watches to the effort's waits.** Every open question bead a sleeping worker depends on, and every foreign dependency that holds a bead in push-gate state 6, gets a beady-eye `watch`. Name the project for a foreign bead. Compare beady-eye's `watching` list against those waits. Watch what is missing, which after a fresh start is all of them, and `unwatch` what no longer holds anything up.
+8. **Read the topics.** Read the decisions topic and each active worker's working topic: who is mid-flight, who is blocked, and what has been asked of the human. After a compaction you are still subscribed to every topic an earlier you created. The only subscription you might still owe is to a topic someone else created.
 
 You are now bound, reachable, and hold the whole state. Reconstruct from these reads, never from memory.
 
