@@ -248,6 +248,19 @@ check "closing it leaves its caller" true "$(listed "$caller")"
 berth close "$caller"
 berth close "$beside"
 
+echo "# an independent berth in a tab of its caller's"
+
+caller=$(berth open --as independent --cwd "$work" -- true)
+tabbed=$(BERTH_ID=$caller berth open --as independent --tab --cwd "$work" -- true)
+check "it is listed as independent" independent "$(field "$tabbed" relationship)"
+check "it has no parent" null "$(field "$tabbed" parent)"
+berth close "$tabbed"
+check "closing it leaves its caller" true "$(listed "$caller")"
+tabbed=$(BERTH_ID=$caller berth open --as independent --tab --cwd "$work" -- true)
+berth close "$caller"
+check "closing its caller leaves it" true "$(listed "$tabbed")"
+berth close "$tabbed"
+
 echo "# serve and stop"
 
 served="$BERTH_YARD-served"
@@ -281,6 +294,11 @@ refused "a worker's opener has to exist" env BERTH_ID="$independent" berth open 
 refused "a berth beside its caller needs a caller" berth open --as independent --beside --cwd "$work" -- true
 refused "only an independent berth opens beside its caller" \
   env BERTH_ID="$caller" berth open --as tender --beside --cwd "$work" -- true
+refused "a berth in a tab of its caller's needs a caller" berth open --as independent --tab --cwd "$work" -- true
+refused "only an independent berth opens in a tab of its caller's" \
+  env BERTH_ID="$caller" berth open --as worker --tab --cwd "$work" -- true
+refused "a berth opens either beside its caller or in a tab, not both" \
+  env BERTH_ID="$caller" berth open --as independent --beside --tab --cwd "$work" -- true
 refused "a gone berth cannot be named" berth name "$independent" "too late"
 refused "a gone berth cannot take text" berth send-text "$independent" "too late"
 refused "a gone berth cannot take a key" berth send-key "$independent" Enter

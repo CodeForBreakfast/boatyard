@@ -150,14 +150,23 @@ open() {
   shift 6
 
   if [ "$as" = independent ]; then
-    if [ "$place" = beside ]; then
-      opener=$(berth_id "$opener" "there is nothing to open beside")
-      opener_pane=$(existing_pane "$opener" "there is nothing to open beside")
-      id=$(split_tallest "$focus" "$cwd" "[$opener_pane]")
-    else
-      id=$(herdr_result workspace create --cwd "$cwd" ${label:+--label "$label"} \
-        "${berth_env[@]}" "--$focus" | jq -r .root_pane.pane_id)
-    fi
+    case $place in
+      beside)
+        opener=$(berth_id "$opener" "there is nothing to open beside")
+        opener_pane=$(existing_pane "$opener" "there is nothing to open beside")
+        id=$(split_tallest "$focus" "$cwd" "[$opener_pane]")
+        ;;
+      tab)
+        opener=$(berth_id "$opener" "there is no workspace to open a tab in")
+        opener_pane=$(existing_pane "$opener" "there is no workspace to open a tab in")
+        id=$(herdr_result tab create --workspace "$(jq -r .workspace_id <<<"$opener_pane")" --cwd "$cwd" \
+          ${label:+--label "$label"} "${berth_env[@]}" "--$focus" | jq -r .root_pane.pane_id)
+        ;;
+      apart)
+        id=$(herdr_result workspace create --cwd "$cwd" ${label:+--label "$label"} \
+          "${berth_env[@]}" "--$focus" | jq -r .root_pane.pane_id)
+        ;;
+    esac
     # It starts its own line of work, so its opener is not its parent.
     opener=""
   else
@@ -201,9 +210,11 @@ name() {
   id=$(berth_id "$1")
   pane=$(existing_pane "$id" "it cannot be named")
   herdr_result pane rename "$id" "$2" >/dev/null
-  if [ "$(jq -r '.tokens.berth_relationship // empty' <<<"$pane")" = independent ]; then
-    herdr_result workspace rename "$(jq -r .workspace_id <<<"$pane")" "$2" >/dev/null
-  fi
+  [ "$(jq -r '.tokens.berth_relationship // empty' <<<"$pane")" = independent ] || return 0
+  case $(jq -r .tokens.berth_place <<<"$pane") in
+    apart) herdr_result workspace rename "$(jq -r .workspace_id <<<"$pane")" "$2" >/dev/null ;;
+    tab) herdr_result tab rename "$(jq -r .tab_id <<<"$pane")" "$2" >/dev/null ;;
+  esac
 }
 
 yard_running() {
@@ -287,7 +298,7 @@ state() {
 # with no other line of work?
 owns_workspace() { # <pane>
   local pane=$1 panes
-  jq -e '.tokens.berth_relationship == "independent" and .tokens.berth_place != "beside"' \
+  jq -e '.tokens.berth_relationship == "independent" and .tokens.berth_place == "apart"' \
     <<<"$pane" >/dev/null || return 1
   panes=$(herdr_result pane list --workspace "$(jq -r .workspace_id <<<"$pane")") || exit
   jq -e --arg id "$(jq -r .pane_id <<<"$pane")" '
