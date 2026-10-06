@@ -235,7 +235,7 @@ bdi --json --all --project <project> <project>:<molecule> \
 
 Act on each open step that is ready, or that waits only on its `gh:pr` gate, by whom it names:
 
-- **A step that names you is yours.** Do it, such as merging a pull request whose checks are green, and close it when it is done.
+- **A step that names you, or a seat merging, is yours.** Do it, such as merging a pull request whose checks are green, and close it when it is done.
 - **A step that names the human is their action.** Surface it once, as *The decisions topic carries the human's actions* says.
 - **A step that names the worker needs a seat**, such as a rework after review. Start one on the work bead as *Rework on a bead that already has a pull request* says.
 
