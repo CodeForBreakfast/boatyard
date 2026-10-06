@@ -140,7 +140,7 @@ heartbeat="$BILGE_PUMP_STATE_DIR/$yard/bare/heartbeat"
 eventually test -f "$heartbeat"
 beat=$(cat "$heartbeat" 2>/dev/null)
 check "the heartbeat holds the state, the figure, the threshold and the yard" \
-  "at-rest - 80 $yard" "${beat#* }"
+  "at-rest - 70 $yard" "${beat#* }"
 changed() { [ "$(cat "$heartbeat" 2>/dev/null)" != "$beat" ]; }
 check "the heartbeat is rewritten every tick" true "$(eventually changed && echo true || echo false)"
 sleep 2
@@ -161,6 +161,22 @@ send-key low Enter
 send-key low Enter" "$(typed low)"
 sleep 2
 check "and not again inside the cooldown" 3 "$(typed low | wc -l)"
+
+# The threshold comes from the flag, then the environment, then the default.
+threshold_beat() { # <berth>
+  eventually test -f "$BILGE_PUMP_STATE_DIR/$yard/$1/heartbeat"
+  cut -d' ' -f4 "$BILGE_PUMP_STATE_DIR/$yard/$1/heartbeat" 2>/dev/null
+}
+echo at-rest >"$stub/env.state"
+BILGE_PUMP_THRESHOLD=55 bilge-pump env --tick 1
+check "the variable sets the threshold" 55 "$(threshold_beat env)"
+echo at-rest >"$stub/flag.state"
+BILGE_PUMP_THRESHOLD=55 bilge-pump flag --tick 1 --threshold 40
+check "the flag overrides the variable" 40 "$(threshold_beat flag)"
+err=$(BILGE_PUMP_THRESHOLD=5x bilge-pump bad --tick 1 2>&1)
+check "a variable that is not a whole number is refused" 2 $?
+check "and the usage names the variable" true \
+  "$([[ $err == *BILGE_PUMP_THRESHOLD* ]] && echo true || echo false)"
 
 # A stale pid file does not stop a start.
 sleep 0 &

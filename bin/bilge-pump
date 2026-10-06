@@ -18,6 +18,8 @@ set -euo pipefail
 usage() {
   cat >&2 <<'EOF'
 usage: bilge-pump [<berth>] [--threshold <free %>] [--cooldown <s>] [--tick <s>]
+
+The threshold is --threshold, else $BILGE_PUMP_THRESHOLD, else 70.
 EOF
   exit 2
 }
@@ -27,7 +29,7 @@ die() {
   exit 1
 }
 
-berth="" threshold=80 cooldown=300 tick=60
+berth="" threshold=${BILGE_PUMP_THRESHOLD-70} cooldown=300 tick=60
 while [ $# -gt 0 ]; do
   case "$1" in
     --threshold) threshold=${2:-}; shift 2 || usage ;;
