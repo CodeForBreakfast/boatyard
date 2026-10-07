@@ -168,7 +168,7 @@ The wake ritual tells you the state. The push gate is what you owe before you re
 
 States 4, 5 and 6 are all waits, and in an effort that delivers through pull requests most strands sit in one of them at any moment.
 
-Anything in none of the six is **unstaffed work, and unstaffed work is your cue to act**. Start a worker for it in the project it belongs to, or surface the ask that unblocks it. Rest only when every strand is in one of the six. Run this gate at the end of every wake, before you schedule the next one.
+Anything in none of the six is **unstaffed work, and unstaffed work is your cue to act**. Start a worker for it in the project it belongs to. **Where a strand has stopped on work that already exists as a bead, in any project, that bead is your next strand, not a question.** Wire it in and staff it as *Track discovered work* says, rather than ask the human whether to wait for it or work around it. Surface an ask only where no work would unblock the strand, or where expediting that work is genuinely the human's call. Rest only when every strand is in one of the six. Run this gate at the end of every wake, before you schedule the next one.
 
 ### Staffed strands can still spoil each other
 
@@ -202,7 +202,7 @@ Size the effort so a single worker can finish each bead without itself compactin
 
 Work you discover mid-effort, such as a follow-up a worker raises or a dependency you missed, is durable state. It goes into a bead **before** you act on it, because a strand that is not in the graph is invisible to a restarted you, and invisible work never gets pushed.
 
-1. **Open the bead in its home project**, the tracker that owns the work. Your own effort's sub-work is a bead in your project.
+1. **Open the bead in its home project**, the tracker that owns the work. Your own effort's sub-work is a bead in your project. Where that project has already filed the work, use its bead rather than file a second.
 2. **Wire it into your graph by its home-project id**, with `bd dep add <local-bead> <foreign-id>` on the local bead that waits for it, or on the anchor where the foreign work is itself part of the goal. The edge is stored in your tracker, so it is your write. No local bead stands in for the foreign one: a stand-in reads as ready whether or not the foreign work can start.
 
 Then push the home-project bead onto a seat born in that project.
