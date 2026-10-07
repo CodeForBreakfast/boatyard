@@ -108,6 +108,7 @@ It is written first. Its obligations beyond straight mapping:
 - **The parked-on-background-work correction** described under Agent states.
 - **The lost-agent correction.** Where a wrapper renames Claude Code's process, as Nix's does, herdr names it from its argv, and skips reading argv while the process waits on the disk, as under swap. Enough misses clear the agent, and herdr may not look again for minutes. The session reported at Claude Code's start-up survives, so a pane with no agent, a session, and a foreground process other than its shell reads `active`, not `gone`.
 - **The cascade.** herdr keeps a workspace's other panes when its first pane closes, so the adapter closes them itself. It closes a whole workspace only for the independent berth that opened it, and only while no other independent berth lives there. Any other berth closes its own pane.
+- **Waiting for the shell.** herdr starts every pane with a shell, so the adapter types the berth's command into it. It types only once the shell has settled alone in the foreground, because a child of the shell's start-up, such as a dev shell's hook, can read the terminal and swallow typed input.
 - **Screen source.** `wait-text` matches herdr's recent output, not only the visible frame. A pane shorter than the text it waits for never shows all of it at once.
 - **Package parameter.** herdr's package is a parameter, so a host can supply a platform-specific build.
 

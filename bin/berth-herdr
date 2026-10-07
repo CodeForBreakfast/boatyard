@@ -145,6 +145,38 @@ split_tallest() { # <focus|no-focus> <cwd> <panes as a JSON array>
     "${berth_env[@]}" "--$1" | jq -r .pane.pane_id
 }
 
+# herdr 0.9.3 cannot start a pane with a command, so the command is typed into
+# the pane's shell. A child that the shell's start-up runs in the foreground,
+# such as a dev shell's hook, can read the terminal and swallow it. The shell
+# is alone in the foreground for a moment before its start-up runs anything,
+# so it has to stay alone for several polls in a row.
+shell_wait_seconds=120
+shell_poll_seconds=0.25
+shell_settle_polls=4
+
+shell_alone() { # <id>
+  herdr_result pane process-info --pane "$1" | jq -e '.process_info
+    | .shell_pid as $shell
+    | .foreground_process_group_id == $shell
+      and all(.foreground_processes[]; .pid == $shell)' >/dev/null
+}
+
+# Warns, rather than fails, when the shell never settles, because the berth
+# is open by then and its caller needs its id.
+await_shell() { # <id>
+  local id=$1 settled=0 deadline=$((SECONDS + shell_wait_seconds))
+  while [ "$SECONDS" -lt "$deadline" ]; do
+    if shell_alone "$id"; then
+      settled=$((settled + 1))
+      [ "$settled" -lt "$shell_settle_polls" ] || return 0
+    else
+      settled=0
+    fi
+    sleep "$shell_poll_seconds"
+  done
+  echo "berth (herdr): the shell in berth $id was still starting after ${shell_wait_seconds}s, so its command is typed anyway and may be lost." >&2
+}
+
 open() {
   local as=$1 place=$2 focus=$3 cwd=$4 label=$5 opener=$6 id opener_pane workspace panes tab
   shift 6
@@ -200,6 +232,7 @@ open() {
   # command rather than the pane's shell.
   local command
   printf -v command '%q ' "$@"
+  await_shell "$id"
   herdr_result pane run "$id" "env BERTH_ID=$(printf '%q' "$id") $command" >/dev/null
 
   printf '%s\n' "$id"
