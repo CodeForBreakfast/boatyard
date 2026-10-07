@@ -289,7 +289,7 @@ The foreign-born worker gates its home bead on the pull request in the same way,
 
 ## Starting a worker
 
-A worker needs its own berth, its own commy identity and its own context, and **you start it yourself** with `sign-on`. **Start the seat before you post its brief**, so the brief can name the seat's berth and no other reader takes it.
+A worker needs its own berth, its own commy identity and its own context, and **you start it yourself** with `sign-on`. **Start the seat with no prompt, post its brief, and only then type the seat its prompt.** The brief can then name the seat's berth, so no other reader takes it, and the brief is already there when the worker first reads its topic. A seat that finds its topic empty and waits is not reliably woken when the brief lands.
 
 For each bead that is ready:
 
@@ -313,17 +313,25 @@ For each bead that is ready:
    ```bash
    bd update <bead> --set-metadata seat_model=<model or default> --set-metadata seat_effort=<level>
    ```
-3. **Start the seat:**
+3. **Start the seat, with no prompt:**
 
    ```bash
    sign-on --as worker --cwd <project-checkout> --label <bead> \
-     --model <model> --effort <level> "/boatyard:worker #<project>/<effort>-<bead>"
+     --model <model> --effort <level>
    ```
 
-   Leave out `--model` for a seat on the default model. `sign-on` opens a berth kept with your other workers, starts Claude Code in it, gets it past its startup gate, and attaches the compactor that keeps its context lean across a long sleep. It prints the new berth's id.
+   Leave out `--model` for a seat on the default model. `sign-on` opens a berth kept with your other workers, starts Claude Code in it, gets it past its startup gate, and attaches the compactor that keeps its context lean across a long sleep. It prints the new berth's id, and the seat waits idle at its prompt.
 
    **`--cwd` is the project the seat is born in**, which decides its `CLAUDE.md`, its tracker, its skills and its lane. For a single-project effort that is your own project. For a strand in another project it is that project's main checkout, so the seat claims that project's bead directly. The repo the worker works in is a separate thing, carried in the brief.
-4. **Post the brief, then subscribe to its topic.** Fill in **Seat** with the berth id, post the brief to the working topic straight away, then `subscribe <project>/<effort>-<bead>`. A worker that reads the topic before the brief lands waits for it.
+4. **Post the brief, then subscribe to its topic.** Fill in **Seat** with the berth id, post the brief to the working topic straight away, then `subscribe <project>/<effort>-<bead>`.
+5. **Type the worker its prompt:**
+
+   ```bash
+   berth send-text <id> "/boatyard:worker #<project>/<effort>-<bead>"
+   berth send-key <id> Enter
+   ```
+
+   If the seat has not claimed its bead by the time you next look, `berth read <id>` shows whether the prompt is still sitting unsent.
 
 Starting workers is a **loop**, not a kickoff. Start one at each ready bead, and again whenever an unblock makes another bead ready.
 
