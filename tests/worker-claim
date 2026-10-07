@@ -1,0 +1,57 @@
+#!/usr/bin/env bash
+# The worker skill's claim, run against the pinned bd. A rework seat claims a
+# bead that sits open behind its pull request's gate, and the claim must take
+# it. A bead parked as blocked must be refused, because the skill tells the seat
+# to report that refusal rather than force its way past it. See
+# skills/worker/SKILL.md, "Claim".
+#
+# Run it with bd on the path. It makes its own throwaway tracker.
+#
+# Needs: bash, coreutils, jq, bd.
+set -uo pipefail
+
+work=$(mktemp -d)
+failures=0
+
+check() { # <what> <want> <got>
+  if [ "$2" = "$3" ]; then
+    echo "ok: $1"
+  else
+    echo "FAIL: $1: wanted '$2', got '$3'"
+    failures=$((failures + 1))
+  fi
+}
+
+# bd warns on stderr about settings this throwaway tracker does not need.
+quiet_bd() {
+  bd "$@" 2>/dev/null
+}
+
+status_of() { # <id>
+  quiet_bd show "$1" --json | jq -r '.[0].status'
+}
+
+export HOME="$work/home" BEADS_DIR="$work/.beads" BD_NON_INTERACTIVE=1
+mkdir -p "$HOME"
+cd "$work" || exit 1
+bd init --prefix t --skip-agents --non-interactive >/dev/null 2>&1 \
+  || { echo "FAIL: bd init"; exit 1; }
+
+# A bead in delivery, as a worker leaves it: open, behind a gh:pr gate.
+in_delivery=$(quiet_bd create --silent --title "in delivery")
+gate=$(quiet_bd gate create --type=gh:pr --blocks "$in_delivery" --await-id=1 --json | jq -r .id)
+quiet_bd update "$in_delivery" --claim >/dev/null
+check "a rework seat's claim takes a bead behind its gate" in_progress "$(status_of "$in_delivery")"
+check "the claim leaves the gate open" open "$(status_of "$gate")"
+
+parked=$(quiet_bd create --silent --title "parked")
+quiet_bd update "$parked" --status blocked >/dev/null
+output=$(bd update "$parked" --claim 2>&1)
+check "the claim leaves a blocked bead blocked" blocked "$(status_of "$parked")"
+case "$output" in
+  *"not claimable"*) echo "ok: the refusal says the bead is not claimable" ;;
+  *) echo "FAIL: the refusal did not say 'not claimable': $output"; failures=$((failures + 1)) ;;
+esac
+
+rm -rf "$work"
+[ "$failures" = 0 ]

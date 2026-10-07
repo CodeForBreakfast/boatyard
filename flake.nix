@@ -81,6 +81,12 @@
           touch $out
         '';
 
+        workerClaimTest = pkgs.runCommand "worker-claim-test"
+          { nativeBuildInputs = [ beads.packages.${system}.bd pkgs.bash pkgs.coreutils pkgs.jq ]; } ''
+          bash ${./tests/worker-claim}
+          touch $out
+        '';
+
         # The subject main carries comes from the pull request's title, because
         # this repository squash-merges. A title is not in a tree, so this
         # cannot be a `checks` entry: the workflow hands it the string. The
@@ -395,6 +401,7 @@ and a second line"
         checks = componentOutputs "checks" // {
           check-before-push-test = checkBeforePushTest;
           conventional-subject-test = conventionalSubjectTest;
+          worker-claim-test = workerClaimTest;
         };
       }
     );
