@@ -164,7 +164,7 @@ You are now bound, reachable, and hold the whole state. Reconstruct from these r
 
 ## The push gate: never rest with unstaffed work
 
-The wake ritual tells you the state. The push gate is what you owe before you rest. Walk **every strand of work the anchor needs, in your project and in every other project the effort touches**, and confirm each is in exactly one of six states:
+The wake ritual tells you the state. The push gate is what you owe before you rest. Walk **every strand of work the anchor needs, in your project and in every other project the effort touches**, and confirm each is in exactly one of seven states:
 
 1. **Done.** It has landed on the repo's default branch, which with pull requests means merged rather than opened, and its bead says so.
 2. **Staffed and live.** An accountable worker is on it and has reported recently, through a post, a commit or a bead update. A worker that has gone dark is not this state, and neither is a bead handed to a channel nobody picked up.
@@ -174,10 +174,11 @@ The wake ritual tells you the state. The push gate is what you owe before you re
 4. **In delivery.** The bead sits behind the open `gh:pr` gate of its own pull request, or behind an open delivery molecule whose ready steps are not the worker's. It has no seat, correctly. What you owe it is the watch in *Watching your pull requests*, or the reading in *A bead delivered by a formula*, not a new worker.
 5. **Capped.** The strand could start, but its repo already holds this effort's limit of unmerged pull requests. Only a merge releases it.
 6. **Blocked by a dependency.** `bd` shows an unmet blocker other than the bead's own pull-request gate, such as a gate on a pull request outside the effort, or `bdi` reads a foreign dependency as not closed. A worker started here would build on code that is not on the default branch yet.
+7. **Deferred to a date.** The strand cannot start before a known date, and its bead records it with `bd defer <bead> --until <date>`. bd returns the bead to `bd ready` once the date passes, whether or not any steward is still running, so the date survives your session.
 
-States 4, 5 and 6 are all waits, and in an effort that delivers through pull requests most strands sit in one of them at any moment.
+States 4 to 7 are all waits, and in an effort that delivers through pull requests most strands sit in one of them at any moment.
 
-Anything in none of the six is **unstaffed work, and unstaffed work is your cue to act**. Start a worker for it in the project it belongs to. **Where a strand has stopped on work that already exists as a bead, in any project, that bead is your next strand, not a question.** Wire it in and staff it as *Track discovered work* says, rather than ask the human whether to wait for it or work around it. Surface an ask only where no work would unblock the strand, or where expediting that work is genuinely the human's call. Rest only when every strand is in one of the six. Run this gate at the end of every wake, before you schedule the next one.
+Anything in none of the seven is **unstaffed work, and unstaffed work is your cue to act**. Start a worker for it in the project it belongs to. **Where a strand has stopped on work that already exists as a bead, in any project, that bead is your next strand, not a question.** Wire it in and staff it as *Track discovered work* says, rather than ask the human whether to wait for it or work around it. Surface an ask only where no work would unblock the strand, or where expediting that work is genuinely the human's call. Rest only when every strand is in one of the seven. Run this gate at the end of every wake, before you schedule the next one.
 
 ### Staffed strands can still spoil each other
 
@@ -191,6 +192,8 @@ You bloat, and force expensive compaction, by pulling detail of the work into yo
 
 - **Don't read large artefacts yourself**: source files, transcripts, long logs. When you need a conclusion from a pile of material, give the reading to a throwaway subagent and keep only its answer. Work that owns a bead goes to a worker in its own berth. A one-off read goes to your own subagent.
 - **Sleep between events, but only once the push gate is clean.** Use `ScheduleWakeup` only for a specific future event you care about: a worker's declared checkpoint, which is the watch for its death because a dead worker sends nothing. Otherwise commy and beady-eye deliver inbound messages reliably, so don't poll on a tight interval.
+
+  **A wait for a date goes on its bead, not only in a wake.** A `ScheduleWakeup` dies with your session, so defer the bead to the date as push-gate state 7 says. You may also schedule a wake for the date. If your session has gone by then, the bead shows as ready and tally shows the effort with no live steward, and a person starts one.
 
   **A bead you wait on wakes you through your watch on it.** A closed question bead or foreign dependency ends a wait, so `unwatch` it and run the wake ritual. A comment, or any change that leaves the bead open, is nothing to act on unless it is a question for you.
 
