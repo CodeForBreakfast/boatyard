@@ -44,6 +44,8 @@ As soon as you have oriented:
                   --set-metadata agent_pane="$BERTH_ID"
    ```
 
+   The claim sets the bead `in_progress` and assigns it to you. It takes a bead whose status is `open`, whatever the bead depends on, so it takes a rework seat's bead behind its pull request's gate. It refuses any other status. **If bd says the bead is not claimable, don't force it with `--status`.** A bead parked as `blocked` may be a sleeping seat's, so post the refusal to the working topic and let the steward hand the bead back.
+
    Your topic is not always the one a steward would guess. A rework seat gets `-r2` or `-r3`, and a replacement steward can learn your topic only from the bead. Without it, the steward relays into the wrong topic and you sleep through an answer that was sent.
 
    `agent_pane` is how a bead viewer draws your berth against your bead. **Clear it whenever you let the bead go**, as *Deliver* and *Finish* say. Your berth id can be reused for another seat, and a bead still naming it then blanks the agent on both beads.
@@ -166,7 +168,7 @@ If that push is rejected because the branch is protected, the repo's statement w
    **Don't close the bead, and don't set it `blocked`.** A closed bead tells the steward the work is delivered. While the bead stays open it blocks its dependents, so nothing starts against code that has not landed. The open gate keeps the bead out of `bd ready`, and the merge closes the gate. A bead set `blocked` stays out of `bd ready` even after that.
 4. **Post the pull request's address to the working topic**, then finish. Don't wait for the review. The steward watches the pull request from here, and starts a fresh seat on your bead if the reviewers ask for changes.
 
-**If your brief says your bead already has a pull request, you are a rework seat.** Move that pull request rather than replacing it: push to its existing branch, and never open a second pull request for the same bead. Its gate already waits on that pull request, so make no second gate. When you finish, put the bead back to `open` as *Finish* says. A bead left claimed with no seat on it reads to the steward as unstaffed work.
+**If your brief says your bead already has a pull request, you are a rework seat.** Your bead sits `open` behind its gate, so claim it as *Claim* says. The claim leaves the gate in place. Move that pull request rather than replacing it: push to its existing branch, and never open a second pull request for the same bead. Its gate already waits on that pull request, so make no second gate. When you finish, put the bead back to `open` as *Finish* says. A bead left claimed with no seat on it reads to the steward as unstaffed work.
 
 ## Finish
 
