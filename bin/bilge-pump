@@ -64,9 +64,8 @@ log() { # <what> [<detail>]
     >>"$log_file"
 }
 
-# How long a berth may stay gone before its agent first shows. sign-on
-# attaches after the startup gate, but a caller attaching by hand may be
-# early.
+# How long a berth may stay gone before its agent first shows, because
+# sign-on attaches before the agent has started.
 arrival_timeout=600
 
 pump() {
