@@ -125,7 +125,10 @@ The host supplies the site-specific parts as configuration:
 - the Claude Code command, including any wrapper, environment setup and flags;
 - the startup gate's text, because the gate comes from the host's flags. With none configured, `sign-on` returns once the agent has shown, and the steward finds a gate nobody configured as a blocked berth;
 - the MCP start-up timeout;
-- how long an agent may take to show its gate, or to show at all.
+- how long an agent may take to show its gate, or to show at all;
+- the memory the host must have available before a seat starts, 8 GiB by default.
+
+`sign-on` checks that memory before it opens a berth. Below the floor it opens nothing and exits with status 75, so a caller can tell "not now" from a failure.
 
 Each launch states its own relationship, working directory, label and prompt. A launch with no prompt leaves the seat idle at its prompt, past its gate and with its compactor attached, until a person types. An independent launch may ask to open beside its caller, or in a tab near it. It may ask for focus, so that a caller such as a desktop shortcut lands the person on the seat as soon as it opens. It may add a model, an effort level, an extra working directory, environment variables, a settings file and a compaction threshold. A steward's settings file lets it run `sign-on`, and a worker gets none.
 

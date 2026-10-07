@@ -100,6 +100,9 @@ recorded() { # <name> <variable>
 }
 
 export SIGN_ON_START_TIMEOUT=30
+# The host running these tests may be short of memory, so only the tests of
+# the memory floor set one.
+export SIGN_ON_MIN_MEMORY=0
 mkdir -p "$work/project" "$work/extra"
 prompt="/boatyard:worker #project/effort-bead, then read this project's \"brief\" \$HOME \`id\` &"
 
@@ -254,6 +257,15 @@ fails "a gate that does not clear" "$gate" \
 fails "a seat beside a caller in no pane" pane \
   SIGN_ON_CLAUDE="$(seat nowhere rest 0)" sign-on --as independent --beside --cwd "$work/project" "$prompt"
 check "and no berth opens for it" false "$(test -f "$work/nowhere/args" && echo true || echo false)"
+
+fails "a launch on a host short of memory" memory \
+  SIGN_ON_CLAUDE="$(seat cramped rest 0)" SIGN_ON_MIN_MEMORY=1000000 \
+  sign-on --as independent --cwd "$work/project" "$prompt"
+check "and no berth opens for it" false "$(test -f "$work/cramped/args" && echo true || echo false)"
+SIGN_ON_MIN_MEMORY=1000000 sign-on --as independent --cwd "$work/project" "$prompt" 2>/dev/null
+check "a refusal for memory exits with the status that says try again later" 75 "$?"
+fails "a memory floor that is not a whole number" SIGN_ON_MIN_MEMORY \
+  SIGN_ON_MIN_MEMORY=8GB sign-on --as independent --cwd "$work/project" "$prompt"
 
 fails "a launch with an empty prompt" usage sign-on --as independent --cwd "$work/project" ""
 fails "a worker beside its caller" usage \

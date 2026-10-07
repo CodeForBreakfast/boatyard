@@ -10,6 +10,7 @@
 , startupGate ? null
 , mcpStartupTimeout ? null
 , startupTimeout ? 180
+, minAvailableMemory ? 8
 }:
 
 stdenvNoCC.mkDerivation {
@@ -28,6 +29,7 @@ stdenvNoCC.mkDerivation {
     wrapProgram $out/bin/sign-on --prefix PATH : ${lib.makeBinPath [ coreutils git ]} \
       --set-default SIGN_ON_CLAUDE ${lib.escapeShellArg claudeCommand} \
       --set-default SIGN_ON_START_TIMEOUT ${toString startupTimeout} \
+      --set-default SIGN_ON_MIN_MEMORY ${toString minAvailableMemory} \
       ${lib.optionalString (startupGate != null) "--set-default SIGN_ON_GATE ${lib.escapeShellArg startupGate}"} \
       ${lib.optionalString (mcpStartupTimeout != null) "--set-default SIGN_ON_MCP_TIMEOUT ${toString mcpStartupTimeout}"}
   '';
