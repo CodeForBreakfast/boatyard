@@ -242,7 +242,7 @@ The rules endpoint returns only rules from rulesets, so a branch under classic p
 
 Where neither endpoint answers, guess direct. A wrong direct guess is loud and cheap, because the push is rejected and the worker reports it. A wrong pull-request guess throttles an effort silently.
 
-**A merge is your act or the human's, never a worker's.** By default a worker stops at the merge button, you watch the pull request, and the human merges. Only where the repo's declared policy says its agents merge on green do you merge, and then you do it yourself.
+**Without a formula, a merge is your act or the human's, never a worker's.** By default a worker stops at the merge button, you watch the pull request, and the human merges. Only where the repo's declared policy says its agents merge on green do you merge, and then you do it yourself.
 
 The worker reads the rest from the repo: whether a pull request opens as a draft, and what its title must look like.
 
@@ -277,7 +277,8 @@ bdi --json --all --project <project> <project>:<molecule> \
 
 Act on each open step that is ready, or that waits only on its `gh:pr` gate, by whom it names:
 
-- **A step that names you, or a seat merging, is yours.** Do it, such as merging a pull request whose checks are green, and close it when it is done.
+- **A step that names you is yours.** Do it, such as merging a pull request whose checks are green, and close it when it is done.
+- **A step that names the delivering seat belongs to the worker while its seat is up.** It merges, settles the gate and closes the molecule itself, so leave those steps alone. If that seat has signed off or died with such a step still open, start a seat on the work bead to finish it.
 - **A step that names the human is their action.** Surface it once, as *The decisions topic carries the human's actions* says.
 - **A step that names the worker needs a seat**, such as a rework after review. Start one on the work bead as *Rework on a bead that already has a pull request* says.
 

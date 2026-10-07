@@ -138,7 +138,8 @@ The first line names the default. A line with `for` names the formula for one ki
 2. **Follow the steps.** `bd mol current <molecule>` shows which steps are done and which are ready. Do each ready step that is yours, then close it.
 
    A `gh:pr` gate is poured without its pull request. Once you open the pull request, give the gate its number with `bd update <gate> --await-id <n>`.
-3. **Stop at the first step that is someone else's**, such as a review or a merge. A merge is the steward's even where its step says a seat merges, because it waits on checks you need not stay for. Post the pull request's address, or what the step waits on, to the working topic, then finish. The steward acts on the molecule from here.
+3. **A step that names the delivering seat is yours, merges included.** Stay up until the checks are green for the commit you pushed, which `gh pr checks <n> --watch` waits on. A failing check is yours to fix. Then merge as the step says and close it, and do the steps after it that name you, such as settling the gate and closing the molecule. A merge your permission mode refuses goes to the human as *Getting the human's permission* says.
+4. **Stop at the first step that is someone else's**, such as a review, or a merge that names the steward or the human. Post the pull request's address, or what the step waits on, to the working topic, then finish. The steward acts on the molecule from here.
 
    **Leave your bead open.** The molecule holds it, and the bead goes ready only once the molecule's last step closes. If you closed that last step yourself, the work has landed, so close your bead in *Finish* as for direct delivery.
 
