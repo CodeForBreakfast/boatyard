@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+# A berth runs its command even when its shell's start-up reads the terminal,
+# as a dev shell's hook can. See docs/design.md, "The herdr adapter".
+#
+# Run it under with-herdr-yard, whose HOME is a throwaway, because it writes
+# the shell's start-up file there.
+#
+# Needs: bash, coreutils, jq, berth.
+set -uo pipefail
+
+: "${BERTH_BACKEND:?}" "${BERTH_YARD:?}"
+unset BERTH_ID
+
+work=$(mktemp -d)
+
+# A child in the foreground, as a dev shell's hook would be, reads whatever
+# reaches the terminal while it runs.
+cat >"$HOME/.bashrc" <<'EOF'
+timeout --foreground 2 cat >/dev/null
+EOF
+cp "$HOME/.bashrc" "$HOME/.bash_profile"
+
+id=$(berth open --as independent --cwd "$work" -- touch "$work/ran")
+
+for _ in $(seq 1 100); do
+  [ -f "$work/ran" ] && break
+  sleep 0.1
+done
+
+berth close "$id"
+
+if [ -f "$work/ran" ]; then
+  echo "ok: the command ran after the shell's start-up read the terminal"
+else
+  echo "FAIL: the command never ran after the shell's start-up read the terminal"
+  exit 1
+fi
