@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# sign-on: launches Claude Code in a berth, gets it past its startup gate and
-# attaches bilge-pump. See docs/design.md, "sign-on".
+# sign-on: launches Claude Code in a berth, attaches bilge-pump and gets it past
+# its startup gate. See docs/design.md, "sign-on".
 #
 # The host configures it through the environment:
 #
@@ -125,6 +125,11 @@ fi
 command=(env ${SIGN_ON_MCP_TIMEOUT:+"MCP_TIMEOUT=$SIGN_ON_MCP_TIMEOUT"} "${env[@]}" "$claude" "${flags[@]}" "${prompt[@]}")
 id=$(berth open --as "$as" ${place:+"$place"} ${focus:+--focus} --cwd "$cwd" ${label:+--label "$label"} -- "${command[@]}")
 
+# Attached before the gate, because a berth sign-on gives up on stays open and
+# goes to work once a person answers whatever stopped it.
+bilge-pump "$id" ${threshold:+--threshold "$threshold"} >&2 ||
+  die "bilge-pump did not attach, so the berth $id is up with no compactor."
+
 stuck() {
   die "the berth $id $1. It is left open to read: berth read $id, then berth close $id."
 }
@@ -155,8 +160,5 @@ else
     sleep 1
   done
 fi
-
-bilge-pump "$id" ${threshold:+--threshold "$threshold"} >&2 ||
-  die "bilge-pump did not attach, so the berth $id is up with no compactor."
 
 printf '%s\n' "$id"

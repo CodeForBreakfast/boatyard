@@ -117,8 +117,10 @@ It is written first. Its obligations beyond straight mapping:
 
 1. It asks `berth yard` which yard it is in, so that it works from a pane that is not a berth, then opens a berth through `berth open`.
 2. It starts the configured Claude Code command in that berth.
-3. It gets past the startup gate: `berth wait-text` for the gate's text, then `berth send-key Enter`, repeated until `berth read` no longer shows the gate. `wait-text` cannot tell when the gate has gone, because it searches recent output.
-4. It attaches `bilge-pump` to the berth.
+3. It attaches `bilge-pump` to the berth.
+4. It gets past the startup gate: `berth wait-text` for the gate's text, then `berth send-key Enter`, repeated until `berth read` no longer shows the gate. `wait-text` cannot tell when the gate has gone, because it searches recent output.
+
+The compactor goes on before the gate because a berth that `sign-on` gives up on stays open for a person to read. Once that person answers the prompt that stopped it, the seat goes to work, and it must not work without a compactor.
 
 The host supplies the site-specific parts as configuration:
 
