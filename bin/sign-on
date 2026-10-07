@@ -12,6 +12,8 @@
 #   SIGN_ON_MCP_TIMEOUT    Claude Code's MCP start-up timeout, in milliseconds.
 #   SIGN_ON_START_TIMEOUT  how long the agent may take to show its gate, or to
 #                          show at all, in seconds.
+#   SIGN_ON_MIN_MEMORY     the memory the host must have available for a seat
+#                          to start, in GiB. 0 turns the check off.
 #
 # Needs: bash, coreutils, git, berth, bilge-pump.
 set -euo pipefail
@@ -82,6 +84,29 @@ done
 claude=${SIGN_ON_CLAUDE:-claude}
 gate=${SIGN_ON_GATE:-}
 start_timeout=${SIGN_ON_START_TIMEOUT:-180}
+min_memory=${SIGN_ON_MIN_MEMORY:-8}
+
+# Prints MemAvailable in KiB, or fails where the host has no /proc/meminfo.
+available_kib() {
+  local key value _
+  while read -r key value _; do
+    [ "$key" != MemAvailable: ] || { printf '%s\n' "$value" && return 0; }
+  done </proc/meminfo
+  return 1
+} 2>/dev/null
+
+[[ $min_memory =~ ^[0-9]+$ ]] || die "SIGN_ON_MIN_MEMORY is '$min_memory', not a whole number of GiB."
+if [ "$min_memory" -gt 0 ]; then
+  if available=$(available_kib); then
+    if [ "$available" -lt $((min_memory * 1024 * 1024)) ]; then
+      echo "sign-on: the host has $((available / 1024 / 1024)) GiB of memory available, below the $min_memory GiB a seat needs. Start the seat once a running one has finished." >&2
+      exit 75 # sysexits' EX_TEMPFAIL, so a caller can tell "not now" from a failure.
+    fi
+  else
+    # ponytail: Linux only. macOS would need vm_stat's page counts.
+    echo "sign-on: the host does not report its available memory, so the seat starts without the $min_memory GiB check." >&2
+  fi
+fi
 
 BERTH_YARD=$(berth yard)
 export BERTH_YARD

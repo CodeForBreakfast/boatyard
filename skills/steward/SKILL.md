@@ -332,6 +332,8 @@ For each bead that is ready:
 
    Leave out `--model` for a seat on the default model. `sign-on` opens a berth kept with your other workers, starts Claude Code in it, gets it past its startup gate, and attaches the compactor that keeps its context lean across a long sleep. It prints the new berth's id, and the seat waits idle at its prompt.
 
+   **`sign-on` refuses a seat while the host is short of memory.** It then exits with status 75 and opens nothing. Leave the bead ready, start no other seat, and try again when a running seat finishes. With none of your seats running, tell the human the host is short of memory. Don't set a gate of your own.
+
    **`--cwd` is the project the seat is born in**, which decides its `CLAUDE.md`, its tracker, its skills and its lane. For a single-project effort that is your own project. For a strand in another project it is that project's main checkout, so the seat claims that project's bead directly. The repo the worker works in is a separate thing, carried in the brief.
 4. **Post the brief, then subscribe to its topic.** Fill in **Seat** with the berth id, post the brief to the working topic straight away, then `subscribe <project>/<effort>-<bead>`.
 5. **Type the worker its prompt:**
