@@ -152,7 +152,7 @@ The persistent set's start-up script calls `sign-on` too, so the gate logic exis
 | Skill | Role | Invocation |
 |---|---|---|
 | `steward` | Drives one multi-agent effort anchored on one bead. | slash only |
-| `worker` | Executes one bead as a berth in an effort. `sign-on` starts it by typing `/boatyard:worker <brief>`. | slash only |
+| `worker` | Executes one bead as a berth in an effort. The steward starts it with `sign-on`, posts its brief, then types `/boatyard:worker <topic>` into its berth. | slash only |
 | `muster` | Turns a body of work into an effort a steward can drive cold, then launches the steward. | model-invoked, so an agent told to start an effort can run it from its own seat. Its description says to use it only when invoked by name. |
 | `tally` | A read-only roll-up of every live effort and what each needs from a human. | model-invoked, so plain questions reach it. Its description says "boatyard" and "effort". |
 
