@@ -67,7 +67,7 @@ For each other project the effort touches, hold a working session with its conci
 
 1. **Post the strand's context** in the foreign channel, in a topic named for the effort: what the effort is, and which slice that project owns.
 2. **Find or create the beads.** Some slices already have beads and some don't. Work with the concierge to find the beads that cover the slice, or to create new ones, and take its lead on how to decompose the slice, where its edges sit, and whether something already covers it.
-3. **Get the slice into shape.** It must be sliced into outcomes, context-sized, briefable, and **wired inside its home tracker so that one worker can drive it to done without an unwired stall**. A half-wired foreign slice is a stall the steward will hit mid-effort, so land it now.
+3. **Get the slice into shape.** It must be filed as outcomes, context-sized, briefable, and **wired inside its home tracker so that one worker can drive it to done without an unwired stall**. A half-wired foreign slice is a stall the steward will hit mid-effort, so land it now.
 4. **Collect the ids and the ready state** the concierge reports.
 5. **Wire it in** with `bd dep add` from the waiting local bead, or the top bead, to the foreign id the concierge reported.
 
