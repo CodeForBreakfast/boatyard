@@ -146,7 +146,8 @@ A mod in the plugin compacts a session at the end of a turn once its free contex
 - **The engine supplies the figures.** At the end of each answered turn of the main loop, the mod reads the context fill and the auto-compact point from the session. It compacts with the same call that `/compact` makes.
 - **The figure is free context before auto-compact,** as a whole percentage of the space usable before auto-compact. A session with auto-compact off measures against its whole window.
 - **A turn with no figure is left alone.** The engine has none until a session's first response, and none straight after a compact, so the mod never compacts twice running. It does not compact after an interrupted turn, which the person is about to follow up, or at the end of a subagent's turn.
-- **Plugin settings turn it off and set the threshold,** which is 70 by default. `BOATYARD_COMPACT_THRESHOLD` in a session's environment gives that session its own threshold, which wins over the setting. `sign-on` sets it from a launch's compaction threshold. A value that is not a whole number is logged and ignored.
+- **A session is left alone unless it has opted in,** so a person's interactive session is never compacted by surprise. Setting `BOATYARD_COMPACT_THRESHOLD` in a session's environment opts that session in and gives it its own threshold, which wins over the plugin setting. `sign-on` sets it from a launch's compaction threshold. A value that is not a whole number is logged and ignored, and the session stays opted in at the setting's threshold.
+- **Plugin settings can opt in every session and set the threshold.** `compactAtRest` is off by default. The threshold is 70 by default.
 
 ## Skills
 

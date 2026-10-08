@@ -50,14 +50,28 @@ const TURN = { answer: 'done', durationMs: 1000, isAborted: false, turnId: 'turn
 // A share of free context before auto-compact, as tokens in use.
 const tokensAtFree = (percent: number) => AUTO_COMPACT_AT * (1 - percent / 100)
 
-test('compacts at the end of a turn below the threshold', async ($, on) => {
+const OPTED_IN = { BOATYARD_COMPACT_THRESHOLD: '70' }
+
+test('compacts an opted-in session at the end of a turn below the threshold', async ($, on) => {
+  const compactions = session(on, tokensAtFree(60), OPTED_IN)
+  await $.turn.complete({ ...TURN, reason: 'answer' })
+  expect(compactions.count).toBe(1)
+})
+
+test('leaves a session that has not opted in alone', async ($, on) => {
+  const compactions = session(on, tokensAtFree(10))
+  await $.turn.complete({ ...TURN, reason: 'answer' })
+  expect(compactions.count).toBe(0)
+})
+
+test('the plugin setting opts every session in', { options: { compactAtRest: true } }, async ($, on) => {
   const compactions = session(on, tokensAtFree(60))
   await $.turn.complete({ ...TURN, reason: 'answer' })
   expect(compactions.count).toBe(1)
 })
 
 test('does not compact at or above the threshold', async ($, on) => {
-  const compactions = session(on, tokensAtFree(70))
+  const compactions = session(on, tokensAtFree(70), OPTED_IN)
   await $.turn.complete({ ...TURN, reason: 'answer' })
   expect(compactions.count).toBe(0)
 })
@@ -71,24 +85,24 @@ test('does not compact when turned off', { options: { compactAtRest: false } }, 
 test('does not compact straight after its own compact', async ($, on) => {
   // The engine reports no context figure until the first response after a
   // compact.
-  const compactions = session(on, undefined)
+  const compactions = session(on, undefined, OPTED_IN)
   await $.turn.complete({ ...TURN, reason: 'answer' })
   expect(compactions.count).toBe(0)
 })
 
 test('does not compact after a turn the person interrupted', async ($, on) => {
-  const compactions = session(on, tokensAtFree(10))
+  const compactions = session(on, tokensAtFree(10), OPTED_IN)
   await $.turn.complete({ ...TURN, isAborted: true, reason: 'aborted' })
   expect(compactions.count).toBe(0)
 })
 
 test('does not compact for a subagent', async ($, on) => {
-  const compactions = session(on, tokensAtFree(10))
+  const compactions = session(on, tokensAtFree(10), OPTED_IN)
   await $.turn.complete({ ...TURN, agentId: 'agent-1', reason: 'answer' })
   expect(compactions.count).toBe(0)
 })
 
-test('takes the threshold from the plugin setting', { options: { compactThreshold: 50 } }, async ($, on) => {
+test('takes the threshold from the plugin setting', { options: { compactAtRest: true, compactThreshold: 50 } }, async ($, on) => {
   const compactions = session(on, tokensAtFree(60))
   await $.turn.complete({ ...TURN, reason: 'answer' })
   expect(compactions.count).toBe(0)
