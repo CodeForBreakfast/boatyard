@@ -126,16 +126,19 @@ Delivery formula for <kind of work>: `<formula>`
 
 The first line names the default. A line with `for` names the formula for one kind of work. Use the formula for your bead's kind of work where a line names one, and the default otherwise. The formula's steps say how the work lands and who acts at each step, so they replace the rest of this section, except that any branch you push is still based on the default branch.
 
-1. **Pour the formula when your work is ready to deliver, and make your bead wait on its outcome step.** Each formula labels one step `outcome`, the step that closes once the work has landed:
+1. **Pour the formula when your work is ready to deliver, rewire its merge gate, and make your bead wait on its outcome step.** Each formula labels one step `outcome`, the step that closes once the work has landed:
 
    ```bash
-   bd mol pour <formula> --var bead=<id> --var repo=<owner>/<repo> --json
+   j=$(bd mol pour <formula> --var bead=<id> --var repo=<owner>/<repo> --json)
+   # rewire the gate here, as the formula's description says
    bd list --parent <molecule> --label outcome --include-gates --json
    bd dep add <id> <outcome-step>
    bd note <id> "Delivering through <formula>, molecule <molecule>, outcome step <outcome-step>."
    ```
 
    The molecule's id is `new_epic_id` in the output. `id_mapping` gives each step's id under `<formula>.<step>`, and a gated step's gate under `<formula>.gate-<step>`. **If your bead already depends on an outcome step, a seat before you poured its molecule.** Carry on with that one rather than pour a second.
+
+   **A formula's `gh:pr` gate is its merge step, so rewire it straight after the pour.** bd pours the gate in front of the step that declares it. Turn that edge round so the gate waits on the steps before it, make every following step wait on the gate, and give the gate its title. Where the merge is the outcome, the gate takes the `outcome` label, which is why the lookup above includes gates. `bd formula show <formula>` prints the formula's description, which gives the commands. Rewire before you look up the outcome step, or you will find none.
 2. **Follow the steps.** `bd mol current <molecule>` shows which steps are done and which are ready. A step's title states the outcome it reaches, and its description says who acts. Read the description with `bd show <step>`. Do each ready step that is yours, then close it.
 
    A `gh:pr` gate is poured without its pull request. Once you open the pull request, give the gate its number with `bd update <gate> --await-id <n>`.
