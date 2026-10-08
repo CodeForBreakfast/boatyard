@@ -93,7 +93,7 @@ This holds because a steward acquires its commy identity lazily, on its first po
      | jq -r '.[]? | select(.await_type == "gh:pr" and .status == "closed" and .metadata.outside_effort != "true") | "\(.metadata.repo)#\(.await_id)"'
    ```
 
-   A ready bead that depends on a closed delivery molecule is delivered too, so close it.
+   A ready bead that depends on a closed outcome step of a delivery molecule is delivered too, so close it.
 5. **Review the graph for errors.** bdi reports every edge in the effort's tree that leads nowhere. First run `bd gate check --type=gh:pr`, so a merged pull request's gate is already closed. Then read the top bead's trees across every project, because an edge into a project bdi did not read would otherwise look missing:
 
    ```bash
@@ -134,7 +134,7 @@ This holds because a steward acquires its commy identity lazily, on its first po
       ```
 
       Its dependency on its question bead keeps it out of `bd ready` until the human answers, and an open pull-request gate keeps it out until the merge. Then start a fresh worker on it in the next `-r` topic, with the answer quoted from the question bead in its brief. A bead that waited on a permission or an action is ready at once, and its fresh worker asks again.
-   2. **Otherwise an open `gh:pr` gate or an open delivery molecule means the bead is in delivery**, as *A bead closes on merge* and *A bead delivered by a formula* say. No seat is on it, so never relay to it and never start a worker on it. Poll its pull request, or read its molecule.
+   2. **Otherwise an open `gh:pr` gate or an open outcome step of a delivery molecule means the bead is in delivery**, as *A bead closes on merge* and *A bead delivered by a formula* say. No seat is on it, so never relay to it and never start a worker on it. Poll its pull request, or read its molecule.
 
    ```bash
    bd list --has-metadata-key blocked_on --limit 0 --json
@@ -152,7 +152,7 @@ This holds because a steward acquires its commy identity lazily, on its first po
      | "\($b.id) \(.metadata.repo)#\(.await_id) gate \(.id)"'
    ```
 
-   Under a delivery formula, the bead this lists is a step of a molecule, and the bead in delivery is the work bead that depends on that molecule.
+   Under a delivery formula, the bead this lists is a step of a molecule, and the bead in delivery is the work bead that depends on that molecule's outcome step.
 
    **Last, check every open or in-progress effort bead that names a berth.** A bead in delivery should name none, and one that does names a seat that left without finishing. Check each berth other than your own, and clear each bead whose berth is no longer its seat, as *Watching the berths you started* says:
 
@@ -176,7 +176,7 @@ The wake ritual tells you the state. The push gate is what you owe before you re
 
    **Nor is a foreign bead that another project accepted, filed, and promised to report back on.** It looks like everything you wanted: a fast reply, a real bead id, a named owner. It is still a place in a queue, and it moves on that project's priorities rather than your effort's. The question is not whether someone accepted it. The question is whether a seat is running on it right now. If not, start one born in that project, and say so in that project's channel so its concierge can stand it down if it would rather own the scheduling.
 3. **A surfaced ask.** It waits only on the human, as an open question bead labelled `human` that the strand depends on, or as an action filed where your host keeps the human's actions, or in the decisions topic where it keeps none.
-4. **In delivery.** The bead sits behind the open `gh:pr` gate of its own pull request, or behind an open delivery molecule whose ready steps are not the worker's. It has no seat, correctly. What you owe it is the watch in *Watching your pull requests*, or the reading in *A bead delivered by a formula*, not a new worker.
+4. **In delivery.** The bead sits behind the open `gh:pr` gate of its own pull request, or behind the open outcome step of a delivery molecule whose ready steps are not the worker's. It has no seat, correctly. What you owe it is the watch in *Watching your pull requests*, or the reading in *A bead delivered by a formula*, not a new worker.
 5. **Capped.** The strand could start, but its repo already holds this effort's limit of unmerged pull requests. Only a merge releases it.
 6. **Blocked by a dependency.** `bd` shows an unmet blocker other than the bead's own pull-request gate, such as a gate on a pull request outside the effort, or `bdi` reads a foreign dependency as not closed. A worker started here would build on code that is not on the default branch yet.
 7. **Deferred to a date.** The strand cannot start before a known date, and its bead records it with `bd defer <bead> --until <date>`. bd returns the bead to `bd ready` once the date passes, whether or not any steward is still running, so the date survives your session.
@@ -230,7 +230,7 @@ Some repos take a commit on the default branch. Others take a pull request. That
 
 **The brief does not carry the mode.** A worker is born in the repo with that repo's instructions loaded, so it reads how work lands there just as you do. A copy in the brief is a second one to go stale. Where a repo declares nothing, get a policy written into that repo rather than a paragraph into a brief.
 
-**A repo that names a delivery formula carries its mode in the formula.** A repo's `CLAUDE.md`, or the `CLAUDE.local.md` beside it, may name a beads formula on a line that starts `Delivery formula`. The worker pours that formula for its bead, makes its bead depend on the molecule it poured, and follows the steps. The steps say how the work lands and who acts at each step, including whose the merge is. So for such a repo you read neither its prose nor GitHub, and you act on the molecule as *A bead delivered by a formula* says. The rest of this section is for a repo that names no formula.
+**A repo that names a delivery formula carries its mode in the formula.** A repo's `CLAUDE.md`, or the `CLAUDE.local.md` beside it, may name a beads formula on a line that starts `Delivery formula`. The worker pours that formula for its bead, makes its bead depend on the poured molecule's step labelled `outcome`, and follows the steps. Each step's title states an outcome, and its description says how the work lands and who acts, including whose the merge is. So for such a repo you read neither its prose nor GitHub, and you act on the molecule as *A bead delivered by a formula* says. The rest of this section is for a repo that names no formula.
 
 **Read the project's own statement first.** A repo's `CLAUDE.md`, or the `CLAUDE.local.md` beside it, may say how work lands there. That statement decides the mode, and no probe overrules it, because a private repo on a free plan can hold no branch protection at all, so a project that delivers by policy looks direct to every probe.
 
@@ -273,20 +273,27 @@ A bead that merely has to land later, or would edit the same file, gets no edge.
 
 ### A bead delivered by a formula
 
-The work bead depends on its molecule and stays `open` behind it. A molecule closes itself when its last step closes, so the bead goes ready only once its work has landed. Close it then, rather than start a worker on it.
+The work bead depends on its molecule's outcome step, the one step labelled `outcome`, and stays `open` behind it. The outcome step closes once the work has landed, and only then does the bead go ready. Close it at that point, rather than start a worker on it. The worker's note on the bead names the molecule and its outcome step.
 
-At each wake, read each open molecule's steps through `bdi`, in your project or another:
+At each wake, read each open molecule's steps through `bdi`, in your project or another. A step's title states the outcome it reaches, and only its description says who acts, so read the descriptions too:
 
 ```bash
-bdi --json --all --project <project> <project>:<molecule> \
-  | jq -r '.trees[].nodes[] | select(.status != "closed")
-           | "\(.id) ready=\(.ready) blocked_by=\(.blocked_by | join(",")) \(.title)"'
+steps=$(bdi --json --all --project <project> <project>:<molecule> \
+  | jq --arg m <molecule> '[.trees[] | reduce .nodes[] as $n ({at: null, ids: []};
+      if $n.id == $m then .at = $n.depth
+      elif .at == null then .
+      elif $n.depth <= .at then .at = null
+      elif $n.depth == .at + 1 and $n.edge == "parent-child" then .ids += [$n.id]
+      else . end) | .ids[]] | unique')
+bdi --beads --project <project> \
+  | jq -r --argjson steps "$steps" '.beads[] | select(.id as $i | $steps | index($i))
+           | "\(.id) ready=\(.ready) blocked_by=\(.blocked_by | join(",")) \(.title)\n  \(.description)"'
 ```
 
-Act on each open step that is ready, or that waits only on its `gh:pr` gate, by whom it names:
+Act on each open step that is ready, or that waits only on its `gh:pr` gate, by the actor its description names:
 
 - **A step that names you is yours.** Do it, such as merging a pull request whose checks are green, and close it when it is done.
-- **A step that names the delivering seat belongs to the worker while its seat is up.** It merges, settles the gate and closes the molecule itself, so leave those steps alone. If that seat has signed off or died with such a step still open, start a seat on the work bead to finish it.
+- **A step that names the seat or the delivering seat belongs to the worker while its seat is up.** It merges, settles the gate and closes the outcome step itself, so leave those steps alone. If that seat has signed off or died with such a step still open, start a seat on the work bead to finish it.
 - **A step that names the human is their action.** Surface it once, as *The decisions topic carries the human's actions* says.
 - **A step that names the worker needs a seat**, such as a rework after review. Start one on the work bead as *Rework on a bead that already has a pull request* says.
 
@@ -457,7 +464,7 @@ Then act on `state` first:
 | `MERGED` | Close its gate with `bd gate resolve <gate>`, close the bead, fast-forward the main checkout as *Advancing the chain* says, then re-check `bd ready`. |
 | `CLOSED` | Nobody will merge it, and its gate stays open. File a question bead, asking whether to reopen it, redo it, or drop the bead. A bead in delivery on a dead pull request blocks its dependents for ever. Once the human answers, close the gate with `bd gate resolve <gate>`, unless they reopen the pull request. |
 
-**Under a delivery formula, the molecule decides who reviews and who merges.** The draft row and the merge-on-green row give way to the molecule's ready steps, as *A bead delivered by a formula* says. On `MERGED`, close the gate but not the bead: the bead closes once its molecule has.
+**Under a delivery formula, the molecule decides who reviews and who merges.** The draft row and the merge-on-green row give way to the molecule's ready steps, as *A bead delivered by a formula* says. On `MERGED`, close the gate but not the bead: the bead closes once its outcome step has.
 
 **The age rule is what stops a capped effort sleeping for ever.** With every strand capped or in delivery, the gate is satisfied and you sleep, while the one person who can release the cap may not know they are the blocker. Raise it **once** per pull request. A queue that repeats itself trains the human to stop reading it.
 

@@ -126,22 +126,23 @@ Delivery formula for <kind of work>: `<formula>`
 
 The first line names the default. A line with `for` names the formula for one kind of work. Use the formula for your bead's kind of work where a line names one, and the default otherwise. The formula's steps say how the work lands and who acts at each step, so they replace the rest of this section, except that any branch you push is still based on the default branch.
 
-1. **Pour the formula when your work is ready to deliver, and make your bead wait on it:**
+1. **Pour the formula when your work is ready to deliver, and make your bead wait on its outcome step.** Each formula labels one step `outcome`, the step that closes once the work has landed:
 
    ```bash
    bd mol pour <formula> --var bead=<id> --var repo=<owner>/<repo> --json
-   bd dep add <id> <molecule>
-   bd note <id> "Delivering through <formula>, molecule <molecule>."
+   bd list --parent <molecule> --label outcome --json
+   bd dep add <id> <outcome-step>
+   bd note <id> "Delivering through <formula>, molecule <molecule>, outcome step <outcome-step>."
    ```
 
-   The molecule's id is `new_epic_id` in the output. `id_mapping` gives each step's id under `<formula>.<step>`, and a gated step's gate under `<formula>.gate-<step>`. **If your bead already depends on a molecule, a seat before you poured it.** Carry on with that one rather than pour a second.
-2. **Follow the steps.** `bd mol current <molecule>` shows which steps are done and which are ready. Do each ready step that is yours, then close it.
+   The molecule's id is `new_epic_id` in the output. `id_mapping` gives each step's id under `<formula>.<step>`, and a gated step's gate under `<formula>.gate-<step>`. **If your bead already depends on an outcome step, a seat before you poured its molecule.** Carry on with that one rather than pour a second.
+2. **Follow the steps.** `bd mol current <molecule>` shows which steps are done and which are ready. A step's title states the outcome it reaches, and its description says who acts. Read the description with `bd show <step>`. Do each ready step that is yours, then close it.
 
    A `gh:pr` gate is poured without its pull request. Once you open the pull request, give the gate its number with `bd update <gate> --await-id <n>`.
-3. **A step that names the delivering seat is yours, merges included.** Stay up until the checks are green for the commit you pushed, which `gh pr checks <n> --watch` waits on. A failing check is yours to fix. Then merge as the step says and close it, and do the steps after it that name you, such as settling the gate and closing the molecule. A merge your permission mode refuses goes to the human as *Getting the human's permission* says.
-4. **Stop at the first step that is someone else's**, such as a review, or a merge that names the steward or the human. Post the pull request's address, or what the step waits on, to the working topic, then finish. The steward acts on the molecule from here.
+3. **A step whose description names the seat or the delivering seat as its actor is yours, merges included.** Stay up until the checks are green for the commit you pushed, which `gh pr checks <n> --watch` waits on. A failing check is yours to fix. Then merge as the step says and close it, and do the steps after it whose descriptions name you, such as settling the gate and closing the outcome step. A merge your permission mode refuses goes to the human as *Getting the human's permission* says.
+4. **Stop at the first step whose description names someone else**, such as a review, or a merge that names the steward or the human. Post the pull request's address, or what the step waits on, to the working topic, then finish. The steward acts on the molecule from here.
 
-   **Leave your bead open.** The molecule holds it, and the bead goes ready only once the molecule's last step closes. If you closed that last step yourself, the work has landed, so close your bead in *Finish* as for direct delivery.
+   **Leave your bead open.** The outcome step holds it, and the bead goes ready only once that step closes. If you closed the outcome step yourself, the work has landed, so close your bead in *Finish* as for direct delivery.
 
 **Direct to the default branch.** Commit and push by the project's conventions. The work is delivered when it is pushed, and your bead closes in *Finish*. Nothing else in this section applies.
 
@@ -179,11 +180,11 @@ If that push is rejected because the branch is protected, the repo's statement w
 
 When the deliverable meets the brief's definition of done, wind the seat down in this order. The steward can reclaim your berth the moment it sees your sign-off, so steps 4 to 6 go in one response.
 
-1. **Bring the bead up to date.** With direct delivery, close it by your project's conventions. With a pull request, or a delivery molecule that is still open, put it back to `open`, because its gate or molecule holds it and the steward closes it once the work lands. Either way, clear every key that says a seat is on it:
+1. **Bring the bead up to date.** With direct delivery, close it by your project's conventions. With a pull request, or a delivery outcome step that is still open, put it back to `open`, because its gate or outcome step holds it and the steward closes it once the work lands. Either way, clear every key that says a seat is on it:
 
    ```bash
    bd update <id> --unset-metadata agent_pane --unset-metadata working_topic
-   bd update <id> --status open    # with a pull request or an open molecule only
+   bd update <id> --status open    # with a pull request or an open outcome step only
    ```
 
    The steward reads a bead holding `working_topic` as one with a live worker. `bd close` takes no metadata flags, so this is its own update before the close.
