@@ -157,10 +157,12 @@ The persistent set's start-up script calls `sign-on` too, so the gate logic exis
 
 | Skill | Role | Invocation |
 |---|---|---|
-| `steward` | Drives one multi-agent effort anchored on one bead. | slash only |
+| `steward` | Drives one multi-agent effort from its top bead. | slash only |
 | `worker` | Executes one bead as a berth in an effort. The steward starts it with `sign-on`, posts its brief, then types `/boatyard:worker <topic>` into its berth. | slash only |
 | `muster` | Turns a body of work into an effort a steward can drive cold, then launches the steward. | model-invoked, so an agent told to start an effort can run it from its own seat. Its description says to use it only when invoked by name. |
 | `tally` | A read-only roll-up of every live effort and what each needs from a human. | model-invoked, so plain questions reach it. Its description says "boatyard" and "effort". |
+
+An effort is its top bead and everything that bead depends on, followed transitively across trackers. The top bead states the outcome the effort delivers, and parent links put nothing in an effort. `muster` adopts or files the top bead rather than creating an epic to anchor the effort. It files the work as observable outcomes, each wired to the outcomes it needs, and places a bead that is true only after a release or deployment downstream of that release. An epic is an "and" over the outcomes it depends on. The steward is started with the top bead, and the effort's slug, index line and berth are keyed on it. The effort ends when someone who has seen the evidence for its outcome closes the top bead.
 
 The slash-only skills set `disable-model-invocation: true`, because plugin skills cannot be disabled one at a time. Claude Code then refuses them to the Skill tool, so only a typed command or a launch prompt starts one.
 
