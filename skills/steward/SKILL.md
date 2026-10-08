@@ -480,7 +480,14 @@ On every completion, merge or unblock, update the bead graph, see what `bd ready
 
 **While any effort bead's pull request is open, the effort is not finished.** Only you are watching that unlanded work, so sleep through the review rather than closing.
 
-**The effort ends when the top bead closes, and you never close it on your own say-so.** Whoever closes it has seen the evidence that its outcome is true. Once everything it depends on has closed, the top bead goes ready like any other bead. Start a worker on it to check that evidence and close it. Where only the human can see the evidence, closing it is their action.
+**The effort ends when the top bead closes, and you never close it on your own say-so.** Whoever closes it has seen the evidence that its outcome is true. When the top bead goes ready, start no worker on it. File a bead to check that evidence instead, and make the top bead depend on it:
+
+```bash
+e=$(bd create --silent --title "Check the evidence that <top-bead> is true" --description "<the evidence the top bead names>")
+bd dep add <top-bead> "$e"
+```
+
+Start a worker on that bead, and brief it to close the bead with what it saw, then close the top bead. Its berth lands on the evidence bead, so yours stays on the top bead. Where only the human can see the evidence, closing the top bead is their action.
 
 When the top bead has closed:
 
