@@ -120,7 +120,7 @@ sign-on --as independent [--beside] --cwd <this project's checkout> --label <eff
   "/boatyard:steward <top-bead>"
 ```
 
-Either way the steward's berth is independent of yours, so closing your seat leaves the steward running. `sign-on` starts Claude Code there, gets it past its startup gate, attaches the compactor, and prints the new berth's id. It births the seat in the project's main checkout, where the top bead's tracker and instructions are.
+Either way the steward's berth is independent of yours, so closing your seat leaves the steward running. `sign-on` starts Claude Code there, gets it past its startup gate, opts it in to the compaction mod, and prints the new berth's id. It births the seat in the project's main checkout, where the top bead's tracker and instructions are.
 
 If `sign-on` fails, report its message. Where the message says your seat is in no multiplexer, because no backend is named or your seat is in no pane, give the human the line `/boatyard:steward <top-bead>` to start by hand, and say which project the top bead lives in. Where it opened a berth and then got stuck, its message names that berth, so pass the name on for the human to read and close.
 

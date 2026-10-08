@@ -3,8 +3,7 @@
 # wherever nixpkgs has an attribute of that name, so none of these may share
 # one.
 #
-# berth and bilge-pump are not dependencies: sign-on uses whichever the host
-# puts on the path.
+# berth is not a dependency: sign-on uses whichever the host puts on the path.
 { lib, stdenvNoCC, makeWrapper, bash, coreutils, git
 , claudeCommand ? "claude"
 , startupGate ? null

@@ -11,11 +11,11 @@ These are decided and changed here, and nowhere else:
   multiplexer, herdr's first.
 - **The launcher.** `sign-on`, including how it gets a seat past Claude Code's
   startup gate.
-- **The compactor.** `bilge-pump` and its statusline tap.
+- **The compactor.** The plugin's mod that compacts a session at rest.
 - **The orchestration skills.** `steward`, `worker`, `muster` and `tally`, and
   the plugin that carries them.
 - **The packaging.** The flake, its packages and checks, and the rules for how
-  a host supplies its multiplexer, Claude Code command and state directory.
+  a host supplies its multiplexer and Claude Code command.
 - **The design.** `docs/design.md`, and the migration steps it sets out.
 
 A user's deployment, configuration and data live with that user, not here.
@@ -67,7 +67,7 @@ commit message. Write the title as a conventional commit:
 - **type** is one of `build`, `chore`, `ci`, `docs`, `feat`, `fix`, `perf`,
   `refactor`, `revert`, `style`, `test`. A `!` before the colon marks a breaking
   change.
-- **scope** is optional and closed: `berth`, `bilge-pump`, `sign-on`, `skills`,
+- **scope** is optional and closed: `berth`, `sign-on`, `skills`,
   `ci`, `flake`, `docs`, `tests`, `deps`. Leave it out rather than coin one; a
   new scope is a change to the check.
 - **description** is lower case, in the imperative, and has no full stop at the
