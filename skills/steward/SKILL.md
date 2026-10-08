@@ -294,7 +294,7 @@ Act on each open step that is ready by the actor its title and description name.
 
 - **A step that names you is yours.** Do it, such as merging a pull request whose checks are green, and close it when it is done.
 - **A step that names the seat or the delivering seat belongs to the worker while its seat is up.** It merges, settles the gate and closes the outcome step itself, so leave those steps alone. If that seat has signed off or died with such a step still open, start a seat on the work bead to finish it.
-- **A step that names the human is their action, and the step is its record.** Surface it once in the decisions topic, carrying the pull request where the step has one. File no separate action for it, because the step already sits in the tracker.
+- **A step that names the human is theirs, and the step is the one record of it.** The human sees it ready in the tracker, so file nothing and post nothing for it.
 - **A step that names the worker needs a seat**, such as a rework after review. Start one on the work bead as *Rework on a bead that already has a pull request* says.
 
 A `gh:pr` gate carries its pull request. Watch that pull request as *Watching your pull requests* says. `bd gate check` closes the gate once the pull request merges.
@@ -308,7 +308,7 @@ mol-k7.2   The human merges the pull request     gate, ready      waits on mol-k
 mol-k7.3   The retry flag is on main             outcome, open    waits on mol-k7.2
 ```
 
-The gate is ready and names the human, so post it once in the decisions topic with its pull request. When they merge, `bd gate check` closes the gate, and the outcome step goes ready for whoever it names.
+The gate is ready and names the human, so it is their turn, and you file and post nothing. When they merge, `bd gate check` closes the gate, and the outcome step goes ready for whoever it names.
 
 ### The cap: two unmerged pull requests per repo
 
