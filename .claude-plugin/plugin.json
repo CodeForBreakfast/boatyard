@@ -10,8 +10,8 @@
     "compactAtRest": {
       "type": "boolean",
       "title": "Compact at rest",
-      "description": "Compact the session at the end of a turn once its free context falls below the threshold.",
-      "default": true
+      "description": "Compact every session at the end of a turn once its free context falls below the threshold. Off, a session is compacted only if its environment sets BOATYARD_COMPACT_THRESHOLD.",
+      "default": false
     },
     "compactThreshold": {
       "type": "number",

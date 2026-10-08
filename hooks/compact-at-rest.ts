@@ -2,8 +2,8 @@ import type { EngineInterface, PluginOptions, Register } from 'claude-code'
 
 const WHOLE_NUMBER = /^\d+$/
 
-// A launcher sets BOATYARD_COMPACT_THRESHOLD in a session's environment to
-// give that session its own threshold over the plugin setting.
+// A launcher sets BOATYARD_COMPACT_THRESHOLD in a session's environment to opt
+// that session in, and to give it its own threshold over the plugin setting.
 async function thresholdFor($: EngineInterface, options: PluginOptions): Promise<number> {
   const override = await $.env.get('BOATYARD_COMPACT_THRESHOLD')
   if (override === undefined) return Number(options.compactThreshold)
@@ -24,11 +24,10 @@ async function freeBeforeAutoCompact($: EngineInterface): Promise<number | undef
 }
 
 export const register: Register = (on, options) => {
-  if (options.compactAtRest === false) return
-
   on('turn.complete', async ($, e, next) => {
     const answered = await next(e)
     if (e.agentId !== undefined || e.reason !== 'answer') return answered
+    if (options.compactAtRest !== true && (await $.env.get('BOATYARD_COMPACT_THRESHOLD')) === undefined) return answered
 
     const free = await freeBeforeAutoCompact($)
     if (free !== undefined && free < (await thresholdFor($, options))) {
