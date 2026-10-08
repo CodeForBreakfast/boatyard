@@ -47,9 +47,9 @@ The top bead states the outcome the effort delivers, such as "installed and work
 
 The top bead is the effort's cold-restart record, as *Wire the graph* describes. It lives in the project you are running in, which is the project the steward runs in. Whoever closes it has seen the evidence that its outcome is true, and the effort ends when it closes.
 
-## Slice the work into outcomes
+## File the work as outcomes
 
-**File each vertical slice of the work as an outcome bead that someone outside the change can observe.** A slice may depend on smaller beads, one per layer, each providing what that slice needs from its layer. The slice bead is what groups its layer beads, so file no layer bead that no slice depends on.
+**File the work as outcome beads that someone outside the change can observe, and wire each outcome to the outcomes it needs.**
 
 ## Audit local beads for size and briefability
 
@@ -98,13 +98,13 @@ Before you start the steward, confirm that the graph can be driven. All of these
 
 - `bd dep cycles` returns nothing.
 - Something in the effort can start now: it is in `bd ready`, and every foreign dependency it has is closed.
-- Every vertical slice is an observable outcome bead, and every bead is context-sized and briefable.
+- Every bead is an observable outcome, context-sized and briefable.
 - Every bead in the effort is reachable from the top bead through dependency edges, and every bead that is true only after a release or deployment sits downstream of it.
 - Every foreign strand is confirmed in good shape by its home project, and wired into the graph as an edge on its home-project id.
 - The top bead states the outcome and its evidence, the effort's shape and what is settled, and carries the effort slug in its metadata. It restates nothing the graph holds.
 - Every edge is a real dependency, and beads that would collide in one file have had their structure considered.
 
-For a graph that is not trivial, give **one** throwaway subagent an adversarial review of it, and keep only its verdict. Its brief: hunt for edges that only order work, colliding beads a better structure would separate, missing blockers including work built on unmerged code, layer beads that no slice depends on, a release or deployment wired upstream of the work it ships, beads reached only through a parent link, oversized beads, unwired foreign strands, and a top bead that would not let a cold steward rebuild the effort. Fix what it finds. This review is your own quality check, not a gate on the human. Where your seat may not start subagents, as a concierge's often may not, the review does not run, and the checks above remain the real bar.
+For a graph that is not trivial, give **one** throwaway subagent an adversarial review of it, and keep only its verdict. Its brief: hunt for edges that only order work, colliding beads a better structure would separate, missing blockers including work built on unmerged code, beads that state a task rather than an observable outcome, a release or deployment wired upstream of the work it ships, beads reached only through a parent link, oversized beads, unwired foreign strands, and a top bead that would not let a cold steward rebuild the effort. Fix what it finds. This review is your own quality check, not a gate on the human. Where your seat may not start subagents, as a concierge's often may not, the review does not run, and the checks above remain the real bar.
 
 **There is no confirmation checkpoint.** Flow through the building, splitting, wiring and foreign shaping, and say what you do as you do it: beads created, splits made, edges added, slices confirmed. The human interrupts if something looks wrong. Don't stop to wait for approval.
 
