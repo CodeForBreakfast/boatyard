@@ -258,7 +258,7 @@ The worker reads the rest from the repo: whether a pull request opens as a draft
 
 The worker opens the pull request, blocks its bead on it with a `gh:pr` gate that names the repo, leaves the bead `open`, and leaves. The gate keeps the bead out of `bd ready`. **You close that bead, and only once the pull request merges.** The merge closes the gate and the bead goes ready, but its work is finished, so close it rather than start a worker on it.
 
-Where the human merges and your host files the human's actions in a tracker of its own, the merge is an action like any other. File it there, carrying the pull request, as your host says. The work bead still waits only on its gate, so add no edge from it to the merge action.
+**The human's review or merge of a pull request is not an action.** The gate that holds the bead is the one record of it, and the human sees it in the tracker. File nothing for it and post nothing about it.
 
 A bead that is not closed blocks its dependents, so none of them reaches `bd ready` until the code it needs is on the default branch. Close a bead when its pull request opens and dependents can start against unmerged work, which is how an effort becomes a tower of stacked pull requests that can only be reviewed bottom up.
 
@@ -396,7 +396,7 @@ Starting workers is a **loop**, not a kickoff. Start one at each ready bead, and
 One topic per effort, `#<project>/<effort>-decisions`:
 
 - **A question never goes in it.** A question that you need the human to settle, such as architecture, money, an external commitment or a pull request nobody will merge, goes on its own bead labelled `human`, filed as a worker files one. The top bead, or the bead the question holds up, depends on it.
-- **Only actions the human must take go in it**: provide this credential, trigger this deploy, review this pull request. Everything in it is waiting on the human. No status, no chatter, no acknowledgements. Where your host files the human's actions in a tracker of its own, file each action there instead, and make the waiting bead depend on it. The decisions topic then carries only a pointer to it.
+- **Only actions the human must take go in it**: provide this credential, trigger this deploy. A review or merge of a pull request is not one, as *A bead closes on merge* says. Everything in it is waiting on the human. No status, no chatter, no acknowledgements. Where your host files the human's actions in a tracker of its own, file each action there instead, and make the waiting bead depend on it. The decisions topic then carries only a pointer to it.
 - **Don't mention the human.** Their queue is where they look. Mention them only when waiting costs something that grows by the hour, such as an outage, and then once, in one line that links the ask. Commy's `list_humans` gives their name.
 - **Shape every ask as `using-commy` describes.**
 - **Keep it current.** When the human acts, edit or close that item with `edit_message`, so the topic never shows a stale ask.
@@ -455,18 +455,14 @@ Then act on `state` first:
 
 | What you see | What you do |
 |---|---|
-| `OPEN`, `isDraft: true` | Ask the human to review it, **once**, as an action. A merge action already filed for it is that ask. They mark it ready themselves, and that change is your answer, so never ask again. |
+| `OPEN`, a draft, or not a draft with no `reviewDecision` | Nothing. It waits on the human's review or merge, and its gate is the one record of that. |
 | `OPEN`, not a draft, every check green, **and the repo's declared policy says its agents merge on green** | Merge it with `gh pr merge <n> -R "$OWNER/$REPO" --squash --delete-branch`, then act on the `MERGED` row in the same pass. Without that policy this row does not exist, and the merge is the human's. |
-| `OPEN`, not a draft, no `reviewDecision`, opened recently | Nothing. It is with the reviewers. |
-| `OPEN`, not a draft, no `reviewDecision`, **more than two days old** | Raise it once as holding up the effort, on its merge action where there is one, and in the decisions topic otherwise. |
 | `OPEN`, `reviewDecision: CHANGES_REQUESTED`, or a failing check | Start a rework seat on the same bead, with the review comments in the brief. |
 | `OPEN`, `mergeStateStatus: BEHIND` or `DIRTY` | Start a rework seat on the same bead to rebase. |
 | `MERGED` | Close its gate with `bd gate resolve <gate>`, close the bead, fast-forward the main checkout as *Advancing the chain* says, then re-check `bd ready`. |
 | `CLOSED` | Nobody will merge it, and its gate stays open. File a question bead, asking whether to reopen it, redo it, or drop the bead. A bead in delivery on a dead pull request blocks its dependents for ever. Once the human answers, close the gate with `bd gate resolve <gate>`, unless they reopen the pull request. |
 
-**Under a delivery formula, the molecule decides who reviews and who merges.** The draft row and the merge-on-green row give way to the molecule's ready steps, as *A bead delivered by a formula* says. On `MERGED`, close the gate but not the bead: the bead closes once its outcome step has.
-
-**The age rule is what stops a capped effort sleeping for ever.** With every strand capped or in delivery, the gate is satisfied and you sleep, while the one person who can release the cap may not know they are the blocker. Raise it **once** per pull request. A queue that repeats itself trains the human to stop reading it.
+**Under a delivery formula, the molecule decides who reviews and who merges.** The row that waits on the human and the merge-on-green row give way to the molecule's ready steps, as *A bead delivered by a formula* says. On `MERGED`, close the gate but not the bead: the bead closes once its outcome step has.
 
 **`mergeStateStatus: UNKNOWN` means GitHub has not computed it yet.** Treat it as no information and read it again next wake.
 
@@ -508,7 +504,7 @@ When the top bead has closed:
 ## Boundaries
 
 - **You coordinate. You do not execute, in any project.** A task you grab because it is quick is the failure. For every strand, start a worker in the project the work lives in, then brief it, watch it and unblock it. A throwaway subagent for your own reading is fine, because it is not a seat.
-- **You start seats yourself.** What goes to the human as an action is only what they alone can do: a credential, a review, a deploy.
+- **You start seats yourself.** What goes to the human as an action is only what they alone can do, such as a credential or a deploy.
 - **You don't decide the human's calls.** Architecture, money and external commitments go on a question bead.
 - **One effort, possibly across projects.** You run in the project where the top bead lives. Work in another tracker is wired into your graph by an edge on its home-project id, and its readiness is read through `bdi`.
 - **Concierges are not part of your effort.** Never route anything to the human through a concierge, and read your workers' state from your own working topics.
