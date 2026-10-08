@@ -10,7 +10,7 @@ In scope now:
 
 - The orchestration skills and the launcher.
 - A persistent set of long-lived agents, which starts at login under a service manager.
-- The compactor, `bilge-pump`.
+- Compaction at rest, by a mod in the plugin.
 
 Later: the integrations that serve interactive panes only. These are the agent-state hooks, the statusline, review tabs and window-manager keybinds. They go on calling their multiplexer directly until they are moved.
 
@@ -20,10 +20,10 @@ Later: the integrations that serve interactive panes only. These are the agent-s
 |---|---|---|
 | `berth` | The port: a backend-neutral command, plus one adapter per multiplexer | a multiplexer |
 | `sign-on` | Launches Claude Code in a berth and gets it past its startup gate | `berth` |
-| `bilge-pump` | Compacts an idle agent before it runs low on context | `berth` |
+| Compaction mod | Compacts a session at rest before it runs low on context | Claude Code |
 | Skills | `steward`, `worker`, `muster` and `tally` | `sign-on`, `berth` |
 
-The port knows only terminal mechanics. It knows nothing about Claude Code. The startup gate belongs to Claude Code, so it lives in `sign-on`. Compaction is useful without any orchestration, so `bilge-pump` is its own component. It is a consumer of the port and is not part of it.
+The port knows only terminal mechanics. It knows nothing about Claude Code. The startup gate belongs to Claude Code, so it lives in `sign-on`. Compaction is useful without any orchestration, so it runs inside every session that loads the plugin, in a berth or not, and does not use the port.
 
 ## The port: `berth`
 
@@ -139,19 +139,14 @@ A seat is born in its repository's main checkout, never in a linked worktree. Cl
 
 The persistent set's start-up script calls `sign-on` too, so the gate logic exists once.
 
-## `bilge-pump`
+## Compaction
 
-`bilge-pump` sends Claude Code's compact command to an agent that is at rest and low on free context. The next message then lands on a lean context, rather than the agent drifting into Claude Code's own auto-compact mid-turn.
+A mod in the plugin compacts a session at the end of a turn once its free context falls below a threshold. The next message then lands on a lean context, rather than the session drifting into Claude Code's own auto-compact mid-turn.
 
-- **It consumes the port.** It reads `berth state` and types through `berth send-text`. It runs one long-lived process per berth, attached by `sign-on` or by hand.
-- **It works without orchestration.** A person running one agent in one multiplexer pane can use it. It always needs a multiplexer, because Claude Code offers no outside way to trigger a compact.
-- **The context figure comes from a statusline tap.** A plugin cannot register the main statusline, and hook input carries no context figure. So `bilge-pump` ships a tap that reads the statusline's input, records the context figure for the berth in a state file, and passes the input on unchanged to the user's own statusline command. The state file is keyed by yard and berth id, because a berth id is unique only within its yard. The user wires it in with one settings line.
-- **A berth with no figure is never compacted.** It is left to Claude Code's auto-compact, which is what happens today without a compactor. The compactor logs once per berth that it has no figure.
-- **The threshold is a free-context percentage, 70 by default.** `--threshold` sets it for one launch, which `sign-on` passes through. Otherwise `BILGE_PUMP_THRESHOLD` sets it, and the package bakes in that variable's default through its `threshold` argument. A value that is not a whole number is refused. There is no config file.
-- **Heartbeat.** It rewrites a heartbeat file for each berth every tick, holding the epoch, state, free context, threshold and yard. A reader can then tell a ticking compactor from a wedged one.
-- **One compactor per berth.** It declines to start where one already runs. Its state directory is configurable.
-- **Pure decisions.** The compaction decision is a pure function with its own unit tests.
-- **Dependency check.** It exits non-zero with a clear message if `berth` is not on the path.
+- **The engine supplies the figures.** At the end of each answered turn of the main loop, the mod reads the context fill and the auto-compact point from the session. It compacts with the same call that `/compact` makes.
+- **The figure is free context before auto-compact,** as a whole percentage of the space usable before auto-compact. A session with auto-compact off measures against its whole window.
+- **A turn with no figure is left alone.** The engine has none until a session's first response, and none straight after a compact, so the mod never compacts twice running. It does not compact after an interrupted turn, which the person is about to follow up, or at the end of a subagent's turn.
+- **Plugin settings turn it off and set the threshold,** which is 70 by default. `BOATYARD_COMPACT_THRESHOLD` in a session's environment gives that session its own threshold, which wins over the setting. `sign-on` sets it from a launch's compaction threshold. A value that is not a whole number is logged and ignored.
 
 ## Skills
 
@@ -173,6 +168,7 @@ The skills contain no multiplexer syntax. They call only `sign-on` and `berth`. 
 - **One repository, one Claude Code plugin, `boatyard`.** It holds the skills and puts the executables in its `bin/`, which reaches the Bash tool's path.
 - **One flake exporting three packages:** `berth`, `bilge-pump` and `sign-on`. The packages matter as much as the plugin. `bilge-pump` runs detached, and the persistent set starts under a service manager, and neither of those sees the plugin's `bin/`.
 - **Host inputs.** The multiplexer package, the Claude Code command and flags, the settings path and the state directory are all package arguments or configuration. A host supplies its own.
+- **A host allows the plugin's mod.** Where a host's managed settings limit mods to its organization's, the compaction mod does not load until the host allows it.
 - **Runtime dependencies.** The scripts in `bin/` state their dependencies, such as `jq`, for readers who do not use nix.
 - **One revision per host.** Claude Code puts a plugin's `bin/` after the ambient path, so where a host installs the packages, the packages run and the plugin supplies only the skills. A host that installs both loads the plugin from the same revision as the packages, with `--plugin-dir` on its Claude Code command.
 
@@ -181,7 +177,7 @@ The skills contain no multiplexer syntax. They call only `sign-on` and `berth`. 
 - **Port contract suite.** One suite states what every adapter must do: open in each relationship, list, name, send-text, send-key, wait-text, read, state across all four states, close, and the cascade when an independent berth closes. It runs against every adapter.
   - For herdr, it runs a throwaway server with `HOME` redirected and every `HERDR_*` variable unset. An inherited `HERDR_SOCKET_PATH` would otherwise drive the live session. The server runs inside the nix build sandbox, so the suite is a flake check.
   - herdr treats a process named `claude` as an agent and reads its state from the screen. The suite drives the states with a stand-in process of that name, not with Claude Code.
-- **Unit tests.** The pure decisions have their own tests: `bilge-pump`'s compaction decision, and each adapter's mapping from backend states to the four port states, including the herdr parked-on-background-work and lost-agent corrections.
+- **Unit tests.** The compaction mod's rule has its own tests, run by `claude plugin test` against a stand-in engine. So does each adapter's mapping from backend states to the four port states, including the herdr parked-on-background-work and lost-agent corrections.
 - **End to end.** One real effort runs on `steward` and `worker` before any previous system is retired.
 
 ## Migration from an existing herdr-based setup
@@ -196,18 +192,19 @@ The work lands in three places: this repository, the host configuration that pac
 4. Write `steward` and `worker`. Install the packages and the plugin on one host, and allow `berth` and `sign-on` in the permission settings the seats run under. Then run one real effort, its steward started by hand with `sign-on` and indexed in a `boatyard` topic.
 5. Move the persistent set, one host at a time, because each host has its own service manager. Its server runs under `berth serve`, and its start-up script opens each agent with `sign-on`.
 6. Write `muster` and `tally`. Switch every skill that starts an effort to `muster`, so that no new effort starts on the old system. `tally` reads both the old and the new index topics until the last old effort closes.
-7. When the last old effort has closed, retire the old skills, the old launcher and the old monitor. Remove their names from the hooks, the settings and the other skills that mention them, and tell each project to do the same in its own notes. Each old index topic gets one closing line pointing at `boatyard`.
+7. Move compaction into the plugin's mod. `sign-on` stops attaching `bilge-pump` and sets the mod's per-session threshold instead, and `bilge-pump` and its statusline tap go.
+8. When the last old effort has closed, retire the old skills, the old launcher and the old monitor. Remove their names from the hooks, the settings and the other skills that mention them, and tell each project to do the same in its own notes. Each old index topic gets one closing line pointing at `boatyard`.
 
 The migration is done when no search of the host configuration or the Claude Code configuration finds the old skill, launcher and monitor names, and no raw multiplexer calls remain in the in-scope files.
 
 ## Open decisions
 
-- **The second adapter.** tmux would bring `bilge-pump` to the most users. tuios fits the port model most closely. Orca was the original request for a second backend.
+- **The second adapter.** tmux would bring `berth` to the most users. tuios fits the port model most closely. Orca was the original request for a second backend.
 
 ## Rejected alternatives
 
 - **Primitive verbs,** which would have given each herdr command a neutral name. The startup gate and screen scraping would have stayed in consumers, and Orca's worktree model would have leaked into them.
 - **Teaching the skills several multiplexer dialects.** That doubles the recipes in the documents that are hardest to keep correct.
 - **Our own agent-state detection.** Every candidate multiplexer surfaces agent state, so adapters correct their backend instead.
-- **Deriving context from the session transcript.** It needs the model's window size, and the transcript format is not documented as stable. It remains a fallback if the statusline tap proves unworkable.
-- **Separate plugins for `berth` and `bilge-pump`.** A plugin's `bin/` gives a compactor-only user nothing, because the compactor runs outside any session. The flake packages carry that independence instead.
+- **Deriving context from the session transcript.** It needs the model's window size, and the transcript format is not documented as stable.
+- **A compactor outside the session,** which typed `/compact` into the berth once a statusline tap recorded a low figure. It needed a multiplexer and a tap wired into the user's statusline, and it measured against the whole window rather than the auto-compact point.

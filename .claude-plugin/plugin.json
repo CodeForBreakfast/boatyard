@@ -5,5 +5,21 @@
     "name": "Code For Breakfast"
   },
   "repository": "https://github.com/CodeForBreakfast/boatyard",
-  "license": "Apache-2.0"
+  "license": "Apache-2.0",
+  "userConfig": {
+    "compactAtRest": {
+      "type": "boolean",
+      "title": "Compact at rest",
+      "description": "Compact the session at the end of a turn once its free context falls below the threshold.",
+      "default": true
+    },
+    "compactThreshold": {
+      "type": "number",
+      "title": "Compaction threshold",
+      "description": "Free context before auto-compact, as a percentage of the space usable before it, below which a session is compacted at rest. BOATYARD_COMPACT_THRESHOLD in a session's environment wins over this.",
+      "default": 70,
+      "min": 0,
+      "max": 100
+    }
+  }
 }
