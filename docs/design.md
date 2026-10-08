@@ -143,8 +143,8 @@ The persistent set's start-up script calls `sign-on` too, so the gate logic exis
 
 A mod in the plugin compacts a session at the end of a turn once its free context falls below a threshold. The next message then lands on a lean context, rather than the session drifting into Claude Code's own auto-compact mid-turn.
 
-- **The engine supplies the figures.** At the end of each answered turn of the main loop, the mod reads the context fill and the auto-compact point from the session. It compacts with the same call that `/compact` makes. It needs no multiplexer and no statusline.
-- **The figure is free context before auto-compact,** as a whole percentage of the space usable before auto-compact. A session with auto-compact off measures against its whole window. So a threshold means the same whatever the model's window or the auto-compact point.
+- **The engine supplies the figures.** At the end of each answered turn of the main loop, the mod reads the context fill and the auto-compact point from the session. It compacts with the same call that `/compact` makes.
+- **The figure is free context before auto-compact,** as a whole percentage of the space usable before auto-compact. A session with auto-compact off measures against its whole window.
 - **A turn with no figure is left alone.** The engine has none until a session's first response, and none straight after a compact, so the mod never compacts twice running. It does not compact after an interrupted turn, which the person is about to follow up, or at the end of a subagent's turn.
 - **Plugin settings turn it off and set the threshold,** which is 70 by default. `BOATYARD_COMPACT_THRESHOLD` in a session's environment gives that session its own threshold, which wins over the setting. `sign-on` sets it from a launch's compaction threshold. A value that is not a whole number is logged and ignored.
 
