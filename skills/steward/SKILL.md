@@ -290,14 +290,25 @@ bdi --beads --project <project> \
            | "\(.id) ready=\(.ready) blocked_by=\(.blocked_by | join(",")) \(.title)\n  \(.description)"'
 ```
 
-Act on each open step that is ready, or that waits only on its `gh:pr` gate, by the actor its description names:
+Act on each open step that is ready by the actor its title and description name. A gate is a step like any other, and it is ready once nothing before it is open:
 
 - **A step that names you is yours.** Do it, such as merging a pull request whose checks are green, and close it when it is done.
 - **A step that names the seat or the delivering seat belongs to the worker while its seat is up.** It merges, settles the gate and closes the outcome step itself, so leave those steps alone. If that seat has signed off or died with such a step still open, start a seat on the work bead to finish it.
-- **A step that names the human is their action.** Surface it once, as *The decisions topic carries the human's actions* says.
+- **A step that names the human is their action, and the step is its record.** Surface it once in the decisions topic, carrying the pull request where the step has one. File no separate action for it, because the step already sits in the tracker.
 - **A step that names the worker needs a seat**, such as a rework after review. Start one on the work bead as *Rework on a bead that already has a pull request* says.
 
-**A step's `gh:pr` gate carries its pull request.** Watch that pull request as *Watching your pull requests* says. Once the merge has closed the gate, the step it held is done, so close it.
+A `gh:pr` gate carries its pull request. Watch that pull request as *Watching your pull requests* says. `bd gate check` closes the gate once the pull request merges.
+
+For example, in this invented molecule the gate is the merge step:
+
+```
+mol-k7     Deliver the retry flag
+mol-k7.1   Pull request open with checks green   closed
+mol-k7.2   The human merges the pull request     gate, ready      waits on mol-k7.1
+mol-k7.3   The retry flag is on main             outcome, open    waits on mol-k7.2
+```
+
+The gate is ready and names the human, so post it once in the decisions topic with its pull request. When they merge, `bd gate check` closes the gate, and the outcome step goes ready for whoever it names.
 
 ### The cap: two unmerged pull requests per repo
 
