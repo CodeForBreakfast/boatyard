@@ -130,7 +130,7 @@ The first line names the default. A line with `for` names the formula for one ki
 
    ```bash
    bd mol pour <formula> --var bead=<id> --var repo=<owner>/<repo> --json
-   bd list --parent <molecule> --label outcome --json
+   bd list --parent <molecule> --label outcome --include-gates --json
    bd dep add <id> <outcome-step>
    bd note <id> "Delivering through <formula>, molecule <molecule>, outcome step <outcome-step>."
    ```
