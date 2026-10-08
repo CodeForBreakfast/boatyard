@@ -3,10 +3,11 @@ import type { EngineInterface, PluginOptions, Register } from 'claude-code'
 const WHOLE_NUMBER = /^\d+$/
 
 // A launcher sets BOATYARD_COMPACT_THRESHOLD in a session's environment to opt
-// that session in, and to give it its own threshold over the plugin setting.
+// that session in. A whole number gives the session its own threshold over the
+// plugin setting, and an empty value keeps the plugin setting.
 async function thresholdFor($: EngineInterface, options: PluginOptions): Promise<number> {
   const override = await $.env.get('BOATYARD_COMPACT_THRESHOLD')
-  if (override === undefined) return Number(options.compactThreshold)
+  if (override === undefined || override === '') return Number(options.compactThreshold)
   if (WHOLE_NUMBER.test(override)) return Number(override)
   $.ui.log(`BOATYARD_COMPACT_THRESHOLD=${override} is not a whole number, so the plugin setting stands.`)
   return Number(options.compactThreshold)

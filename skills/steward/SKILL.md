@@ -338,7 +338,7 @@ For each bead that is ready:
      --model <model> --effort <level>
    ```
 
-   Leave out `--model` for a seat on the default model. `sign-on` opens a berth kept with your other workers, starts Claude Code in it, gets it past its startup gate, and attaches the compactor that keeps its context lean across a long sleep. It prints the new berth's id, and the seat waits idle at its prompt.
+   Leave out `--model` for a seat on the default model. `sign-on` opens a berth kept with your other workers, starts Claude Code in it, gets it past its startup gate, and opts it in to the compaction mod that keeps its context lean. It prints the new berth's id, and the seat waits idle at its prompt.
 
    **`sign-on` refuses a seat while the host is short of memory.** It then exits with status 75 and opens nothing. Leave the bead ready, start no other seat, and try again when a running seat finishes. With none of your seats running, tell the human the host is short of memory. Don't set a gate of your own.
 

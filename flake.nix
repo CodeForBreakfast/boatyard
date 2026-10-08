@@ -102,7 +102,7 @@
           fi
 
           types='build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test'
-          scopes='berth|bilge-pump|sign-on|skills|ci|flake|docs|tests|deps'
+          scopes='berth|sign-on|skills|ci|flake|docs|tests|deps'
 
           refuse() {
             echo "This is not a subject main can carry:"
@@ -262,7 +262,7 @@ in blame and in bisect."
           for type in build chore ci docs feat fix perf refactor revert style test; do
             accepts "$type: a subject of no particular interest"
           done
-          for scope in berth bilge-pump sign-on skills ci flake docs tests deps; do
+          for scope in berth sign-on skills ci flake docs tests deps; do
             accepts "fix($scope): a subject of no particular interest"
           done
 

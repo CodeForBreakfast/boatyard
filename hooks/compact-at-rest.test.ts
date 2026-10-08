@@ -119,3 +119,21 @@ test('an override that is not a whole number leaves the plugin setting', { optio
   await $.turn.complete({ ...TURN, reason: 'answer' })
   expect(compactions.count).toBe(0)
 })
+
+test('an empty override opts in at the plugin setting, and says nothing', { options: { compactThreshold: 50 } }, async ($, on) => {
+  const logged: string[] = []
+  on('ui.log', (_$, e) => {
+    logged.push(e.text)
+    return { value: undefined }
+  })
+  const below = session(on, tokensAtFree(40), { BOATYARD_COMPACT_THRESHOLD: '' })
+  await $.turn.complete({ ...TURN, reason: 'answer' })
+  expect(below.count).toBe(1)
+  expect(logged).toEqual([])
+})
+
+test('an empty override leaves a session above the plugin setting alone', { options: { compactThreshold: 50 } }, async ($, on) => {
+  const compactions = session(on, tokensAtFree(60), { BOATYARD_COMPACT_THRESHOLD: '' })
+  await $.turn.complete({ ...TURN, reason: 'answer' })
+  expect(compactions.count).toBe(0)
+})

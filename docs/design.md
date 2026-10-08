@@ -117,11 +117,8 @@ It is written first. Its obligations beyond straight mapping:
 `sign-on` launches Claude Code in a berth:
 
 1. It asks `berth yard` which yard it is in, so that it works from a pane that is not a berth, then opens a berth through `berth open`.
-2. It starts the configured Claude Code command in that berth.
-3. It attaches `bilge-pump` to the berth.
-4. It gets past the startup gate: `berth wait-text` for the gate's text, then `berth send-key Enter`, repeated until `berth read` no longer shows the gate. `wait-text` cannot tell when the gate has gone, because it searches recent output.
-
-The compactor goes on before the gate because a berth that `sign-on` gives up on stays open for a person to read. Once that person answers the prompt that stopped it, the seat goes to work, and it must not work without a compactor.
+2. It starts the configured Claude Code command in that berth, opted in to the compaction mod.
+3. It gets past the startup gate: `berth wait-text` for the gate's text, then `berth send-key Enter`, repeated until `berth read` no longer shows the gate. `wait-text` cannot tell when the gate has gone, because it searches recent output.
 
 The host supplies the site-specific parts as configuration:
 
@@ -133,7 +130,7 @@ The host supplies the site-specific parts as configuration:
 
 `sign-on` checks that memory before it opens a berth. Below the floor it opens nothing and exits with status 75, so a caller can tell "not now" from a failure.
 
-Each launch states its own relationship, working directory, label and prompt. A launch with no prompt leaves the seat idle at its prompt, past its gate and with its compactor attached, until a person types. An independent launch may ask to open beside its caller, or in a tab near it. It may ask for focus, so that a caller such as a desktop shortcut lands the person on the seat as soon as it opens. It may add a model, an effort level, an extra working directory, environment variables, a settings file and a compaction threshold. A steward's settings file lets it run `sign-on`, and a worker gets none.
+Each launch states its own relationship, working directory, label and prompt. A launch with no prompt leaves the seat idle at its prompt, past its gate, until a person types. An independent launch may ask to open beside its caller, or in a tab near it. It may ask for focus, so that a caller such as a desktop shortcut lands the person on the seat as soon as it opens. It may add a model, an effort level, an extra working directory, environment variables, a settings file and a compaction threshold. A steward's settings file lets it run `sign-on`, and a worker gets none.
 
 A seat is born in its repository's main checkout, never in a linked worktree. Claude Code reads its instructions, skills and trust state from the launch directory and cannot re-read them after a `cd`.
 
@@ -146,7 +143,7 @@ A mod in the plugin compacts a session at the end of a turn once its free contex
 - **The engine supplies the figures.** At the end of each answered turn of the main loop, the mod reads the context fill and the auto-compact point from the session. It compacts with the same call that `/compact` makes.
 - **The figure is free context before auto-compact,** as a whole percentage of the space usable before auto-compact. A session with auto-compact off measures against its whole window.
 - **A turn with no figure is left alone.** The engine has none until a session's first response, and none straight after a compact, so the mod never compacts twice running. It does not compact after an interrupted turn, which the person is about to follow up, or at the end of a subagent's turn.
-- **A session is left alone unless it has opted in,** so a person's interactive session is never compacted by surprise. Setting `BOATYARD_COMPACT_THRESHOLD` in a session's environment opts that session in and gives it its own threshold, which wins over the plugin setting. `sign-on` sets it from a launch's compaction threshold. A value that is not a whole number is logged and ignored, and the session stays opted in at the setting's threshold.
+- **A session is left alone unless it has opted in,** so a person's interactive session is never compacted by surprise. Setting `BOATYARD_COMPACT_THRESHOLD` in a session's environment opts that session in. A whole number gives the session its own threshold, which wins over the plugin setting, and an empty value keeps the setting's threshold. `sign-on` sets it for every seat it launches, to the launch's compaction threshold or else empty. Any other value is logged and ignored, and the session stays opted in at the setting's threshold.
 - **Plugin settings can opt in every session and set the threshold.** `compactAtRest` is off by default. The threshold is 70 by default.
 
 ## Skills
@@ -167,8 +164,8 @@ The skills contain no multiplexer syntax. They call only `sign-on` and `berth`. 
 ## Packaging
 
 - **One repository, one Claude Code plugin, `boatyard`.** It holds the skills and puts the executables in its `bin/`, which reaches the Bash tool's path.
-- **One flake exporting three packages:** `berth`, `bilge-pump` and `sign-on`. The packages matter as much as the plugin. `bilge-pump` runs detached, and the persistent set starts under a service manager, and neither of those sees the plugin's `bin/`.
-- **Host inputs.** The multiplexer package, the Claude Code command and flags, the settings path and the state directory are all package arguments or configuration. A host supplies its own.
+- **One flake exporting two packages:** `berth` and `sign-on`. The packages matter as much as the plugin. The persistent set starts under a service manager, which does not see the plugin's `bin/`.
+- **Host inputs.** The multiplexer package, the Claude Code command and flags, and the settings path are all package arguments or configuration. A host supplies its own.
 - **A host allows the plugin's mod.** Where a host's managed settings limit mods to its organization's, the compaction mod does not load until the host allows it.
 - **Runtime dependencies.** The scripts in `bin/` state their dependencies, such as `jq`, for readers who do not use nix.
 - **One revision per host.** Claude Code puts a plugin's `bin/` after the ambient path, so where a host installs the packages, the packages run and the plugin supplies only the skills. A host that installs both loads the plugin from the same revision as the packages, with `--plugin-dir` on its Claude Code command.
@@ -188,13 +185,12 @@ Build beside the existing system under the new names. The two share one herdr se
 The work lands in three places: this repository, the host configuration that packages the old launcher and the persistent set, and the user's Claude Code configuration, which holds the old skills, the statusline, the settings and the hooks.
 
 1. Build `berth` with the herdr adapter and its contract suite.
-2. Build `bilge-pump`, with the statusline tap and the no-figure fallback. Wire the tap into the statusline. The statusline's compactor indicator reads whichever heartbeat its pane has, the old one or the new one.
-3. Build `sign-on`, which attaches `bilge-pump`.
-4. Write `steward` and `worker`. Install the packages and the plugin on one host, and allow `berth` and `sign-on` in the permission settings the seats run under. Then run one real effort, its steward started by hand with `sign-on` and indexed in a `boatyard` topic.
-5. Move the persistent set, one host at a time, because each host has its own service manager. Its server runs under `berth serve`, and its start-up script opens each agent with `sign-on`.
-6. Write `muster` and `tally`. Switch every skill that starts an effort to `muster`, so that no new effort starts on the old system. `tally` reads both the old and the new index topics until the last old effort closes.
-7. Move compaction into the plugin's mod. `sign-on` stops attaching `bilge-pump` and sets the mod's per-session threshold instead, and `bilge-pump` and its statusline tap go.
-8. When the last old effort has closed, retire the old skills, the old launcher and the old monitor. Remove their names from the hooks, the settings and the other skills that mention them, and tell each project to do the same in its own notes. Each old index topic gets one closing line pointing at `boatyard`.
+2. Build `sign-on`.
+3. Write `steward` and `worker`. Install the packages and the plugin on one host, and allow `berth` and `sign-on` in the permission settings the seats run under. Then run one real effort, its steward started by hand with `sign-on` and indexed in a `boatyard` topic.
+4. Move the persistent set, one host at a time, because each host has its own service manager. Its server runs under `berth serve`, and its start-up script opens each agent with `sign-on`.
+5. Write `muster` and `tally`. Switch every skill that starts an effort to `muster`, so that no new effort starts on the old system. `tally` reads both the old and the new index topics until the last old effort closes.
+6. Compact every seat with the plugin's mod. `sign-on` opts each seat it launches in to it, with the launch's threshold where one is given.
+7. When the last old effort has closed, retire the old skills, the old launcher and the old monitor. Remove their names from the hooks, the settings and the other skills that mention them, and tell each project to do the same in its own notes. Each old index topic gets one closing line pointing at `boatyard`.
 
 The migration is done when no search of the host configuration or the Claude Code configuration finds the old skill, launcher and monitor names, and no raw multiplexer calls remain in the in-scope files.
 

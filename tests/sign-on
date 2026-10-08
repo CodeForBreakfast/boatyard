@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# sign-on's tests: it opens a berth, starts the configured command in it, gets
-# past the startup gate and attaches bilge-pump. See docs/design.md,
-# "sign-on".
+# sign-on's tests: it opens a berth, starts the configured command in it opted
+# in to the plugin's compaction mod, and gets past the startup gate. See
+# docs/design.md, "sign-on".
 #
-# Run it with sign-on, berth and bilge-pump on the path, and BERTH_BACKEND and
-# BERTH_YARD naming a yard that is up.
+# Run it with sign-on and berth on the path, and BERTH_BACKEND and BERTH_YARD
+# naming a yard that is up.
 #
 # Needs: bash, coreutils, git, jq.
 set -uo pipefail
@@ -37,17 +37,6 @@ eventually() { # <command>...
   done
   return 1
 }
-
-export BILGE_PUMP_STATE_DIR="$work/pump"
-pid_of() { cat "$BILGE_PUMP_STATE_DIR/$BERTH_YARD/$1/pid" 2>/dev/null; }
-pumping() { [ -n "$(pid_of "$1")" ] && kill -0 "$(pid_of "$1")" 2>/dev/null; }
-stop_pumps() {
-  local file
-  for file in "$BILGE_PUMP_STATE_DIR/$BERTH_YARD"/*/pid; do
-    [ -f "$file" ] && kill "$(cat "$file")" 2>/dev/null
-  done
-}
-trap stop_pumps EXIT
 
 gate="I am using this for local development"
 
@@ -108,7 +97,12 @@ prompt="/boatyard:worker #project/effort-bead, then read this project's \"brief\
 
 echo "# a configured gate"
 
-id=$(SIGN_ON_CLAUDE=$(seat gated rest 2) SIGN_ON_GATE=$gate SIGN_ON_MCP_TIMEOUT=120000 \
+# Every process sign-on starts inherits the mark, and the seat does not,
+# because the yard's server starts it.
+mark="SIGN_ON_TEST_MARK=$work"
+marked() { grep -lsxzF "$mark" /proc/[0-9]*/environ; }
+
+id=$(env "$mark" SIGN_ON_CLAUDE="$(seat gated rest 2)" SIGN_ON_GATE="$gate" SIGN_ON_MCP_TIMEOUT=120000 \
   sign-on --as independent --cwd "$work/project" --label "a seat" --model a-model \
   --effort high --add-dir "$work/extra" --env SEAT_ROLE=tester \
   --settings "$work/settings.json" --threshold 70 "$prompt" 2>"$work/gated.err")
@@ -130,10 +124,11 @@ check "the gate took two Enters and is gone from the screen" false \
   "$(contains "$(berth read "$id")" "$gate")"
 berth wait-text "$id" "$gate" --timeout 1 2>/dev/null
 check "wait-text still finds the cleared gate, so it cannot say when a gate goes" 0 "$?"
-check "bilge-pump is attached to the berth" true "$(pumping "$id" && echo true || echo false)"
-eventually test -f "$BILGE_PUMP_STATE_DIR/$BERTH_YARD/$id/heartbeat"
-check "bilge-pump takes the launch's threshold" 70 \
-  "$(cut -d' ' -f4 "$BILGE_PUMP_STATE_DIR/$BERTH_YARD/$id/heartbeat" 2>/dev/null)"
+check "the command takes the launch's threshold for the compaction mod" 70 \
+  "$(recorded gated BOATYARD_COMPACT_THRESHOLD)"
+check "the seat does not carry the mark" false \
+  "$(grep -qx "$mark" "$work/gated/env" && echo true || echo false)"
+check "sign-on leaves no process of its own running" "" "$(marked)"
 opener=$id
 
 echo "# no gate configured"
@@ -145,11 +140,11 @@ check "with no flags, the command gets only the prompt" "-- $prompt" \
 # The yard's own environment reaches every berth, so "none" is whatever that
 # holds.
 check "with no timeout configured, sign-on sets none" "${MCP_TIMEOUT:-}" "$(recorded resting MCP_TIMEOUT)"
-check "bilge-pump is attached to a berth with no gate" true "$(pumping "$id" && echo true || echo false)"
+check "with no threshold, the command is opted in to the mod at the plugin setting" true \
+  "$(grep -qx "BOATYARD_COMPACT_THRESHOLD=" "$work/resting/env" && echo true || echo false)"
 
 id=$(SIGN_ON_CLAUDE=$(seat busy turn 0) sign-on --as independent --cwd "$work/project" "$prompt")
 check "an agent already in its first turn has shown" 0 "$?"
-check "bilge-pump is attached to a busy berth" true "$(pumping "$id" && echo true || echo false)"
 
 id=$(BERTH_ID=$opener SIGN_ON_CLAUDE=$(seat worker rest 0) \
   sign-on --as worker --cwd "$work/project" --label bead "$prompt")
@@ -164,7 +159,6 @@ check "sign-on succeeds with no prompt" 0 "$?"
 check "the command gets the launch's flags and no first message" "--model a-model" \
   "$(tr '\n' ' ' <"$work/idle/args" | sed 's/ $//')"
 check "the gate is gone from the screen" false "$(contains "$(berth read "$id")" "$gate")"
-check "bilge-pump is attached to a seat with no prompt" true "$(pumping "$id" && echo true || echo false)"
 
 echo "# a caller can land on the seat"
 
@@ -230,7 +224,6 @@ check "sign-on succeeds with no BERTH_YARD" 0 "$?"
 check "the berth opens in the yard berth resolves" true \
   "$(berth list | jq -r --arg id "$id" 'any(.[]; .id == $id)')"
 check "the command learns that BERTH_YARD" "$BERTH_YARD" "$(recorded plain BERTH_YARD)"
-check "bilge-pump is attached to the berth" true "$(pumping "$id" && echo true || echo false)"
 
 echo "# failures"
 
@@ -242,21 +235,14 @@ fails() { # <what> <word the reason has> <sign-on's environment and arguments>..
   check "$what says why" true "$(contains "$err" "$word")"
 }
 
-# sign-on leaves a berth it gives up on open, and a person who answers its
-# prompt sets the seat working, so the compactor is attached all the same.
-pumps() { find "$BILGE_PUMP_STATE_DIR/$BERTH_YARD" -name pid | wc -l; }
-before=$(pumps)
 fails "a command that never becomes an agent" "no agent" \
   SIGN_ON_CLAUDE=true SIGN_ON_START_TIMEOUT=3 sign-on --as independent --cwd "$work/project" "$prompt"
-check "bilge-pump is attached to a berth with no agent" $((before + 1)) "$(pumps)"
 fails "a gate that never appears" "$gate" \
   SIGN_ON_CLAUDE="$(seat ungated rest 0)" SIGN_ON_GATE="$gate" SIGN_ON_START_TIMEOUT=3 \
   sign-on --as independent --cwd "$work/project" "$prompt"
-check "bilge-pump is attached to a berth whose gate never appeared" $((before + 2)) "$(pumps)"
 fails "a gate that does not clear" "$gate" \
   SIGN_ON_CLAUDE="$(seat stuck rest 100)" SIGN_ON_GATE="$gate" \
   sign-on --as independent --cwd "$work/project" "$prompt"
-check "bilge-pump is attached to a berth stuck at its gate" $((before + 3)) "$(pumps)"
 
 fails "a seat beside a caller in no pane" pane \
   SIGN_ON_CLAUDE="$(seat nowhere rest 0)" sign-on --as independent --beside --cwd "$work/project" "$prompt"
@@ -282,6 +268,8 @@ fails "a launch with two prompts" usage sign-on --as independent --cwd "$work/pr
 fails "a launch with no working directory" usage sign-on --as independent "$prompt"
 fails "an --env that is not an assignment" usage \
   sign-on --as independent --cwd "$work/project" --env SEAT_ROLE "$prompt"
+fails "a threshold that is not a whole number" usage \
+  sign-on --as independent --cwd "$work/project" --threshold 70% "$prompt"
 
 echo
 if [ "$failures" -gt 0 ]; then
