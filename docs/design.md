@@ -159,7 +159,7 @@ An effort is its top bead and everything that bead depends on, followed transiti
 
 The slash-only skills set `disable-model-invocation: true`, because plugin skills cannot be disabled one at a time. Claude Code then refuses them to the Skill tool, so only a typed command or a launch prompt starts one.
 
-The skills contain no multiplexer syntax. They call only `sign-on` and `berth`. Coordination runs over [commy](https://github.com/CodeForBreakfast/commy), with each effort indexed in a `boatyard` topic in its project's channel, and the [beads](https://github.com/gastownhall/beads) graph is the system of record. A worker records its berth id on its bead as `agent_pane`, so bead viewers can draw the berth against its work.
+The skills contain no multiplexer syntax. They call only `sign-on` and `berth`. Coordination runs over [commy](https://github.com/CodeForBreakfast/commy), with each effort indexed in a `boatyard` topic in its project's channel, and the [beads](https://github.com/gastownhall/beads) graph is the system of record. A worker records its berth id as `agent_pane` on the bead it is working, so bead viewers can draw the berth against its work.
 
 ## Packaging
 

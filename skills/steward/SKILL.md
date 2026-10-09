@@ -59,7 +59,7 @@ This holds because a steward acquires its commy identity lazily, on its first po
    - **Name your berth after the effort**, so the human can pick it out: `berth name "<effort>"`. On an independent berth the label also names whatever the backend groups under it.
    - **Name your berth on the top bead**, so bead viewers draw the effort against you: `bd update <top-bead> --set-metadata agent_pane="$BERTH_ID"`. A replacement steward overwrites it when it binds. **Clear it when you finish.**
    - **Open a bead viewer beside you**, focused on the top bead: `berth open --as tender --cwd "$PWD" -- bdi <top-bead>`.
-2. **Subscribe to your effort's own topics, never the whole channel.** Other efforts share the project channel, and their traffic would drown yours. Subscribe to `<project>/<effort>-decisions`, and to each working topic that already exists. Mentions of you always arrive without a subscription. You create working topics in the spawn loop, so you subscribe to each as you create it. **A replacement steward must not guess their names.** Each live worker records its topic as `working_topic` on its bead, which is the only reliable source once rework seats have moved topics:
+2. **Subscribe to your effort's own topics, never the whole channel.** Other efforts share the project channel, and their traffic would drown yours. Subscribe to `<project>/<effort>-decisions`, and to each working topic that already exists. Mentions of you always arrive without a subscription. You create working topics in the spawn loop, so you subscribe to each as you create it. **A replacement steward must not guess their names.** Each live worker records its topic as `working_topic` on the bead it sits on, which is the only reliable source once rework seats have moved topics:
 
    ```bash
    bd list --has-metadata-key working_topic --limit 0 --json
@@ -94,6 +94,8 @@ This holds because a steward acquires its commy identity lazily, on its first po
    ```
 
    A ready bead that depends on a closed outcome step of a delivery molecule is delivered too, so close it.
+
+   **A ready bead whose parent names a live seat belongs to that seat.** The seat works its parent's small beads one at a time, so start no worker on it.
 5. **Review the graph for errors.** bdi reports every edge in the effort's tree that leads nowhere. First run `bd gate check --type=gh:pr`, so a merged pull request's gate is already closed. Then read the top bead's trees across every project, because an edge into a project bdi did not read would otherwise look missing:
 
    ```bash
@@ -133,8 +135,8 @@ This holds because a steward acquires its commy identity lazily, on its first po
                      --unset-metadata agent_pane --unset-metadata working_topic
       ```
 
-      Its dependency on its question bead keeps it out of `bd ready` until the human answers, and an open pull-request gate keeps it out until the merge. Then start a fresh worker on it in the next `-r` topic, with the answer quoted from the question bead in its brief. A bead that waited on a permission or an action is ready at once, and its fresh worker asks again.
-   2. **Otherwise an open `gh:pr` gate or an open outcome step of a delivery molecule means the bead is in delivery**, as *A bead closes on merge* and *A bead delivered by a formula* say. No seat is on it, so never relay to it and never start a worker on it. Poll its pull request, or read its molecule.
+      Its dependency on its question bead keeps it out of `bd ready` until the human answers, and an open pull-request gate keeps it out until the merge. Then start a fresh worker on it in the next `-r` topic, with the answer quoted from the question bead in its brief. Where the bead is a step of a delivery molecule, brief the worker on the work bead that waits on that molecule, and it sits on the step again. A bead that waited on a permission or an action is ready at once, and its fresh worker asks again.
+   2. **Otherwise an open `gh:pr` gate or an open outcome step of a delivery molecule means the bead is in delivery**, as *A bead closes on merge* and *A bead delivered by a formula* say. No seat is on the bead itself, so never relay to it and never start a worker on it. Poll its pull request, or read its molecule, whose steps show any seat still working it.
 
    ```bash
    bd list --has-metadata-key blocked_on --limit 0 --json
@@ -154,7 +156,7 @@ This holds because a steward acquires its commy identity lazily, on its first po
 
    Under a delivery formula, the bead this lists is a step of a molecule, and the bead in delivery is the work bead that depends on that molecule's outcome step.
 
-   **Last, check every open or in-progress effort bead that names a berth.** A bead in delivery should name none, and one that does names a seat that left without finishing. Check each berth other than your own, and clear each bead whose berth is no longer its seat, as *Watching the berths you started* says:
+   **Last, check every open or in-progress effort bead that names a berth.** A seat sits on the bead it is working, which under a delivery formula is a step of its molecule. A bead in delivery should name none, and one that does names a seat that left without finishing. Check each berth other than your own, and clear each bead whose berth is no longer its seat, as *Watching the berths you started* says:
 
    ```bash
    bd list --has-metadata-key agent_pane --status open,in_progress --limit 0 --json \
@@ -172,11 +174,11 @@ You are now bound, reachable, and hold the whole state. Reconstruct from these r
 The wake ritual tells you the state. The push gate is what you owe before you rest. Walk **every strand of work the top bead needs, in your project and in every other project the effort touches**, and confirm each is in exactly one of seven states:
 
 1. **Done.** It has landed on the repo's default branch, which with pull requests means merged rather than opened, and its bead says so.
-2. **Staffed and live.** An accountable worker is on it and has reported recently, through a post, a commit or a bead update. A worker that has gone dark is not this state, and neither is a bead handed to a channel nobody picked up.
+2. **Staffed and live.** An accountable worker is on it and has reported recently, through a post, a commit or a bead update. Under a delivery formula the worker sits on a step of the bead's molecule, not on the bead. A worker that has gone dark is not this state, and neither is a bead handed to a channel nobody picked up.
 
    **Nor is a foreign bead that another project accepted, filed, and promised to report back on.** It looks like everything you wanted: a fast reply, a real bead id, a named owner. It is still a place in a queue, and it moves on that project's priorities rather than your effort's. The question is not whether someone accepted it. The question is whether a seat is running on it right now. If not, start one born in that project, and say so in that project's channel so its concierge can stand it down if it would rather own the scheduling.
 3. **A surfaced ask.** It waits only on the human, as an open question bead labelled `human` that the strand depends on, or as an action filed where your host keeps the human's actions, or in the decisions topic where it keeps none.
-4. **In delivery.** The bead sits behind the open `gh:pr` gate of its own pull request, or behind the open outcome step of a delivery molecule whose ready steps are not the worker's. It has no seat, correctly. What you owe it is the watch in *Watching your pull requests*, or the reading in *A bead delivered by a formula*, not a new worker.
+4. **In delivery.** The bead sits behind the open `gh:pr` gate of its own pull request, or behind the open outcome step of a delivery molecule where no seat sits on a step and the ready steps are not the worker's. It has no seat, correctly. What you owe it is the watch in *Watching your pull requests*, or the reading in *A bead delivered by a formula*, not a new worker.
 5. **Capped.** The strand could start, but its repo already holds this effort's limit of unmerged pull requests. Only a merge releases it.
 6. **Blocked by a dependency.** `bd` shows an unmet blocker other than the bead's own pull-request gate, such as a gate on a pull request outside the effort, or `bdi` reads a foreign dependency as not closed. A worker started here would build on code that is not on the default branch yet.
 7. **Deferred to a date.** The strand cannot start before a known date, and its bead records it with `bd defer <bead> --until <date>`. bd returns the bead to `bd ready` once the date passes, whether or not any steward is still running, so the date survives your session.
@@ -210,6 +212,8 @@ You bloat, and force expensive compaction, by pulling detail of the work into yo
 ## One bead, one worker, one context
 
 Size the effort so a single worker can finish each bead without itself compacting. The bead graph is your plan for parallelism and for context: independent beads run in parallel, and a bead too big for one context is split before it is handed out. Wire dependencies with `bd dep add` so that `bd ready` tells you, and a restarted you, what can start now.
+
+A bead may be a parent whose small beads one worker finishes together, under one pull request. Brief the parent, and the worker takes its small beads with it.
 
 **No seat does work that has no bead.** New work goes into a bead before any seat does it, whether that seat is new or already running. Nothing is handed to a seat only in conversation.
 
@@ -273,7 +277,7 @@ A bead that merely has to land later, or would edit the same file, gets no edge.
 
 ### A bead delivered by a formula
 
-The work bead depends on its molecule's outcome step, the one step labelled `outcome`, and stays `open` behind it. The outcome step closes once the work has landed, and only then does the bead go ready. Close it at that point, rather than start a worker on it. The worker's note on the bead names the molecule and its outcome step.
+The work bead depends on its molecule's outcome step, the one step labelled `outcome`, and stays `open` behind it. The worker pours the molecule when it claims, before it writes any code, so the bead waits there for the whole of its work. The outcome step closes once the work has landed, and only then does the bead go ready. Close it at that point, rather than start a worker on it. The worker's note on the bead names the molecule and its outcome step.
 
 At each wake, read each open molecule's steps through `bdi`, in your project or another. A step's title states the outcome it reaches, and only its description says who acts, so read the descriptions too:
 
@@ -287,13 +291,13 @@ steps=$(bdi --json --all --project <project> <project>:<molecule> \
       else . end) | .ids[]] | unique')
 bdi --beads --project <project> \
   | jq -r --argjson steps "$steps" '.beads[] | select(.id as $i | $steps | index($i))
-           | "\(.id) ready=\(.ready) blocked_by=\(.blocked_by | join(",")) \(.title)\n  \(.description)"'
+           | "\(.id) \(.status) ready=\(.ready) seat=\(.metadata.agent_pane // "none") blocked_by=\(.blocked_by | join(",")) \(.title)\n  \(.description)"'
 ```
 
 Act on each open step that is ready by the actor its title and description name. A gate is a step like any other, and it is ready once nothing before it is open:
 
 - **A step that names you is yours.** Do it, such as merging a pull request whose checks are green, and close it when it is done.
-- **A step that names the seat or the delivering seat belongs to the worker while its seat is up.** It merges, settles the gate and closes the outcome step itself, so leave those steps alone. If that seat has signed off or died with such a step still open, start a seat on the work bead to finish it.
+- **A step that names the seat or the delivering seat belongs to the worker while its seat is up.** The seat sits on the step it is working, which shows `in_progress` with its berth. It merges, settles the gate and closes the outcome step itself, so leave those steps alone. If that seat has signed off or died with such a step still open, start a seat on the work bead to finish it.
 - **A step that names the human is theirs, and the step is the one record of it.** The human sees it ready in the tracker, so file nothing and post nothing for it.
 - **A step that names the worker needs a seat**, such as a rework after review. Start one on the work bead as *Rework on a bead that already has a pull request* says.
 
@@ -375,7 +379,7 @@ Starting workers is a **loop**, not a kickoff. Start one at each ready bead, and
 
 ### Watching the berths you started
 
-- **What ties a seat to its bead** is the `agent_pane` the worker writes on its bead when it claims it. `sign-on` labels the berth with the bead, and you set neither yourself.
+- **What ties a seat to its work** is the `agent_pane` on the bead the seat sits on. That is the bead you briefed it on, or under a delivery formula the step of that bead's molecule it is working. `sign-on` labels the berth with the bead you brief, the worker names its berth after each bead it moves to, and you set neither yourself.
 - **`berth state <id>` reads `blocked` when a worker is waiting at a permission prompt.** Only the human can clear it, so take it to them as *A worker's permission goes to the human in your berth* says.
 - **A bead names a berth only while that berth is its seat.** A seat that dies before it finishes leaves its berth on its bead, and a berth id is reused once its berth closes. A stale `agent_pane` then joins the bead to whatever seat takes the id next. The berth is still the bead's seat only while `berth list` holds its id, labelled with the bead's id, in a state other than `gone`:
 

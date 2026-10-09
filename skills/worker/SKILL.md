@@ -136,7 +136,7 @@ Delivery formula for <kind of work>: `<formula>`
 
 The first line names the default. A line with `for` names the formula for one kind of work. Use the formula for your bead's kind of work where a line names one, and the default otherwise. The formula's steps say how the work lands and who acts at each step, so they replace the rest of this section, except that any branch you push is still based on the default branch.
 
-1. **Pour the formula, rewire its merge gate, and make your bead wait on its outcome step.** You do this at claim, before you write any code. Each formula labels one step `outcome`, the step that closes once the work has landed:
+1. **Pour the formula, rewire its merge gate, and make your bead wait on its outcome step.** You do this at claim. Each formula labels one step `outcome`, the step that closes once the work has landed:
 
    ```bash
    j=$(bd mol pour <formula> --var bead=<id> --var repo=<owner>/<repo> --json)
@@ -157,7 +157,7 @@ The first line names the default. A line with `for` names the formula for one ki
    ```
 
    A `gh:pr` gate is poured without its pull request. Once you open the pull request, give the gate its number with `bd update <gate> --await-id <n>`.
-3. **Stay up until the checks are green for the commit you pushed**, which `gh pr checks <n> --watch` waits on. A failing check is yours to fix. Where the merge gate names the delivering seat, sit on it, merge as it says, and clear your keys from it before `bd gate check` closes it. A closed bead that still names your berth reads as a stale pane. Then do the steps after it whose descriptions name you, such as closing the molecule. A merge your permission mode refuses goes to the human as *Getting the human's permission* says.
+3. **Stay up until the checks are green for the commit you pushed**, which `gh pr checks <n> --watch` waits on. A failing check is yours to fix. Where the merge gate names the delivering seat, sit on it, merge as it says, and clear your keys from it before `bd gate check` closes it. Then do the steps after it whose descriptions name you, such as closing the molecule. A merge your permission mode refuses goes to the human as *Getting the human's permission* says.
 4. **Stop at the first step whose description names someone else**, such as a review, or a merge that names the steward or the human. Don't sit on it. Post the pull request's address, or what the step waits on, to the working topic, then finish. The steward acts on the molecule from here.
 
    **Leave your bead open.** The outcome step holds it, and the bead goes ready only once that step closes. If you closed the outcome step yourself, the work has landed, so close your bead in *Finish* as for direct delivery.
