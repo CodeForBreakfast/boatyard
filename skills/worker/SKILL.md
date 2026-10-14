@@ -90,11 +90,14 @@ You will most often stall on something only the human can give you: an answer to
    bd update <bead> --status blocked --set-metadata blocked_on=human
    ```
 
-   `blocked_on=human` says only that a live seat is asleep here. Without it, a rework seat's bead looks like a bead in delivery, because both sit behind an open pull-request gate, and the steward would poll the pull request instead of waking you. When you wake, put the bead back in progress and clear the key:
+   `blocked_on=human` says only that a live seat is asleep here. Without it, a rework seat's bead looks like a bead in delivery, because both sit behind an open pull-request gate, and the steward would poll the pull request instead of waking you. When you wake, put the bead back in progress, clear the key, and heartbeat the claim in the same step:
 
    ```bash
    bd update <bead> --status in_progress --unset-metadata blocked_on
+   bd heartbeat <bead>
    ```
+
+   Setting a bead `blocked` deletes its claim's lease, and moving it back grants none. Until your next heartbeat the claim has no lease, and a seat that dies in that window keeps the claim for ever, because `bd reclaim` never takes a leaseless claim.
 2. **If it is a question, put it on its own bead, labelled `human`.** That label is the human's queue, which `bd human list` reads. Where your host has you review a question before it goes out, do that first, and if the review lets you settle the question yourself, settle it and record why instead of asking. The bead carries one question, worded so the human can answer it cold. File it in your own tracker, and make the bead you sit on wait on it:
 
    ```bash
