@@ -57,7 +57,14 @@ As soon as you have oriented:
 
    Your topic is not always the one a steward would guess. A rework seat gets `-r2` or `-r3`, and a replacement steward can learn your topic only from the bead. Without it, the steward relays into the wrong topic and you sleep through an answer that was sent.
 
-   `agent_pane` is how a bead viewer draws your berth against the bead you sit on, and your berth's label is how the steward checks that the berth is still that bead's seat. **Keep the three together:** when you move to another bead, clear both keys from the bead you leave, claim the next as above, and name your berth after it. **Clear the keys whenever you let a bead go**, as *Deliver* and *Finish* say. Your berth id can be reused for another seat, and a bead still naming it then blanks the agent on both beads.
+   `agent_pane` is how a bead viewer draws your berth against the bead you sit on, and your berth's label is how the steward checks that the berth is still that bead's seat. **Keep the three together:** when you move to another bead, clear both keys from the bead you leave, claim the next as above, and name your berth after it. **Clear the keys and release your claim whenever you let a bead go**, as *Deliver* and *Finish* say. Your berth id can be reused for another seat, and a bead still naming it then blanks the agent on both beads. A bead still assigned to you refuses every other seat's claim and close, even after you close it, because a reopened bead keeps its assignee. So release a bead before you close it too:
+
+   ```bash
+   bd update <bead> --status in_progress    # only a bead you set blocked
+   bd unclaim <bead>
+   ```
+
+   `bd unclaim` releases only an `in_progress` bead, and leaves it `open`.
 
    **Where your bead is a parent, you take its small beads with it, and you never move between them.** Without a delivery formula you sit on the parent, and set each small bead `in_progress` as you start it. With direct delivery, close each once it is pushed. Where one pull request delivers them, each waits on its merge, as *Deliver* says.
 3. **Subscribe to your working topic, and only that**: `subscribe <channel>/<topic>`. Don't subscribe to the whole channel, because its other traffic is noise to you. Mentions of you always arrive without a subscription. This subscription is what lets the steward's relayed answers wake you while you sleep.
@@ -153,11 +160,12 @@ The first line names the default. A line with `for` names the formula for one ki
 
    ```bash
    bd update <step> --unset-metadata agent_pane --unset-metadata working_topic
+   bd unclaim <step>
    bd close <step>
    ```
 
    A `gh:pr` gate is poured without its pull request. Once you open the pull request, give the gate its number with `bd update <gate> --await-id <n>`.
-3. **Stay up until the checks are green for the commit you pushed**, which `gh pr checks <n> --watch` waits on. A failing check is yours to fix. Where the merge gate names the delivering seat, sit on it, merge as it says, and clear your keys from it before `bd gate check` closes it. Then do the steps after it whose descriptions name you, such as closing the molecule. A merge your permission mode refuses goes to the human as *Getting the human's permission* says.
+3. **Stay up until the checks are green for the commit you pushed**, which `gh pr checks <n> --watch` waits on. A failing check is yours to fix. Where the merge gate names the delivering seat, sit on it, merge as it says, and clear your keys from it and release it before `bd gate check` closes it. Then do the steps after it whose descriptions name you, such as closing the molecule. A merge your permission mode refuses goes to the human as *Getting the human's permission* says.
 4. **Stop at the first step whose description names someone else**, such as a review, or a merge that names the steward or the human. Don't sit on it. Post the pull request's address, or what the step waits on, to the working topic, then finish. The steward acts on the molecule from here.
 
    **Leave your bead open.** The outcome step holds it, and the bead goes ready only once that step closes. If you closed the outcome step yourself, the work has landed, so close your bead in *Finish* as for direct delivery.
@@ -173,11 +181,12 @@ If that push is rejected because the branch is protected, the repo's statement w
    If your bead turns out to need code from a bead whose pull request has not merged, that is a missing dependency. Post it to the working topic and block and sleep, watching the bead you need. It closes when its pull request merges, and that wakes you. The steward wires the dependency, or stands you down instead. If you are stood down, record where you got to on your bead, hand back the bead you sit on, and close your seat as *Finish* describes, without claiming the deliverable is done:
 
    ```bash
-   bd update <bead> --status open --unset-metadata blocked_on \
+   bd update <bead> --status in_progress --unset-metadata blocked_on \
                   --unset-metadata working_topic --unset-metadata agent_pane
+   bd unclaim <bead>
    ```
 
-   The status is what hands the bead back. A bead left `in_progress` with no seat behind it reads to the steward as a live worker, so nobody ever picks it up again.
+   The release is what hands the bead back. A bead left `in_progress` with no seat behind it reads to the steward as a live worker, so nobody ever picks it up again.
 2. **Open the pull request as a draft** unless the repo says otherwise.
 3. **Block the bead on the pull request with a `gh:pr` gate:**
 
@@ -192,22 +201,23 @@ If that push is rejected because the branch is protected, the repo's statement w
    **Don't close the bead, and don't set it `blocked`.** A closed bead tells the steward the work is delivered. While the bead stays open it blocks its dependents, so nothing starts against code that has not landed. The open gate keeps the bead out of `bd ready`, and the merge closes the gate. A bead set `blocked` stays out of `bd ready` even after that.
 4. **Post the pull request's address to the working topic**, then finish. Don't wait for the review. The steward watches the pull request from here, and starts a fresh seat on your bead if the reviewers ask for changes.
 
-**If your brief says your bead already has a pull request, you are a rework seat.** Your bead sits `open` behind its gate, so claim it as *Claim* says. The claim leaves the gate in place. Move that pull request rather than replacing it: push to its existing branch, and never open a second pull request for the same bead. Its gate already waits on that pull request, so make no second gate. When you finish, put the bead back to `open` as *Finish* says. Under a delivery formula you sit on the reopened step instead, as *Claim* says, and close it again once the checks are green. A bead left claimed with no seat on it reads to the steward as unstaffed work.
+**If your brief says your bead already has a pull request, you are a rework seat.** Your bead sits `open` behind its gate, so claim it as *Claim* says. The claim leaves the gate in place. Move that pull request rather than replacing it: push to its existing branch, and never open a second pull request for the same bead. Its gate already waits on that pull request, so make no second gate. When you finish, release the bead as *Finish* says. Under a delivery formula you sit on the reopened step instead, as *Claim* says, and release and close it again once the checks are green. A bead left claimed with no seat on it reads to the steward as unstaffed work.
 
 ## Finish
 
 When the deliverable meets the brief's definition of done, wind the seat down in this order. The steward can reclaim your berth the moment it sees your sign-off, so steps 4 to 6 go in one response.
 
-1. **Let go of the bead you sit on, and bring your bead up to date.** Clear every key that says a seat is on the bead you sit on, if you still sit on one:
+1. **Let go of the bead you sit on, and bring your bead up to date.** Clear every key that says a seat is on the bead you sit on, if you still sit on one, and release your claim on it:
 
    ```bash
    bd update <bead> --unset-metadata agent_pane --unset-metadata working_topic
+   bd unclaim <bead>
    ```
 
    The steward reads a bead holding `working_topic` as one with a live worker. `bd close` takes no metadata flags, so this is its own update before any close. Then:
 
    - **With direct delivery**, close your bead by your project's conventions.
-   - **With a pull request and no formula**, put your bead back to `open` with `bd update <id> --status open`. Its gate holds it, and the steward closes it once the work lands.
+   - **With a pull request and no formula**, leave your bead `open`, where the release left it. Its gate holds it, and the steward closes it once the work lands.
    - **Under a delivery formula**, your bead already waits on the outcome step, and you never claimed it. If you closed the outcome step yourself, the work has landed, so close your bead and each small bead under it. Otherwise leave them open.
 
    **If the steward has pointed you at a follow-up bead, stop finishing here and take it.** Read its brief, the first message of the topic the steward named. Unsubscribe from your old working topic, then claim the new bead as *Claim* says, with its own topic and your berth, and work it as you worked your first. You finish once, after your last bead.

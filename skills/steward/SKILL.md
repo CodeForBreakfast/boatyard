@@ -131,9 +131,12 @@ This holds because a steward acquires its commy identity lazily, on its first po
       **Otherwise the seat died asleep, and nothing will wake it.** Hand the bead back to the graph:
 
       ```bash
-      bd update <id> --status open --unset-metadata blocked_on \
+      bd update <id> --status in_progress --unset-metadata blocked_on \
                      --unset-metadata agent_pane --unset-metadata working_topic
+      bd unclaim <id> --if-assignee "<worker>"
       ```
+
+      `<worker>` is the dead seat's own name, the sender of its posts in its working topic. `bd unclaim` releases only an `in_progress` bead, and leaves it `open`. Where another seat now holds the bead, it changes nothing and names the holder, so leave that claim alone.
 
       Its dependency on its question bead keeps it out of `bd ready` until the human answers, and an open pull-request gate keeps it out until the merge. Then start a fresh worker on it in the next `-r` topic, with the answer quoted from the question bead in its brief. Where the bead is a step of a delivery molecule, brief the worker on the work bead that waits on that molecule, and it sits on the step again. A bead that waited on a permission or an action is ready at once, and its fresh worker asks again.
    2. **Otherwise an open `gh:pr` gate or an open outcome step of a delivery molecule means the bead is in delivery**, as *A bead closes on merge* and *A bead delivered by a formula* say. No seat is on the bead itself, so never relay to it and never start a worker on it. Poll its pull request, or read its molecule, whose steps show any seat still working it.
@@ -388,12 +391,14 @@ Starting workers is a **loop**, not a kickoff. Start one at each ready bead, and
     'any(.[]; .id == $id and .label == $bead and .state != "gone")'
   ```
 
-  When that prints `false`, and whenever you close a berth yourself, clear the bead in the same step. A bead left `in_progress` also goes back to `open`, because a claimed bead with no seat reads as a live worker:
+  When that prints `false`, and whenever you close a berth yourself, clear the bead in the same step. A bead left `in_progress` is also released from its dead seat's claim, because a claimed bead with no seat reads as a live worker and refuses every other seat's claim and close:
 
   ```bash
   bd update <bead> --unset-metadata agent_pane --unset-metadata working_topic
-  bd update <bead> --status open    # only a bead left in_progress
+  bd unclaim <bead> --if-assignee "<worker>"    # only a bead left in_progress
   ```
+
+  Name the worker as *Reconstruct* says for a seat that died asleep.
 
   A bead with `blocked_on=human` is handed back as *Reconstruct* says instead. Only a bead in your own tracker is yours to clear. For a seat born in another project, post the bead and its berth in that project's channel.
 - **Reclaim a berth that did not close itself.** On the success path a finished worker posts its sign-off, reacts `wave` to its brief, and closes its own berth. A worker that crashed first leaves its berth open. If a berth is still open after its worker waved, or `berth state` reads it `at-rest` long after the worker went dark without waving, close it with `berth close <id>` and clear its bead as the bullet above says. **Never close the berth of a bead that is `blocked` with `blocked_on=human`.** That worker is asleep on purpose, waiting for you to wake it. The exception is a worker you have confirmed dark: you relayed, and it never acknowledged by its checkpoint. A dead worker cannot clear its own `blocked_on`, so close its berth and hand its bead back as *Reconstruct* says for a seat that died asleep.
