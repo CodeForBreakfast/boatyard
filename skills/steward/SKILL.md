@@ -79,14 +79,14 @@ This holds because a steward acquires its commy identity lazily, on its first po
 4. **Sort the graph.** `bd ready` and `bd blocked`, filtered to the effort's beads, show what can start and what waits on a dependency. **Neither lists the whole effort.** `bd ready` leaves out anything `in_progress` or `blocked`, and `bd blocked` reports beads with unmet dependency edges, not beads whose status is `blocked`. A bead parked by status appears in neither. The top bead's tree in `bdi` is what lists the effort: the top bead and everything it depends on, followed transitively across trackers. Parent links put no bead in the effort, so don't walk them.
 
    ```bash
-   bdi --json --all --all-projects <project>:<top-bead> | jq -r --arg p <project> '
+   bdi --json --all <project>:<top-bead> | jq -r --arg p <project> '
      .trees[] | select(.project == $p) | .nodes[] | "\(.project):\(.id) \(.status)"' | sort -u
    ```
 
    **Neither reads a dependency on another project's bead.** `bd ready` lists a bead as ready while its foreign dependency is still open, and `bd dep list` and `bd dep tree` don't show the edge. `bd list --id <bead> --json` does, under `dependencies`. Before a ready bead counts as startable, read its dependencies there, and read the status of each foreign one through `bdi`:
 
    ```bash
-   bdi --json --all --project <project> <project>:<their-id> \
+   bdi --json --all --project <their-project> <their-project>:<their-id> \
      | jq -r '[.. | objects | select(.id? == "<their-id>" and has("status")) | .status] | first'
    ```
 
@@ -102,10 +102,10 @@ This holds because a steward acquires its commy identity lazily, on its first po
    A ready bead that depends on a closed outcome step of a delivery molecule is delivered too, so close it.
 
    **A ready bead whose parent names a live seat belongs to that seat.** The seat works its parent's small beads one at a time, so start no worker on it.
-5. **Review the graph for errors.** bdi reports every edge in the effort's tree that leads nowhere. First run `bd gate check --type=gh:pr`, so a merged pull request's gate is already closed. Then read the top bead's trees across every project, because an edge into a project bdi did not read would otherwise look missing:
+5. **Review the graph for errors.** bdi reports every edge in the effort's tree that leads nowhere. First run `bd gate check --type=gh:pr`, so a merged pull request's gate is already closed. Then read the top bead's tree from your project's directory. bdi also reads each blocker in another project, where bdi's config states that project's prefix:
 
    ```bash
-   bdi --json --all --all-projects <project>:<top-bead> | jq -r --arg p <project> '
+   bdi --json --all <project>:<top-bead> | jq -r --arg p <project> '
      .trees[] | select(.project == $p)
      | (select(.tracker != "ok") | "tracker \(.tracker | tojson)"),
        (.cycles[] | "cycle \(.)"),
@@ -126,7 +126,8 @@ This holds because a steward acquires its commy identity lazily, on its first po
    - **A gate that lacks its pull request never closes.** Give it what its bead's pull request says is missing, with `bd update <gate> --set-metadata repo=<owner>/<repo>` or `bd update <gate> --await-id <n>`.
    - **A cycle means a bead waits on one of its own forebears.** Remove the edge the plan contradicts, where the plan makes clear which edge that is, and file a question bead where it does not.
    - **`stale-pane` means a closed bead still names a berth.** Clear it with `bd update <bead> --unset-metadata agent_pane`. `orphan-claim` and `stale-claim` mean a seat went dark, which *Every stall is yours to break* covers.
-   - **`held-by-unread`, `not-read` or a `tracker` line means a tracker gave bdi no answer.** The edge is not at fault. Read again next wake, and if the same tracker still fails, post in its project's channel.
+   - **`held-by-unread` or a `tracker` line means a tracker gave bdi no answer.** The edge is not at fault. Read again next wake, and if the same tracker still fails, post in its project's channel.
+   - **`not-read` means bdi read none of the projects that may hold the id.** Either their trackers failed, or bdi's config states none of their prefixes. The edge is not at fault. Read again next wake. If the line stays, raise the missing prefix with the human as an action, because the configuration bdi reads is theirs.
    - **`held-by-several` means two projects share the id's prefix.** The fix is in the configuration bdi reads, not in the graph, so raise it with the human as an action.
 6. **Find the beads parked by status, and sort them in this order:**
 
