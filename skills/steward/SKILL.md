@@ -58,7 +58,13 @@ This holds because a steward acquires its commy identity lazily, on its first po
    - **Register the effort in the project's index**, as *The boatyard index* describes.
    - **Name your berth after the effort**, so the human can pick it out: `berth name "<effort>"`. On an independent berth the label also names whatever the backend groups under it.
    - **Name your berth on the top bead**, so bead viewers draw the effort against you: `bd update <top-bead> --set-metadata agent_pane="$BERTH_ID"`. A replacement steward overwrites it when it binds. **Clear it when you finish.**
-   - **Open a bead viewer beside you**, focused on the top bead: `berth open --as tender --cwd "$PWD" -- bdi <top-bead>`.
+   - **Keep one bead viewer for the effort beside you**, focused on the top bead and labelled with the effort. A resumed steward often starts where an earlier one left its viewer, so look in `berth list` first, and open a viewer only when none for the effort sits beside you:
+
+     ```bash
+     berth open --as tender --cwd "$PWD" --label "<effort>" -- bdi <top-bead>
+     ```
+
+     `berth state` describes agents only, so it reads `gone` for a running viewer. A viewer is gone only once `berth list` no longer shows it. Leave alone any viewer you find elsewhere.
 2. **Subscribe to your effort's own topics, never the whole channel.** Other efforts share the project channel, and their traffic would drown yours. Subscribe to `<project>/<effort>-decisions`, and to each working topic that already exists. Mentions of you always arrive without a subscription. You create working topics in the spawn loop, so you subscribe to each as you create it. **A replacement steward must not guess their names.** Each live worker records its topic as `working_topic` on the bead it sits on, which is the only reliable source once rework seats have moved topics:
 
    ```bash
