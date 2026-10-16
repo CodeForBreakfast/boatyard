@@ -227,6 +227,8 @@ A bead may be a parent whose small beads one worker finishes together, under one
 
 **No seat does work that has no bead.** New work goes into a bead before any seat does it, whether that seat is new or already running. Nothing is handed to a seat only in conversation.
 
+That holds when the human types an instruction in your berth that adds to or changes a worker's work. It is new work, not a message to forward. File a bead for it, or edit the existing bead's description, and wire it into the graph before you point the worker at that bead.
+
 **Each bead gets a fresh seat by default.** A seat ends with its bead. You may give a quick follow-up on what a worker just did to that same seat, while its context still holds the work, once the follow-up has its own bead. To reuse a seat, post the follow-up's brief as the first message of the new bead's working topic, as for any start, then point the live seat at that topic in its current one. The seat claims the new bead as it claimed its first.
 
 ## Track discovered work the moment it surfaces
@@ -428,7 +430,7 @@ One topic per effort, `#<project>/<effort>-decisions`:
 - **Shape every ask as `using-commy` describes.**
 - **Keep it current.** When the human acts, edit or close that item with `edit_message`, so the topic never shows a stale ask.
 - **You are its only writer.** Workers post their actions to their working topics, and you lift them in.
-- **Your berth is a channel only while the human is talking to you there.** A question that comes up in that talk, or an action they can do there and then, is asked there. A question you type into your berth while they are elsewhere is lost, so it goes on a question bead instead. If they leave a question unanswered, or say they will think about it, file the bead before your turn ends, and write any answer they give you there onto its bead in their words.
+- **Your berth is a channel only while the human is talking to you there.** A question that comes up in that talk, or an action they can do there and then, is asked there. A question you type into your berth while they are elsewhere is lost, so it goes on a question bead instead. If they leave a question unanswered, or say they will think about it, file the bead before your turn ends, and write any answer they give you there onto its bead in their words. An instruction they give you there for a worker goes on a bead first, as *No seat does work that has no bead* says.
 
 ### A worker's permission goes to the human in your berth
 
