@@ -55,7 +55,8 @@ cat > "$work/beads.json" <<'EOF'
    "blocked_by": [], "agent": null, "labels": [], "metadata": {}},
 
   {"project": "shipwright", "id": "ex-3", "status": "open", "issue_type": "feature", "ready": false,
-   "blocked_by": ["ex-4", "ex-5", "ex-6"], "agent": {"pane": {"id": "b1"}}, "labels": [],
+   "blocked_by": ["ex-4", "ex-5", "ex-6"], "agent": null, "labels": [],
+   "assignee": "hull-steward", "lease_expires_at": "2099-01-01T00:00:00.250Z",
    "metadata": {"effort_slug": "hull-survey"}},
   {"project": "shipwright", "id": "ex-4", "status": "open", "issue_type": "task", "ready": true,
    "blocked_by": [], "agent": null, "labels": ["human"], "title": "Which survey window?", "metadata": {}},
@@ -64,13 +65,17 @@ cat > "$work/beads.json" <<'EOF'
   {"project": "shipwright", "id": "ex-6", "status": "open", "issue_type": "feature", "ready": true,
    "blocked_by": [], "agent": null, "labels": [], "metadata": {"effort_slug": "keel-check"}},
 
-  {"project": "chandlery", "id": "ch-3", "status": "open", "issue_type": "epic", "ready": true,
-   "blocked_by": [], "agent": null, "labels": [], "metadata": {"effort_slug": "bilge-pump"}},
+  {"project": "chandlery", "id": "ch-3", "status": "in_progress", "issue_type": "epic", "ready": true,
+   "blocked_by": [], "agent": {"pane": {"id": "b2"}}, "labels": [],
+   "assignee": "bilge-steward", "lease_expires_at": "2000-01-01T00:00:00Z",
+   "metadata": {"effort_slug": "bilge-pump"}},
 
   {"project": "chandlery", "id": "ch-2", "status": "open", "issue_type": "epic", "ready": true,
    "blocked_by": [], "agent": null, "labels": [], "metadata": {"effort_slug": "stock-sync"}},
-  {"project": "chandlery", "id": "ch-2.1", "status": "open", "issue_type": "task", "ready": true,
-   "blocked_by": [], "agent": null, "labels": [], "metadata": {"effort_slug": "stock-sync"}}
+  {"project": "chandlery", "id": "ch-2.1", "status": "in_progress", "issue_type": "task", "ready": true,
+   "blocked_by": [], "agent": null, "labels": [],
+   "assignee": "stock-worker", "lease_expires_at": "2099-01-01T00:00:00Z",
+   "metadata": {"effort_slug": "stock-sync"}}
 ]}
 EOF
 
@@ -99,7 +104,9 @@ check "the restart line names the project's checkout" \
   "$(effort ex-1 .restart)"
 
 check "a ready top bead is not ready work" '0' "$(effort ch-3 .ready)"
-check "a live steward is its top bead's berth" '"b1"' "$(effort ex-3 .steward)"
+check "a steward on any machine is the holder of its top bead's live lease" '"hull-steward"' "$(effort ex-3 .steward)"
+check "a steward whose lease has expired is gone, whatever berth it names" 'null' "$(effort ch-3 .steward)"
+check "a claim on a bead other than the top is not the steward" 'null' "$(effort ch-2 .steward)"
 check "a gate and a question are not ready work, a folded effort's top is" '1' "$(effort ex-3 .ready)"
 check "a gate is listed as a wait" '["ex-5"]' "$(effort ex-3 .gates)"
 check "a question labelled human is an ask" '[{"id":"ex-4","title":"Which survey window?"}]' "$(effort ex-3 .asks)"

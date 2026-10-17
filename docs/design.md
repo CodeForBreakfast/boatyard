@@ -159,13 +159,14 @@ An effort is its top bead and everything that bead depends on, followed transiti
 
 The slash-only skills set `disable-model-invocation: true`, because plugin skills cannot be disabled one at a time. Claude Code then refuses them to the Skill tool, so only a typed command or a launch prompt starts one.
 
-The skills contain no multiplexer syntax. They call only `sign-on` and `berth`. Coordination runs over [commy](https://github.com/CodeForBreakfast/commy), with each effort indexed in a `boatyard` topic in its project's channel, and the [beads](https://github.com/gastownhall/beads) graph is the system of record. A worker records its berth id as `agent_pane` on the bead it is working, so bead viewers can draw the berth against its work.
+The skills contain no multiplexer syntax. They call only `sign-on` and `berth`. Coordination runs over [commy](https://github.com/CodeForBreakfast/commy), with each effort indexed in a `boatyard` topic in its project's channel, and the [beads](https://github.com/gastownhall/beads) graph is the system of record. A worker records its berth id as `agent_pane` on the bead it is working, so bead viewers can draw the berth against its work. A steward claims its top bead, so `tally` on any machine can tell a running effort from a parked one.
 
 ## Packaging
 
 - **One repository, one Claude Code plugin, `boatyard`.** It holds the skills and puts the executables in its `bin/`, which reaches the Bash tool's path.
 - **One flake exporting two packages:** `berth` and `sign-on`. The packages matter as much as the plugin. The persistent set starts under a service manager, which does not see the plugin's `bin/`.
 - **Host inputs.** The multiplexer package, the Claude Code command and flags, and the settings path are all package arguments or configuration. A host supplies its own.
+- **A host keeps its seats' claims alive.** A bd claim's lease lapses unless something renews it, and `tally` reads a steward as live only while its top bead's lease is. The host renews the claims of every running seat, including a seat that is asleep.
 - **A host allows the plugin's mod.** Where a host's managed settings limit mods to its organization's, the compaction mod does not load until the host allows it.
 - **Runtime dependencies.** The scripts in `bin/` state their dependencies, such as `jq`, for readers who do not use nix.
 - **One revision per host.** Claude Code puts a plugin's `bin/` after the ambient path, so where a host installs the packages, the packages run and the plugin supplies only the skills. A host that installs both loads the plugin from the same revision as the packages, with `--plugin-dir` on its Claude Code command.
