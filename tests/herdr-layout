@@ -65,6 +65,16 @@ echo "# a tender splits beside its opener"
 tender=$(BERTH_ID=$first berth open --as tender --cwd "$work" -- true)
 check "a tender opens in its opener's tab" "$(pane "$first" tab_id)" "$(pane "$tender" tab_id)"
 
+echo "# a labelled tender opens once in a workspace"
+
+viewer=$(BERTH_ID=$first berth open --as tender --cwd "$work" --label "a view" -- true)
+# A steward started again by hand, in a new pane of the old workspace.
+restarted=$(herdr --session "$BERTH_YARD" pane split "$first" --direction right --no-focus |
+  jq -r .result.pane.pane_id)
+check "a pane opened by hand in the workspace gives the open tender" "$viewer" \
+  "$(env -u BERTH_ID HERDR_PANE_ID="$restarted" berth open --as tender --cwd "$work" --label "a view" -- true)"
+herdr --session "$BERTH_YARD" pane close "$restarted" >/dev/null
+
 echo "# the cascade takes the whole workspace"
 
 by_hand=$(herdr --session "$BERTH_YARD" pane split "$first" --direction right --no-focus |

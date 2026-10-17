@@ -206,6 +206,17 @@ open() {
     opener_pane=$(existing_pane "$opener" "there is nothing to open a $as beside")
     workspace=$(jq -r .workspace_id <<<"$opener_pane")
 
+    if [ "$as" = tender ] && [ -n "$label" ]; then
+      id=$(herdr_result pane list --workspace "$workspace" | jq -r --arg label "$label" '
+        first(.panes[] | select(.tokens.berth_relationship == "tender" and .label == $label))
+        | .pane_id')
+      if [ -n "$id" ]; then
+        herdr_result pane report-metadata "$id" --source berth --token "berth_parent=$opener" >/dev/null
+        printf '%s\n' "$id"
+        return
+      fi
+    fi
+
     if [ "$as" = tender ]; then
       id=$(split_tallest "$focus" "$cwd" "[$opener_pane]")
     else

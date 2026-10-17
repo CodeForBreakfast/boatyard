@@ -66,13 +66,13 @@ This holds because a steward acquires its commy identity lazily, on its first po
      ```
 
      A steward that closed or died leaves a claim whose lease has lapsed, and `bd reclaim` hands that claim back so yours can take it. If the claim still refuses, another steward holds the effort live. Say so in the coordination topic and close your berth. A replacement steward overwrites the berth when it binds. **Release the claim and clear the berth when you finish.**
-   - **Keep one bead viewer for the effort beside you**, focused on the top bead and labelled with the effort. A resumed steward often starts where an earlier one left its viewer, so look in `berth list` first, and open a viewer only when none for the effort sits beside you:
+   - **Keep one bead viewer for the effort beside you**, focused on the top bead and labelled with the effort:
 
      ```bash
      berth open --as tender --cwd "$PWD" --label "<effort>" -- bdi <top-bead>
      ```
 
-     `berth state` describes agents only, so it reads `gone` for a running viewer. A viewer is gone only once `berth list` no longer shows it. Leave alone any viewer you find elsewhere.
+     Run it at every start-up. Where an earlier steward left a viewer with that label in your line of work, it hands that viewer to you instead of opening another. Leave alone any viewer you find elsewhere.
 2. **Subscribe to your effort's own topics, never the whole channel.** Other efforts share the project channel, and their traffic would drown yours. Subscribe to `<project>/<effort>-decisions`, and to each working topic that already exists. Mentions of you always arrive without a subscription. You create working topics in the spawn loop, so you subscribe to each as you create it. **A replacement steward must not guess their names.** Each live worker records its topic as `working_topic` on the bead it sits on, which is the only reliable source once rework seats have moved topics:
 
    ```bash
