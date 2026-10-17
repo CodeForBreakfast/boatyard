@@ -47,7 +47,7 @@ jq -c --argjson checkouts "$checkouts" '
   | .[] | . as $effort
   | select(any($efforts[]; .top != $effort.top and any(.closure[]; .id == $effort.top)) | not)
   | {project, top, also, slug, status, steward,
-     ready: [.closure[] | select(.ready and .issue_type != "gate" and (.labels | index("human") | not))] | length,
+     ready: [.closure[] | select(.id != $effort.top and .ready and .issue_type != "gate" and (.labels | index("human") | not))] | length,
      gates: [.closure[] | select(.issue_type == "gate") | .id],
      asks: [.closure[] | select(.labels | index("human")) | {id, title}],
      restart: "sign-on --as independent --cwd \($checkouts[.project] | @sh) --label \(.slug | @sh) \("/boatyard:steward \(.top)" | @sh)"}

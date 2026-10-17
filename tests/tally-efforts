@@ -64,6 +64,9 @@ cat > "$work/beads.json" <<'EOF'
   {"project": "shipwright", "id": "ex-6", "status": "open", "issue_type": "feature", "ready": true,
    "blocked_by": [], "agent": null, "labels": [], "metadata": {"effort_slug": "keel-check"}},
 
+  {"project": "chandlery", "id": "ch-3", "status": "open", "issue_type": "epic", "ready": true,
+   "blocked_by": [], "agent": null, "labels": [], "metadata": {"effort_slug": "bilge-pump"}},
+
   {"project": "chandlery", "id": "ch-2", "status": "open", "issue_type": "epic", "ready": true,
    "blocked_by": [], "agent": null, "labels": [], "metadata": {"effort_slug": "stock-sync"}},
   {"project": "chandlery", "id": "ch-2.1", "status": "open", "issue_type": "task", "ready": true,
@@ -87,7 +90,7 @@ effort() { # <top> <jq filter>
 }
 
 check "one line per effort, folding the effort another depends on and the shared slug" \
-  '["ch-2","ex-1","ex-3"]' "$(jq -sc 'map(.top) | sort' <<<"$output")"
+  '["ch-2","ch-3","ex-1","ex-3"]' "$(jq -sc 'map(.top) | sort' <<<"$output")"
 
 check "an effort with no steward says so" 'null' "$(effort ex-1 .steward)"
 check "ready work counts across trackers" '2' "$(effort ex-1 .ready)"
@@ -95,6 +98,7 @@ check "the restart line names the project's checkout" \
   "\"sign-on --as independent --cwd '/srv/yard/shipwright' --label 'mast-step' '/boatyard:steward ex-1'\"" \
   "$(effort ex-1 .restart)"
 
+check "a ready top bead is not ready work" '0' "$(effort ch-3 .ready)"
 check "a live steward is its top bead's berth" '"b1"' "$(effort ex-3 .steward)"
 check "a gate and a question are not ready work, a folded effort's top is" '1' "$(effort ex-3 .ready)"
 check "a gate is listed as a wait" '["ex-5"]' "$(effort ex-3 .gates)"
