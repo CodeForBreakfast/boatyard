@@ -72,7 +72,7 @@ cat > "$work/beads.json" <<'EOF'
 EOF
 
 cat > "$work/bin/bdi" <<EOF
-#!/usr/bin/env bash
+#!$(command -v bash)
 [ "\$*" = "--beads --all-projects" ] || { echo "unexpected bdi \$*" >&2; exit 2; }
 cat "$work/beads.json"
 EOF
