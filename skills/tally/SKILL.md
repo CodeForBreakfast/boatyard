@@ -11,7 +11,7 @@ One screen that answers one question: **across every project, which efforts are 
 
 An effort is a top bead carrying `effort_slug` metadata, and everything that bead depends on, followed transitively across trackers. Parent links put nothing in an effort, so a child bead with a slug of its own is an effort of its own. Two beads in one project that share a slug are one effort, and the shorter id is its top bead. An effort bead that another effort depends on is part of that effort, and is not listed on its own.
 
-An effort is open while its top bead is unfinished. Its steward is the agent `bdi` sees on the top bead, because a steward names its berth there as it binds.
+An effort is open while its top bead is unfinished. Its steward is whoever holds a live claim on the top bead, because a steward claims it as it binds and the claim's lease stays live while the steward runs, on whichever machine.
 
 ## Steps
 
@@ -20,7 +20,7 @@ An effort is open while its top bead is unfinished. Its steward is the agent `bd
    | Field | Holds |
    |---|---|
    | `project`, `top`, `slug` | Where the effort lives, its top bead, and its slug. `also` lists other beads sharing the slug. |
-   | `steward` | The berth on the top bead, or `null` where no live steward holds it. |
+   | `steward` | The holder of the top bead's claim while its lease is live, or `null` where no live steward holds it. |
    | `ready` | How many beads in the effort are ready to work. A gate and a question labelled `human` are not counted. |
    | `gates` | The open gates in the effort, which wait on a merge or another outside event. |
    | `asks` | The open questions labelled `human` in the effort, each with its id and title. |
@@ -57,7 +57,7 @@ Keep each to one line: the top bead's id, the project and slug, and what the eff
 ## Caveats
 
 - **"Running clean" means no open ask and nothing parked. It is not proof of progress.** An effort can still have a pull request in review with nobody on it. Where liveness matters, judge it by recent work product, such as a post, a commit or a bead update. Never judge it by commy's presence, which can report a live seat as offline.
-- **The steward check reads only the berth `bdi` sees on the top bead.** `bdi` sees the berths in the multiplexer on the machine it runs on, so a steward on another machine reads as none. A berth that another agent took over, without naming it on a bead, still reads as a live steward.
+- **The steward check reads only the claim on the top bead.** A steward hands its claim back while a worker checks the evidence for the effort's outcome, so for that short while the effort reads as parked with nothing ready.
 - **A waiting merge is usually healthy rather than stalled.** A day is the mechanism working, and a fortnight means the review it waits on has been forgotten. The gate's bead says how long it has waited.
 
 ## When not to use it

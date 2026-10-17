@@ -57,7 +57,15 @@ This holds because a steward acquires its commy identity lazily, on its first po
 
    - **Register the effort in the project's index**, as *The boatyard index* describes.
    - **Name your berth after the effort**, so the human can pick it out: `berth name "<effort>"`. On an independent berth the label also names whatever the backend groups under it.
-   - **Name your berth on the top bead**, so bead viewers draw the effort against you: `bd update <top-bead> --set-metadata agent_pane="$BERTH_ID"`. A replacement steward overwrites it when it binds. **Clear it when you finish.**
+   - **Claim the top bead and name your berth on it.** The claim is how `tally` on any machine tells a running effort from a parked one, and the berth is how bead viewers draw the effort against you:
+
+     ```bash
+     bd reclaim --id <top-bead> --older-than 0s
+     bd update <top-bead> --claim
+     bd update <top-bead> --set-metadata agent_pane="$BERTH_ID"
+     ```
+
+     A steward that closed or died leaves a claim whose lease has lapsed, and `bd reclaim` hands that claim back so yours can take it. If the claim still refuses, another steward holds the effort live. Say so in the coordination topic and close your berth. A replacement steward overwrites the berth when it binds. **Release the claim and clear the berth when you finish.**
    - **Keep one bead viewer for the effort beside you**, focused on the top bead and labelled with the effort. A resumed steward often starts where an earlier one left its viewer, so look in `berth list` first, and open a viewer only when none for the effort sits beside you:
 
      ```bash
@@ -129,7 +137,7 @@ This holds because a steward acquires its commy identity lazily, on its first po
    - **`held-by-unread` or a `tracker` line means a tracker gave bdi no answer.** The edge is not at fault. Read again next wake, and if the same tracker still fails, post in its project's channel.
    - **`not-read` means bdi read none of the projects that may hold the id.** Either their trackers failed, or bdi's config states none of their prefixes. The edge is not at fault. Read again next wake. If the line stays, raise the missing prefix with the human as an action, because the configuration bdi reads is theirs.
    - **`held-by-several` means two projects share the id's prefix.** The fix is in the configuration bdi reads, not in the graph, so raise it with the human as an action.
-6. **Find the beads parked by status, and sort them in this order:**
+6. **Find the beads where a seat sleeps or the work is in delivery, and sort them in this order:**
 
    1. **`blocked_on=human` means a seat went to sleep there, not that it is still alive.** A seat that dies asleep leaves the key behind. Check whether the berth named in the bead's `agent_pane` is still its seat, as *Watching the berths you started* says.
 
@@ -138,7 +146,7 @@ This holds because a steward acquires its commy identity lazily, on its first po
       **Otherwise the seat died asleep, and nothing will wake it.** Hand the bead back to the graph:
 
       ```bash
-      bd update <id> --status in_progress --unset-metadata blocked_on \
+      bd update <id> --unset-metadata blocked_on \
                      --unset-metadata agent_pane --unset-metadata working_topic
       bd unclaim <id> --if-assignee "<worker>"
       ```
@@ -512,14 +520,14 @@ On every completion, merge or unblock, update the bead graph, see what `bd ready
 
 **While any effort bead's pull request is open, the effort is not finished.** Only you are watching that unlanded work, so sleep through the review rather than closing.
 
-**The effort ends when the top bead closes, and you never close it on your own say-so.** Whoever closes it has seen the evidence that its outcome is true. When the top bead goes ready, start no worker on it. File a bead to check that evidence instead, and make the top bead depend on it:
+**The effort ends when the top bead closes, and you never close it on your own say-so.** Whoever closes it has seen the evidence that its outcome is true. When nothing the top bead depends on is still open, start no worker on it. File a bead to check that evidence instead, and make the top bead depend on it:
 
 ```bash
 e=$(bd create --silent --title "Check the evidence that <top-bead> is true" --description "<the evidence the top bead names>")
 bd dep add <top-bead> "$e"
 ```
 
-Start a worker on that bead, and brief it to close the bead with what it saw, then close the top bead. Its berth lands on the evidence bead, so yours stays on the top bead. Where only the human can see the evidence, closing the top bead is their action.
+Start a worker on that bead, and brief it to close the bead with what it saw, then close the top bead. bd refuses to close a bead claimed by anyone else, so release your claim with `bd unclaim <top-bead>` before you start that worker. Its berth lands on the evidence bead, so yours stays on the top bead. Where only the human can see the evidence, closing the top bead is their action, and you release the claim before you hand it to them.
 
 When the top bead has closed:
 

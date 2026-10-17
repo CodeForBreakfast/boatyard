@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # The worker skill's claim, run against the pinned bd. A rework seat claims a
 # bead that sits open behind its pull request's gate, and the claim must take
-# it. A bead parked as blocked must be refused, because the skill tells the seat
-# to report that refusal rather than force its way past it. See
+# it. A sleeping seat's bead must keep its lease, and must refuse another
+# seat's claim, because the skill tells the seat to report that refusal rather
+# than force its way past it. See
 # skills/worker/SKILL.md, "Claim".
 #
 # Run it with bd on the path. It makes its own throwaway tracker.
@@ -44,14 +45,25 @@ quiet_bd update "$in_delivery" --claim >/dev/null
 check "a rework seat's claim takes a bead behind its gate" in_progress "$(status_of "$in_delivery")"
 check "the claim leaves the gate open" open "$(status_of "$gate")"
 
-parked=$(quiet_bd create --silent --title "parked")
-quiet_bd update "$parked" --status blocked >/dev/null
-output=$(bd update "$parked" --claim 2>&1)
-check "the claim leaves a blocked bead blocked" blocked "$(status_of "$parked")"
+# A seat asleep on a question, as the skill leaves it: still in progress under
+# its claim, marked only by blocked_on.
+sleeping=$(quiet_bd create --silent --title "sleeping")
+quiet_bd update "$sleeping" --claim --actor sleeper >/dev/null
+quiet_bd update "$sleeping" --set-metadata blocked_on=human --actor sleeper >/dev/null
+check "a sleeping seat keeps its claim's lease" true \
+  "$(quiet_bd show "$sleeping" --json | jq '.[0].lease_expires_at != null')"
+output=$(bd update "$sleeping" --claim --actor another 2>&1)
+check "another seat's claim leaves the sleeping seat holding its bead" sleeper \
+  "$(quiet_bd show "$sleeping" --json | jq -r '.[0].assignee')"
 case "$output" in
-  *"not claimable"*) echo "ok: the refusal says the bead is not claimable" ;;
-  *) echo "FAIL: the refusal did not say 'not claimable': $output"; failures=$((failures + 1)) ;;
+  *"already claimed by sleeper"*) echo "ok: the refusal names the sleeping seat" ;;
+  *) echo "FAIL: the refusal did not name the sleeping seat: $output"; failures=$((failures + 1)) ;;
 esac
+
+# The reason the skill keeps a sleeping seat's bead in progress.
+quiet_bd update "$sleeping" --status blocked --actor sleeper >/dev/null
+check "a blocked bead loses its claim's lease" null \
+  "$(quiet_bd show "$sleeping" --json | jq '.[0].lease_expires_at')"
 
 rm -rf "$work"
 [ "$failures" = 0 ]

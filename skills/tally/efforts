@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Prints one JSON line per boatyard effort that bdi finds across every
-# configured project: its top bead, its steward's berth, the ready work, gates
+# configured project: its top bead, its steward, the ready work, gates
 # and human questions among everything it depends on, and the sign-on line that
 # restarts its steward.
 #
@@ -41,7 +41,7 @@ jq -c --argjson checkouts "$checkouts" '
   | map(min_by(.id | length) as $top
       | {project: $top.project, top: $top.id, also: (map(.id) - [$top.id]),
          slug: $top.metadata.effort_slug, status: $top.status,
-         steward: (map(.agent.pane.id // empty) | first),
+         steward: (if $top.lease_expires_at > (now | todate) then $top.assignee else null end),
          closure: (map(.id) | closure)})
   | . as $efforts
   | .[] | . as $effort
