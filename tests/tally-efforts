@@ -1,0 +1,117 @@
+#!/usr/bin/env bash
+# The tally skill's effort list, run against a stand-in bdi that prints a fixed
+# set of unfinished beads. An effort is a bead carrying effort_slug and
+# everything it depends on, so the list must fold an effort bead that another
+# effort depends on, and fold beads that share one slug. See
+# skills/tally/SKILL.md, "Steps".
+#
+# Run it with the repo's skills/tally/efforts as its first argument.
+#
+# Needs: bash, coreutils, jq, awk.
+set -uo pipefail
+
+efforts=$1
+work=$(mktemp -d)
+failures=0
+
+check() { # <what> <want> <got>
+  if [ "$2" = "$3" ]; then
+    echo "ok: $1"
+  else
+    echo "FAIL: $1: wanted '$2', got '$3'"
+    failures=$((failures + 1))
+  fi
+}
+
+export HOME="$work/home"
+mkdir -p "$HOME/.config/beady-eye" "$work/bin"
+export PATH="$work/bin:$PATH"
+
+# Badges sit in their own table under a project, and a path may come before the
+# name.
+cat > "$HOME/.config/beady-eye/config.toml" <<'EOF'
+[[projects]]
+name = "shipwright"
+path = "/srv/yard/shipwright"
+prefix = "ex"
+
+[[projects.badges]]
+key = "metadata.pr"
+link = "https://example.invalid/{number}"
+
+[[projects]]
+path = "~/chandlery"
+name = "chandlery"
+prefix = "ch"
+EOF
+
+cat > "$work/beads.json" <<'EOF'
+{"failed_projects": [], "beads": [
+  {"project": "shipwright", "id": "ex-1", "status": "open", "issue_type": "feature", "ready": false,
+   "blocked_by": ["ex-2", "ch-1"], "agent": null, "labels": [], "metadata": {"effort_slug": "mast-step"}},
+  {"project": "shipwright", "id": "ex-2", "status": "open", "issue_type": "task", "ready": true,
+   "blocked_by": [], "agent": null, "labels": [], "metadata": {}},
+  {"project": "chandlery", "id": "ch-1", "status": "open", "issue_type": "task", "ready": true,
+   "blocked_by": [], "agent": null, "labels": [], "metadata": {}},
+
+  {"project": "shipwright", "id": "ex-3", "status": "open", "issue_type": "feature", "ready": false,
+   "blocked_by": ["ex-4", "ex-5", "ex-6"], "agent": {"pane": {"id": "b1"}}, "labels": [],
+   "metadata": {"effort_slug": "hull-survey"}},
+  {"project": "shipwright", "id": "ex-4", "status": "open", "issue_type": "task", "ready": true,
+   "blocked_by": [], "agent": null, "labels": ["human"], "title": "Which survey window?", "metadata": {}},
+  {"project": "shipwright", "id": "ex-5", "status": "open", "issue_type": "gate", "ready": true,
+   "blocked_by": [], "agent": null, "labels": [], "metadata": {}},
+  {"project": "shipwright", "id": "ex-6", "status": "open", "issue_type": "feature", "ready": true,
+   "blocked_by": [], "agent": null, "labels": [], "metadata": {"effort_slug": "keel-check"}},
+
+  {"project": "chandlery", "id": "ch-2", "status": "open", "issue_type": "epic", "ready": true,
+   "blocked_by": [], "agent": null, "labels": [], "metadata": {"effort_slug": "stock-sync"}},
+  {"project": "chandlery", "id": "ch-2.1", "status": "open", "issue_type": "task", "ready": true,
+   "blocked_by": [], "agent": null, "labels": [], "metadata": {"effort_slug": "stock-sync"}}
+]}
+EOF
+
+cat > "$work/bin/bdi" <<EOF
+#!/usr/bin/env bash
+[ "\$*" = "--beads --all-projects" ] || { echo "unexpected bdi \$*" >&2; exit 2; }
+cat "$work/beads.json"
+EOF
+chmod +x "$work/bin/bdi"
+
+output=$(bash "$efforts" 2>"$work/stderr")
+check "the list runs" 0 "$?"
+check "the list says nothing on stderr" "" "$(cat "$work/stderr")"
+
+effort() { # <top> <jq filter>
+  jq -c --arg top "$1" "select(.top == \$top) | $2" <<<"$output"
+}
+
+check "one line per effort, folding the effort another depends on and the shared slug" \
+  '["ch-2","ex-1","ex-3"]' "$(jq -sc 'map(.top) | sort' <<<"$output")"
+
+check "an effort with no steward says so" 'null' "$(effort ex-1 .steward)"
+check "ready work counts across trackers" '2' "$(effort ex-1 .ready)"
+check "the restart line names the project's checkout" \
+  "\"sign-on --as independent --cwd '/srv/yard/shipwright' --label 'mast-step' '/boatyard:steward ex-1'\"" \
+  "$(effort ex-1 .restart)"
+
+check "a live steward is its top bead's berth" '"b1"' "$(effort ex-3 .steward)"
+check "a gate and a question are not ready work, a folded effort's top is" '1' "$(effort ex-3 .ready)"
+check "a gate is listed as a wait" '["ex-5"]' "$(effort ex-3 .gates)"
+check "a question labelled human is an ask" '[{"id":"ex-4","title":"Which survey window?"}]' "$(effort ex-3 .asks)"
+
+check "a shared slug takes the parent as top" '["ch-2.1"]' "$(effort ch-2 .also)"
+check "a checkout under ~ is expanded" \
+  "\"sign-on --as independent --cwd '$HOME/chandlery' --label 'stock-sync' '/boatyard:steward ch-2'\"" \
+  "$(effort ch-2 .restart)"
+
+jq '.failed_projects = ["chandlery"]' "$work/beads.json" > "$work/failed.json"
+mv "$work/failed.json" "$work/beads.json"
+bash "$efforts" >/dev/null 2>"$work/stderr"
+case "$(cat "$work/stderr")" in
+  *chandlery*) echo "ok: a project bdi could not read is named on stderr" ;;
+  *) echo "FAIL: a project bdi could not read was not named: $(cat "$work/stderr")"; failures=$((failures + 1)) ;;
+esac
+
+rm -rf "$work"
+[ "$failures" = 0 ]
