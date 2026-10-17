@@ -38,10 +38,10 @@ check "the workspace takes the berth's label" "first line" "$(workspace_label "$
 berth name "$first" "renamed line"
 check "naming the berth names its workspace" "renamed line" "$(workspace_label "$workspace")"
 
-echo "# workers share one tab in their opener's workspace"
+echo "# workers share a tab in their opener's workspace"
 
 workers=()
-for _ in 1 2 3; do
+for _ in 1 2; do
   workers+=("$(BERTH_ID=$first berth open --as worker --cwd "$work" -- true)")
 done
 tab=$(pane "${workers[0]}" tab_id)
@@ -54,11 +54,25 @@ done
 check "the workers' tab is labelled for them" workers \
   "$(herdr --session "$BERTH_YARD" tab get "$tab" | jq -r .result.tab.label)"
 
-echo "# a split never takes a pane under the height floor"
+echo "# workers fill a tab, then open another"
 
-min_height=$(herdr --session "$BERTH_YARD" pane list --workspace "$workspace" |
-  jq --arg tab "$tab" '[.result.panes[] | select(.tab_id == $tab) | .scroll.viewport_rows] | min')
-check "every worker keeps 12 rows or more" true "$([ "$min_height" -ge 12 ] && echo true || echo false)"
+for _ in 1 2 3 4 5; do
+  workers+=("$(BERTH_ID=$first berth open --as worker --cwd "$work" -- true)")
+done
+worker_tabs=$(for worker in "${workers[@]}"; do pane "$worker" tab_id; done | sort -u)
+check "the workers fill more than one tab" true "$([ "$(wc -l <<<"$worker_tabs")" -gt 1 ] && echo true || echo false)"
+for worker_tab in $worker_tabs; do
+  check "the workers' tab $worker_tab is labelled for them" workers \
+    "$(herdr --session "$BERTH_YARD" tab get "$worker_tab" | jq -r .result.tab.label)"
+  smallest=$(herdr --session "$BERTH_YARD" pane layout --pane "$(herdr --session "$BERTH_YARD" pane list |
+    jq -r --arg tab "$worker_tab" 'first(.result.panes[] | select(.tab_id == $tab)) | .pane_id')" |
+    jq -c '.result.layout.panes | {rows: (map(.rect.height) | min), cols: (map(.rect.width) | min)}')
+  # A pane's rect holds two rows that its terminal does not get.
+  check "every worker in tab $worker_tab keeps 12 rows or more" true \
+    "$(jq '.rows - 2 >= 12' <<<"$smallest")"
+  check "every worker in tab $worker_tab keeps 80 columns or more" true \
+    "$(jq '.cols >= 80' <<<"$smallest")"
+done
 
 echo "# a tender splits beside its opener"
 

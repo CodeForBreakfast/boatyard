@@ -15,9 +15,12 @@ here=$(dirname "$(readlink -f "$0")")
 yard=${BERTH_YARD:-${HERDR_SESSION:-default}}
 berth_env=(--env BERTH_BACKEND=herdr --env "BERTH_YARD=$yard")
 
-# A split never leaves either half of a pane under min_rows.
+# A worker's split never leaves either half of a pane under min_rows by
+# min_cols, so that Claude Code's startup gate fits on one line. A pane's rect
+# holds chrome_rows that its terminal does not get.
 min_rows=12
-divider_rows=2
+min_cols=80
+chrome_rows=2
 
 die() {
   echo "berth (herdr): $1" >&2
@@ -133,16 +136,31 @@ pane_state() { # <pane>
   esac
 }
 
-# Splits the tallest of the given panes: down while both halves clear
-# min_rows, otherwise right. Prints the new pane's id.
-split_tallest() { # <focus|no-focus> <cwd> <panes as a JSON array>
-  local target
-  target=$(jq -r --argjson floor "$min_rows" --argjson divider "$divider_rows" '
-    sort_by(.scroll.viewport_rows) | last
-    | "\(.pane_id) \(if (.scroll.viewport_rows - $divider) / 2 | floor >= $floor
-                     then "down" else "right" end)"' <<<"$3")
-  herdr_result pane split "${target% *}" --direction "${target#* }" --cwd "$2" \
+# Prints "<pane id> <direction>" for the roomiest of the given panes of one
+# tab that splits with both halves clearing the floors: down where it is tall
+# enough, otherwise right. Prints nothing where none can. A cols floor of 0
+# lets any pane split right.
+split_target() { # <min cols> <pane ids of one tab as a JSON array>
+  herdr_result pane layout --pane "$(jq -r 'first(.[])' <<<"$2")" |
+    jq -r --argjson ids "$2" --argjson rows "$min_rows" --argjson cols "$1" --argjson chrome "$chrome_rows" '
+    [.layout.panes[] | select(.pane_id | IN($ids[])) | .rect as $r
+     | {pane_id, area: ($r.width * $r.height),
+        direction: (if ($r.height / 2 | floor) - $chrome >= $rows then "down"
+                    elif ($r.width / 2 | floor) >= $cols then "right" else null end)}
+     | select(.direction)]
+    | sort_by(.area) | last // empty | "\(.pane_id) \(.direction)"'
+}
+
+# Splits the given pane, and prints the new pane's id.
+split_pane() { # <focus|no-focus> <cwd> <"<pane id> <direction>">
+  herdr_result pane split "${3% *}" --direction "${3#* }" --cwd "$2" \
     "${berth_env[@]}" "--$1" | jq -r .pane.pane_id
+}
+
+# A berth opened beside its opener has nowhere else to go, so it splits
+# however narrow that leaves it.
+split_beside() { # <focus|no-focus> <cwd> <pane id>
+  split_pane "$1" "$2" "$(split_target 0 "[\"$3\"]")"
 }
 
 # herdr 0.9.3 cannot start a pane with a command, so the command is typed into
@@ -178,7 +196,7 @@ await_shell() { # <id>
 }
 
 open() {
-  local as=$1 place=$2 focus=$3 cwd=$4 label=$5 opener=$6 id opener_pane workspace panes tab
+  local as=$1 place=$2 focus=$3 cwd=$4 label=$5 opener=$6 id opener_pane workspace panes tab target
   shift 6
 
   if [ "$as" = independent ]; then
@@ -186,7 +204,7 @@ open() {
       beside)
         opener=$(berth_id "$opener" "there is nothing to open beside")
         opener_pane=$(existing_pane "$opener" "there is nothing to open beside")
-        id=$(split_tallest "$focus" "$cwd" "[$opener_pane]")
+        id=$(split_beside "$focus" "$cwd" "$opener")
         ;;
       tab)
         opener=$(berth_id "$opener" "there is no workspace to open a tab in")
@@ -218,16 +236,19 @@ open() {
     fi
 
     if [ "$as" = tender ]; then
-      id=$(split_tallest "$focus" "$cwd" "[$opener_pane]")
+      id=$(split_beside "$focus" "$cwd" "$opener")
     else
-      # One tab holds an opener's workers.
+      # An opener's workers fill a tab, then open another.
       panes=$(herdr_result pane list --workspace "$workspace")
-      tab=$(jq -r --arg opener "$opener" '
-        first(.panes[] | select(.tokens.berth_parent == $opener
-                                and .tokens.berth_relationship == "worker"))
-        | .tab_id' <<<"$panes")
-      if [ -n "$tab" ]; then
-        id=$(split_tallest "$focus" "$cwd" "$(jq -c --arg tab "$tab" '[.panes[] | select(.tab_id == $tab)]' <<<"$panes")")
+      target=""
+      for tab in $(jq -r --arg opener "$opener" '
+        [.panes[] | select(.tokens.berth_parent == $opener and .tokens.berth_relationship == "worker")
+         | .tab_id] | unique | .[]' <<<"$panes"); do
+        target=$(split_target "$min_cols" "$(jq -c --arg tab "$tab" '[.panes[] | select(.tab_id == $tab) | .pane_id]' <<<"$panes")")
+        [ -z "$target" ] || break
+      done
+      if [ -n "$target" ]; then
+        id=$(split_pane "$focus" "$cwd" "$target")
       else
         id=$(herdr_result tab create --workspace "$workspace" --cwd "$cwd" --label workers \
           "${berth_env[@]}" "--$focus" | jq -r .root_pane.pane_id)
