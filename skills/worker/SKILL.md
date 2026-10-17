@@ -186,7 +186,7 @@ If that push is rejected because the branch is protected, the repo's statement w
    ```
 
    The release is what hands the bead back. A bead left `in_progress` with no seat behind it reads to the steward as a live worker, so nobody ever picks it up again.
-2. **Open the pull request as a draft** unless the repo says otherwise.
+2. **Open the pull request as a draft** unless the repo says otherwise, **and mark it ready for review when you hand it over.** Once the checks are green for the commit you pushed, which `gh pr checks <n> --watch` waits on, run `gh pr ready <n>`. A draft means only that work is still under way.
 3. **Block the bead on the pull request with a `gh:pr` gate:**
 
    ```bash
