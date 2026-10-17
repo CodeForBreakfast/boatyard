@@ -261,6 +261,32 @@ berth close "$caller"
 check "closing its caller leaves it" true "$(listed "$tabbed")"
 berth close "$tabbed"
 
+echo "# a labelled tender opens once in a line of work"
+
+line=$(berth open --as independent --cwd "$work" -- true)
+view=$(BERTH_ID=$line berth open --as tender --cwd "$work" --label "a view" -- true)
+again=$(BERTH_ID=$line open_recording tender "a view" "$work/again")
+check "opening it again gives the open tender" "$view" "$again"
+check "opening it again runs no command" "" "$(recorded "$work/again" BERTH_ID)"
+check "opening it again leaves one tender" 1 "$(berth list | jq '[.[] | select(.relationship == "tender")] | length')"
+other=$(BERTH_ID=$line berth open --as tender --cwd "$work" --label "another view" -- true)
+check "a tender with another label opens anew" true "$([ "$other" != "$view" ] && echo true || echo false)"
+
+successor=$(BERTH_ID=$line berth open --as independent --beside --cwd "$work" -- true)
+check "a berth beside the opener gives the open tender" "$view" \
+  "$(BERTH_ID=$successor berth open --as tender --cwd "$work" --label "a view" -- true)"
+check "it is still a tender" tender "$(field "$view" relationship)"
+check "its parent becomes the berth that opened it again" "$successor" "$(field "$view" parent)"
+
+apart=$(berth open --as independent --cwd "$work" -- true)
+elsewhere=$(BERTH_ID=$apart berth open --as tender --cwd "$work" --label "a view" -- true)
+check "a line of work apart opens a tender of its own" true "$([ "$elsewhere" != "$view" ] && echo true || echo false)"
+
+berth close "$successor"
+check "closing the berth that opened it again closes it" false "$(listed "$view")"
+berth close "$line"
+berth close "$apart"
+
 echo "# serve and stop"
 
 served="$BERTH_YARD-served"

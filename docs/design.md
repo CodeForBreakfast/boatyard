@@ -66,7 +66,7 @@ Each adapter maps its backend's states onto these four and corrects its backend'
 | `berth serve <yard>` | Runs the backend for a yard in the foreground, so a service manager can supervise the real process. |
 | `berth stop <yard>` | Stops a yard. |
 | `berth yard` | Prints the yard the caller acts in, resolved as the adapter resolves it for every other verb. |
-| `berth open --as independent\|worker\|tender --cwd <dir> [--label <text>] [--beside \| --tab] [--focus] -- <command>` | Opens a berth and prints its id. With `--beside`, an independent berth opens beside its opener rather than apart. With `--tab`, it opens in a tab near its opener. With `--focus`, the person watching the yard lands on the new berth. Without it, their focus stays where it was. |
+| `berth open --as independent\|worker\|tender --cwd <dir> [--label <text>] [--beside \| --tab] [--focus] -- <command>` | Opens a berth and prints its id. With `--beside`, an independent berth opens beside its opener rather than apart. With `--tab`, it opens in a tab near its opener. With `--focus`, the person watching the yard lands on the new berth. Without it, their focus stays where it was. A labelled tender opens once in a line of work: where its opener's line of work already holds a tender with that label, `open` makes the opener its parent and prints its id, and runs no command. |
 | `berth name [<id>] <label>` | Labels a berth. On an independent berth that opened apart or in a tab, the label also names whatever the adapter groups under it. |
 | `berth list [<yard>]` | Prints the berths as JSON: id, label, relationship, parent and state. |
 | `berth send-text [<id>] <text>` | Types text into a berth. |
@@ -104,7 +104,7 @@ Where a verb needs the caller, such as a worker's opener or the opener a berth o
 
 It is written first. Its obligations beyond straight mapping:
 
-- **Layout.** An independent berth becomes a workspace. One opened beside its opener splits the opener's pane instead, and shares its workspace. One opened in a tab becomes a new tab in the opener's workspace, and takes the berth's label. Workers share one tab in their opener's workspace and split it. A tender splits beside its opener. The choice of split direction lives here.
+- **Layout.** An independent berth becomes a workspace. One opened beside its opener splits the opener's pane instead, and shares its workspace. One opened in a tab becomes a new tab in the opener's workspace, and takes the berth's label. Workers share one tab in their opener's workspace and split it. A tender splits beside its opener, and a line of work is a workspace when `open` looks for a tender with the same label. The choice of split direction lives here.
 - **The parked-on-background-work correction** described under Agent states.
 - **The lost-agent correction.** Where a wrapper renames Claude Code's process, as Nix's does, herdr names it from its argv, and skips reading argv while the process waits on the disk, as under swap. Enough misses clear the agent, and herdr may not look again for minutes. The session reported at Claude Code's start-up survives, so a pane with no agent, a session, and a foreground process other than its shell reads `active`, not `gone`.
 - **The cascade.** herdr keeps a workspace's other panes when its first pane closes, so the adapter closes them itself. It closes a whole workspace only for the independent berth that opened it, and only while no other independent berth lives there. Any other berth closes its own pane.
