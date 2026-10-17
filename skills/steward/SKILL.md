@@ -174,7 +174,7 @@ This holds because a steward acquires its commy identity lazily, on its first po
    ```
 
    The list covers the whole tracker, so skip a bead outside the effort. Its seat may sit in a yard your `berth list` cannot see.
-7. **Match your watches to the effort's waits.** Every open question bead a sleeping worker depends on, and every foreign dependency that holds a bead in push-gate state 6, gets a beady-eye `watch`. Name the project for a foreign bead. Compare beady-eye's `watching` list against those waits. Watch what is missing, which after a fresh start is all of them, and `unwatch` what no longer holds anything up.
+7. **Match your watches to the effort's waits.** Every open question bead a sleeping worker depends on, every foreign dependency that holds a bead in push-gate state 6, and every bead in delivery gets a beady-eye `watch`. The bead in delivery to watch is the work bead: under a delivery formula, the bead that waits on the outcome step, and otherwise the bead behind its own `gh:pr` gate. It goes ready once that step or gate closes. Name the project for a foreign bead. Compare beady-eye's `watching` list against those waits. Watch what is missing, which after a fresh start is all of them, and `unwatch` what no longer holds anything up.
 8. **Read the topics.** Read the decisions topic and each active worker's working topic: who is mid-flight, who is blocked, and what has been asked of the human. After a compaction you are still subscribed to every topic an earlier you created. The only subscription you might still owe is to a topic someone else created.
 
 You are now bound, reachable, and hold the whole state. Reconstruct from these reads, never from memory.
@@ -214,7 +214,7 @@ You bloat, and force expensive compaction, by pulling detail of the work into yo
 
   **A bead you wait on wakes you through your watch on it.** A closed question bead or foreign dependency ends a wait, so `unwatch` it and run the wake ritual. A comment, or any change that leaves the bead open, is nothing to act on unless it is a question for you.
 
-  **Pull requests are the exception.** A merge sends no message, so an effort waiting on one may have no inbound wake source at all. Schedule the poll explicitly, on the timescale a review really takes, hours rather than minutes.
+  **A merge wakes you through your watch on the bead in delivery.** Once the pull request merges and its gate closes, the bead goes ready, and the watch says so. A watch cannot see a pull request that needs work, such as one with changes requested, a failing check or a needed rebase. So also schedule a poll of your pull requests, on the timescale a review really takes, hours rather than minutes.
 
   **While beady-eye says its watcher is down, your watches wake no one.** Until it says the watcher is answering again, poll the beads you watch within the hour, because workers sleep on them, and when a question bead closes, post its answer, quoted from the bead, into its worker's working topic.
 - **You act; you don't report.** The wake ritual's output is for you. Never narrate your orientation or your plan into the terminal, where it reaches no one. What you emit is actions: a brief, an ask, a bead update.
@@ -471,7 +471,7 @@ Judge liveness by work product, meaning recent posts, commits and bead updates, 
 
 ## Watching your pull requests
 
-An open pull request is a live strand with no seat on it, so nothing moves it unless you do. At each wake, run `bd gate check --type=gh:pr` to close the gate of every merged pull request. The beads behind those gates go ready, and *Reconstruct* closes them. Then walk your own beads in delivery, reading each pull request from its gate, and ask about each one by number:
+An open pull request is a live strand with no seat on it, so nothing moves it unless you do. Your watch on its bead wakes you once it merges and its gate closes, as *Reconstruct* step 7 says. A watch sees nothing of a review, so your scheduled poll finds a pull request that needs rework, and finds a merge while beady-eye says its watcher is down. At each wake, run `bd gate check --type=gh:pr` to close the gate of every merged pull request. The beads behind those gates go ready, and *Reconstruct* closes them. Then walk your own beads in delivery, reading each pull request from its gate, and ask about each one by number:
 
 ```bash
 gh pr view "$N" -R "$OWNER/$REPO" \
