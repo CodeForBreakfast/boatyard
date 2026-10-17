@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+# Prints one JSON line per boatyard effort that bdi finds across every
+# configured project: its top bead, its steward's berth, the ready work, gates
+# and human questions among everything it depends on, and the sign-on line that
+# restarts its steward.
+#
+# Needs: bash, jq, awk, bdi.
+set -euo pipefail
+
+config="$HOME/.config/beady-eye/config.toml"
+
+# Reads only the name and path of each [[projects]] table, which bdi's config
+# writes as plain one-line strings.
+checkouts=$(awk '
+  function flush() { if (name != "" && path != "") print name "\t" path; name = path = "" }
+  /^[[:space:]]*\[/ { flush(); in_project = ($0 ~ /^[[:space:]]*\[\[projects\]\][[:space:]]*$/); next }
+  in_project && /^[[:space:]]*(name|path)[[:space:]]*=/ {
+    key = $0; sub(/^[[:space:]]*/, "", key); sub(/[[:space:]]*=.*$/, "", key)
+    value = $0; sub(/^[^=]*=[[:space:]]*"/, "", value); sub(/".*$/, "", value)
+    if (key == "path") sub(/^~/, ENVIRON["HOME"], value)
+    if (key == "name") name = value; else path = value
+  }
+  END { flush() }
+' "$config" | jq -Rn '[inputs | split("\t") | {(.[0]): .[1]}] | add // {}')
+
+beads=$(bdi --beads --all-projects)
+
+failed=$(jq -r '.failed_projects | join(", ")' <<<"$beads")
+if [ -n "$failed" ]; then
+  echo "efforts: bdi could not read $failed, so its efforts are missing" >&2
+fi
+
+jq -c --argjson checkouts "$checkouts" '
+  (reduce .beads[] as $b ({}; .[$b.id] = $b)) as $by
+  | def closure: {seen: ., next: .}
+      | until(.next == []; ([.next[] | $by[.].blocked_by[]?] - .seen | unique) as $new
+          | .seen += $new | .next = $new)
+      | .seen | map($by[.] // empty);
+  [.beads[] | select(.metadata.effort_slug)]
+  | group_by([.project, .metadata.effort_slug])
+  | map(min_by(.id | length) as $top
+      | {project: $top.project, top: $top.id, also: (map(.id) - [$top.id]),
+         slug: $top.metadata.effort_slug, status: $top.status,
+         steward: (map(.agent.pane.id // empty) | first),
+         closure: (map(.id) | closure)})
+  | . as $efforts
+  | .[] | . as $effort
+  | select(any($efforts[]; .top != $effort.top and any(.closure[]; .id == $effort.top)) | not)
+  | {project, top, also, slug, status, steward,
+     ready: [.closure[] | select(.ready and .issue_type != "gate" and (.labels | index("human") | not))] | length,
+     gates: [.closure[] | select(.issue_type == "gate") | .id],
+     asks: [.closure[] | select(.labels | index("human")) | {id, title}],
+     restart: "sign-on --as independent --cwd \($checkouts[.project] | @sh) --label \(.slug | @sh) \("/boatyard:steward \(.top)" | @sh)"}
+' <<<"$beads"

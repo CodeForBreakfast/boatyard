@@ -440,7 +440,7 @@ Tell the human in your own berth: which worker, the command, why the work needs 
 
 ## The boatyard index
 
-The human runs several efforts at once, so each project keeps one more surface: the **`boatyard` topic in the project channel**, `#<project>/boatyard`. It carries one line per live effort in that project. Keeping your line current is what lets the human, and a roll-up across projects, see your effort at all.
+The human runs several efforts at once, so each project keeps one more surface: the **`boatyard` topic in the project channel**, `#<project>/boatyard`. It carries one line per live effort in that project, so the efforts there know about each other. Nothing reads it as a register: tally finds efforts in the trackers.
 
 A post subscribes you to its topic, so everything posted to a `boatyard` topic reaches every steward that has ever written there. That is why the index is per project, and why an entry is one line and nothing more.
 
