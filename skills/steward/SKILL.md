@@ -1,8 +1,7 @@
 ---
 name: steward
-description: Drives one multi-agent boatyard effort from its top bead, coordinating worker berths rather than doing the work. Started as `/boatyard:steward <top-bead-id>`, typed as the launch prompt.
+description: Drives one multi-agent boatyard effort from its top bead, coordinating worker berths rather than doing the work. Use only when invoked by name, as `/boatyard:steward <top-bead-id>`, or when muster hands an effort to the seat it runs in.
 argument-hint: <top-bead-id>
-disable-model-invocation: true
 ---
 
 # Steward
@@ -50,6 +49,8 @@ Tell the two apart with one passive read, `current_identity`:
 - `{state: 'bound'}` means a compaction. Go straight to *Reconstruct*.
 
 This holds because a steward acquires its commy identity lazily, on its first post. A seat configured with a fixed commy name binds at start-up instead, and would break the test.
+
+A seat that muster has just handed the effort to breaks it too, because it may have posted while it prepared the effort. That seat is starting fresh, whatever `current_identity` says, so it does *Reachable*, then *Reconstruct*.
 
 ### Reachable, on a fresh start only
 

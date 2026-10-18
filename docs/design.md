@@ -150,14 +150,14 @@ A mod in the plugin compacts a session at the end of a turn once its free contex
 
 | Skill | Role | Invocation |
 |---|---|---|
-| `steward` | Drives one multi-agent effort from its top bead. | slash only |
+| `steward` | Drives one multi-agent effort from its top bead. | model-invoked, so `muster` can load it. Its description says to use it only when invoked by name, or when `muster` hands an effort to the seat it runs in. |
 | `worker` | Executes one bead as a berth in an effort. The steward starts it with `sign-on`, posts its brief, then types `/boatyard:worker <topic>` into its berth. | slash only |
-| `muster` | Turns a body of work into an effort a steward can drive cold, then launches the steward. | model-invoked, so an agent told to start an effort can run it from its own seat. Its description says to use it only when invoked by name. |
+| `muster` | Turns a body of work into an effort a steward can drive cold, then hands it to a steward. A seat a person works in takes the effort over itself, by loading `steward`. A seat with a standing role, such as a concierge, launches a separate steward with `sign-on`. | model-invoked, so an agent told to start an effort can run it from its own seat. Its description says to use it only when invoked by name. |
 | `tally` | A read-only roll-up of every live effort and what each needs from a human. | model-invoked, so plain questions reach it. Its description says "boatyard" and "effort". |
 
 An effort is its top bead and everything that bead depends on, followed transitively across trackers. The top bead states the outcome the effort delivers, and parent links put nothing in an effort. `muster` adopts or files the top bead rather than creating an epic to anchor the effort. It files the work as observable outcomes, each wired to the outcomes it needs, and places a bead that is true only after a release or deployment downstream of that release. An epic is an "and" over the outcomes it depends on. The steward is started with the top bead, and the effort's slug, index line and berth are keyed on it. The effort ends when someone who has seen the evidence for its outcome closes the top bead.
 
-The slash-only skills set `disable-model-invocation: true`, because plugin skills cannot be disabled one at a time. Claude Code then refuses them to the Skill tool, so only a typed command or a launch prompt starts one.
+The slash-only skill sets `disable-model-invocation: true`, because plugin skills cannot be disabled one at a time. Claude Code then refuses it to the Skill tool, so only a typed command or a launch prompt starts it.
 
 The skills contain no multiplexer syntax. They call only `sign-on` and `berth`. Coordination runs over [commy](https://github.com/CodeForBreakfast/commy), with each effort indexed in a `boatyard` topic in its project's channel, and the [beads](https://github.com/gastownhall/beads) graph is the system of record. A worker records its berth id as `agent_pane` on the bead it is working, so bead viewers can draw the berth against its work. A steward claims its top bead, so `tally` on any machine can tell a running effort from a parked one.
 
