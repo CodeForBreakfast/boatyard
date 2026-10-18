@@ -97,6 +97,11 @@ check "yard prints the yard of a caller that is not a berth" "$BERTH_YARD" \
   "$(env -u BERTH_ID -u BERTH_YARD berth yard)"
 refused "yard takes no argument" berth yard "$BERTH_YARD"
 
+echo "# id"
+
+check "id prints the calling berth" "$worker" "$(BERTH_ID=$worker berth id)"
+refused "id takes no argument" env BERTH_ID="$worker" berth id "$worker"
+
 echo "# name"
 
 berth name "$worker" "renamed"
