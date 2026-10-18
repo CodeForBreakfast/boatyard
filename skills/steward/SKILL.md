@@ -12,7 +12,7 @@ You are started for **one effort**: a multi-step piece of work that needs severa
 
 Coordination runs over commy: see its `using-commy` skill for channels, topics, tone and the format of an ask. The `worker` skill is the other half of this system.
 
-You run in a berth, one terminal that boatyard opened for you. `BERTH_ID` names it. You touch the terminal layer only through `sign-on`, which starts a seat, and `berth`, which does everything else. A bare `berth` verb acts on your own berth.
+You run in a berth, one terminal that boatyard opened for you. `berth id` prints its id. You touch the terminal layer only through `sign-on`, which starts a seat, and `berth`, which does everything else. A bare `berth` verb acts on your own berth.
 
 ## The one principle everything hangs off
 
@@ -63,7 +63,7 @@ A seat that muster has just handed the effort to breaks it too, because it may h
      ```bash
      bd reclaim --id <top-bead> --older-than 0s
      bd update <top-bead> --claim
-     bd update <top-bead> --set-metadata agent_pane="$BERTH_ID"
+     bd update <top-bead> --set-metadata agent_pane="$(berth id)"
      ```
 
      A steward that closed or died leaves a claim whose lease has lapsed, and `bd reclaim` hands that claim back so yours can take it. If the claim still refuses, another steward holds the effort live. Say so in the coordination topic and close your berth. A replacement steward overwrites the berth when it binds. **Release the claim and clear the berth when you finish.**
@@ -179,7 +179,7 @@ A seat that muster has just handed the effort to breaks it too, because it may h
 
    ```bash
    bd list --has-metadata-key agent_pane --status open,in_progress --limit 0 --json \
-     | jq -r --arg me "$BERTH_ID" '.[] | select(.metadata.agent_pane != $me) | "\(.id) \(.status) \(.metadata.agent_pane)"'
+     | jq -r --arg me "$(berth id)" '.[] | select(.metadata.agent_pane != $me) | "\(.id) \(.status) \(.metadata.agent_pane)"'
    ```
 
    The list covers the whole tracker, so skip a bead outside the effort. Its seat may sit in a yard your `berth list` cannot see.

@@ -74,6 +74,11 @@ renames default "$default_pane" "default caller"
 check "it acts on its own yard" "default caller" "$(label default "$default_pane")"
 check "it leaves the named yard's pane alone" "named caller" "$(label "$yard" "$named_pane")"
 
+echo "# a caller that asks for its own id"
+
+runs "$yard" "$named_pane" id "berth id"
+check "it is given its own pane" "$named_pane" "$(cat "$work/id.out")"
+
 tab_of() { # <session> <pane>
   herdr --session "$1" pane get "$2" | jq -r .result.pane.tab_id
 }

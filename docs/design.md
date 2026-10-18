@@ -66,6 +66,7 @@ Each adapter maps its backend's states onto these four and corrects its backend'
 | `berth serve <yard>` | Runs the backend for a yard in the foreground, so a service manager can supervise the real process. |
 | `berth stop <yard>` | Stops a yard. |
 | `berth yard` | Prints the yard the caller acts in, resolved as the adapter resolves it for every other verb. |
+| `berth id` | Prints the calling berth's id. A caller that is not a berth gets the id of the pane it runs in, which stands in for it as it does for every other verb. |
 | `berth open --as independent\|worker\|tender --cwd <dir> [--label <text>] [--beside \| --tab] [--focus] -- <command>` | Opens a berth and prints its id. With `--beside`, an independent berth opens beside its opener rather than apart. With `--tab`, it opens in a tab near its opener. With `--focus`, the person watching the yard lands on the new berth. Without it, their focus stays where it was. A labelled tender opens once in a line of work: where its opener's line of work already holds a tender with that label, `open` makes the opener its parent and prints its id, and runs no command. |
 | `berth name [<id>] <label>` | Labels a berth. On an independent berth that opened apart or in a tab, the label also names whatever the adapter groups under it. |
 | `berth list [<yard>]` | Prints the berths as JSON: id, label, relationship, parent and state. |
