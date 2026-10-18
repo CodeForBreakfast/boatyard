@@ -1,12 +1,12 @@
 ---
 name: muster
-description: Turns a body of work, usually beads that already exist and possibly spread across several projects, into one boatyard effort that a steward can drive cold, then starts that steward with sign-on. Builds and wires the bead graph, shapes other projects' slices with their concierges over commy, and checks the graph can be driven before the launch. Use only when invoked by name, as `/boatyard:muster` or an explicit instruction to muster an effort.
+description: Turns a body of work, usually beads that already exist and possibly spread across several projects, into one boatyard effort that a steward can drive cold, then hands it to a steward: a person's own seat takes the effort over, and a seat with a standing role starts one with sign-on. Builds and wires the bead graph, shapes other projects' slices with their concierges over commy, and checks the graph can be driven before the launch. Use only when invoked by name, as `/boatyard:muster` or an explicit instruction to muster an effort.
 argument-hint: <beads, a label or a query naming the work>
 ---
 
 # Muster
 
-You turn a body of work into an effort that one steward can drive cold and end to end, and then you start that steward. The work is usually beads that already exist, and it may be spread across several projects.
+You turn a body of work into an effort that one steward can drive cold and end to end, and then you hand it to that steward. The work is usually beads that already exist, and it may be spread across several projects.
 
 The steward consumes a wired, context-sized bead graph under one top bead and never builds one, and a worker never wires the graph, so building it is your job.
 
@@ -22,7 +22,7 @@ Muster work of **any size**: one small bead in this project, a handful of local 
 
 - **No coordination across projects.** When nothing is foreign, skip *Shape other projects' slices over commy*.
 - **A trivial graph.** The top bead may be the one bead, or an outcome bead that depends on a few, with few or no other dependency edges. That graph is complete, not deficient.
-- **A quick readiness gate.** `bd dep cycles` is empty and `bd ready` shows the bead. Skip the adversarial review, because it has nothing to find.
+- **A quick readiness gate.** `bd dep cycles` is empty and `bd ready` shows the bead. Skip the adversarial review, because it has nothing to find, unless your seat will take the effort over itself.
 
 ## The one principle everything hangs off
 
@@ -106,38 +106,50 @@ Before you start the steward, confirm that the graph can be driven. All of these
 
 For a graph that is not trivial, give **one** throwaway subagent an adversarial review of it, and keep only its verdict. Its brief: hunt for edges that only order work, colliding beads a better structure would separate, missing blockers including work built on unmerged code, beads that state a task rather than an observable outcome, a release or deployment wired upstream of the work it ships, beads reached only through a parent link, oversized beads, unwired foreign strands, and a top bead that would not let a cold steward rebuild the effort. Fix what it finds. This review is your own quality check, not a gate on the human. Where your seat may not start subagents, as a concierge's often may not, the review does not run, and the checks above remain the real bar.
 
+**When your seat will take the effort over itself, the review always runs, even on a trivial graph.** A fresh steward is what proves the graph can be driven cold, and a seat that has held the whole conversation is not fresh. So add one more line to the subagent's brief: rebuild the effort from the top bead alone, and report every fact the effort needs that the beads do not hold.
+
 **There is no confirmation checkpoint.** Flow through the building, splitting, wiring and foreign shaping, and say what you do as you do it: beads created, splits made, edges added, slices confirmed. The human interrupts if something looks wrong. Don't stop to wait for approval.
 
 ## Start the steward
 
-Start the steward yourself, with one call, from the project where the top bead lives. Where it opens depends on who you are:
+Who becomes the steward depends on the role your seat already holds. Decide it from that role, and don't ask the person.
 
-- **A seat a person works in** starts the steward beside itself, so the effort opens next to the person who asked for it. Pass `--beside`.
-- **A persistent agent, such as a concierge,** keeps its place in the terminal layout as its own. Leave `--beside` out, and the steward opens apart.
+- **A seat a person works in takes the effort over itself,** in the berth where the person talked it through. No second steward starts.
+- **A seat with a standing role, such as a concierge,** keeps that role, so it starts a separate steward.
+
+You create none of the effort's commy topics and no line in the project's `boatyard` index. The steward opens its topics and registers the effort in the index when it binds, and it names its own berth.
+
+### Take the effort over
+
+Sign off first, as *Sign off* says, because the preparation ends here. Then load the steward skill in this seat with the Skill tool, naming `boatyard:steward` and passing the top bead as its argument. From then on this seat follows the steward skill, not this one.
+
+**Start the steward fresh, whatever `current_identity` says.** Your seat may have bound its commy identity while you prepared, and the steward's wake ritual would read that as a compaction and skip its reachable half. So do the reachable half of the wake ritual, then the reconstruct half.
+
+### Start a separate steward
+
+Start the steward with one call, from the project where the top bead lives. Your seat keeps its place in the terminal layout, so the steward opens apart from it:
 
 ```bash
-sign-on --as independent [--beside] --cwd <this project's checkout> --label <effort> \
+sign-on --as independent --cwd <this project's checkout> --label <effort> \
   "/boatyard:steward <top-bead>"
 ```
 
-Either way the steward's berth is independent of yours, so closing your seat leaves the steward running. `sign-on` starts Claude Code there, gets it past its startup gate, opts it in to the compaction mod, and prints the new berth's id. It births the seat in the project's main checkout, where the top bead's tracker and instructions are.
+The steward's berth is independent of yours, so closing your seat leaves the steward running. `sign-on` starts Claude Code there, gets it past its startup gate, opts it in to the compaction mod, and prints the new berth's id. It births the seat in the project's main checkout, where the top bead's tracker and instructions are.
 
 If `sign-on` fails, report its message. Where the message says your seat is in no multiplexer, because no backend is named or your seat is in no pane, give the human the line `/boatyard:steward <top-bead>` to start by hand, and say which project the top bead lives in. Where it opened a berth and then got stuck, its message names that berth, so pass the name on for the human to read and close.
 
 **You do not close your own seat.** A concierge that musters an effort from its own seat has to outlive the preparation. Sign off, and whatever role you had before carries on.
 
-You create none of the effort's commy topics and no line in the project's `boatyard` index. The steward opens its topics and registers the effort in the index when it binds, and it names its own berth.
-
 ## Sign off
 
-Starting the steward ends the preparation. Don't stay to watch it or to rework the graph, because the steward owns the effort from the moment it runs.
+Handing the effort to a steward ends the preparation. A seat that started a separate steward does not stay to watch it or to rework the graph, because the steward owns the effort from the moment it runs.
 
 1. **Record the preparation** as your host asks of finished work, such as a journal entry: the effort, the top bead, the beads including foreign ones, the splits and edges you made, and the steward's berth.
-2. **Say plainly that preparation is finished.** Name the top bead and the steward's berth, and stop.
+2. **Say plainly that preparation is finished.** Name the top bead and the steward's berth. A seat that takes the effort over then loads the steward skill. Any other seat stops.
 
 If you could not start the steward and handed the human its line instead, still record and sign off. The graph is the preparation's deliverable, and only the start is left to the human.
 
 ## Boundaries
 
-- **You prepare and start the steward. You neither execute nor coordinate.** You never do an effort bead's work, and you never become the steward.
+- **You prepare the effort and hand it over. You neither execute nor coordinate.** You never do an effort bead's work. A seat that takes the effort over coordinates it only once it has loaded the steward skill, and then as the steward.
 - **Don't work around permission prompts.** If the simplest form of a command you need is denied, that is a real gap to raise with the human.
