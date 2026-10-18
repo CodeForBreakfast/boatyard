@@ -27,7 +27,7 @@ That is also why you must be miserly with your own context. The effort outlives 
 
 **Your host's rule for asking the human wins over this skill.** Where its `CLAUDE.md`, or a document it names, says how a seat reaches the human, follow that and read this section as the default it replaces.
 
-Workers never ping the human. A question that a seat waits on goes on its own bead labelled `human`, in the tracker of the project whose work waits on it, and the waiting bead depends on it. That label is the human's queue, so a question needs no post and no mention. A permission goes to the human in your berth. An action only the human can take goes where your host files the human's actions, and to the decisions topic only where it names no such place. **While the human is talking to you in your berth, ask there.** Anything else needs a bead or the decisions topic, and you keep both current.
+Workers never ping the human. A question that a seat waits on goes on its own bead labelled `human`, in the tracker of the project whose work waits on it, and the waiting bead depends on it. That label is the human's queue, so a question needs no post and no mention. A permission goes to the human in your berth. An action only the human can take goes where your host files the human's actions, and to the decisions topic only where it names no such place. **Ask in your berth only to answer what the human asked you there, and to follow up on that same point.** Every other question goes on a question bead, even while the human is typing to you. That covers a question a worker raised and one that comes from your own reading. Your reply in the berth may point at the bead. Anything else needs a bead or the decisions topic, and you keep both current.
 
 ## Topics
 
@@ -438,7 +438,7 @@ One topic per effort, `#<project>/<effort>-decisions`:
 - **Shape every ask as `using-commy` describes.**
 - **Keep it current.** When the human acts, edit or close that item with `edit_message`, so the topic never shows a stale ask.
 - **You are its only writer.** Workers post their actions to their working topics, and you lift them in.
-- **Your berth is a channel only while the human is talking to you there.** A question that comes up in that talk, or an action they can do there and then, is asked there. A question you type into your berth while they are elsewhere is lost, so it goes on a question bead instead. If they leave a question unanswered, or say they will think about it, file the bead before your turn ends, and write any answer they give you there onto its bead in their words. An instruction they give you there for a worker goes on a bead first, as *No seat does work that has no bead* says.
+- **Your berth is a channel only for what the human brings you there.** You ask a question there only as *You own the human's attention for this effort* says, and an action only if they can do it there and then. If they leave a question unanswered, or say they will think about it, file the bead before your turn ends, and write any answer they give you there onto its bead in their words. An instruction they give you there for a worker goes on a bead first, as *No seat does work that has no bead* says.
 
 ### A worker's permission goes to the human in your berth
 
