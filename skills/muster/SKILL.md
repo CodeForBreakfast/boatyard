@@ -22,7 +22,7 @@ Muster work of **any size**: one small bead in this project, a handful of local 
 
 - **No coordination across projects.** When nothing is foreign, skip *Shape other projects' slices over commy*.
 - **A trivial graph.** The top bead may be the one bead, or an outcome bead that depends on a few, with few or no other dependency edges. That graph is complete, not deficient.
-- **A quick readiness gate.** `bd dep cycles` is empty and `bd ready` shows the bead. Skip the adversarial review, because it has nothing to find, unless your seat will take the effort over itself.
+- **A quick readiness gate.** `bd dep cycles` is empty and bdi lists the bead as ready, as *The readiness gate* says. Skip the adversarial review, because it has nothing to find, unless your seat will take the effort over itself.
 
 ## The one principle everything hangs off
 
@@ -32,7 +32,7 @@ Muster work of **any size**: one small bead in this project, a handful of local 
 
 Never run `bd` against another project's tracker, not even to read it. Two things follow:
 
-1. **A foreign strand enters the graph as a dependency on its home-project bead.** `bd dep add <local-bead> <foreign-id>` is written in your tracker and sits where the real dependency is: on the local bead that waits for the foreign work, or on the top bead where the foreign work is itself part of the goal. No local bead stands in for it. `bd ready` does not read an edge to another tracker, so readiness across projects is read through `bdi`.
+1. **A foreign strand enters the graph as a dependency on its home-project bead.** `bd dep add <local-bead> <foreign-id>` is written in your tracker and sits where the real dependency is: on the local bead that waits for the foreign work, or on the top bead where the foreign work is itself part of the goal. No local bead stands in for it. Readiness is read through `bdi`, because `bd ready` does not follow an edge into another tracker.
 2. **Foreign tracker work goes through that project's concierge, over commy.** You post in the foreign project's channel, and its concierge or an active agent finds, creates, shapes and wires the beads there and reports their ids back to you.
 
 ## Scope the effort
@@ -97,7 +97,11 @@ A foreign project that does not answer, or pushes back on shape or feasibility, 
 Before you start the steward, confirm that the graph can be driven. All of these must hold:
 
 - `bd dep cycles` returns nothing.
-- Something in the effort can start now: it is in `bd ready`, and every foreign dependency it has is closed.
+- Something in the effort can start now: bdi lists it under `ready` in the top bead's tree. Read the tree from your project's directory, and never scope the read with `--project`, because a blocker in a project left out then reads as not ready. A ready gate, or a ready bead labelled `human`, is a wait and does not count.
+
+  ```bash
+  bdi --beads --brief <project>:<top-bead> | jq -r '.ready[] | "\(.project):\(.id) \(.labels | join(",")) \(.title)"'
+  ```
 - Every bead is an observable outcome, context-sized and briefable.
 - Every bead in the effort is reachable from the top bead through dependency edges, and every bead that is true only after a release or deployment sits downstream of it.
 - Every foreign strand is confirmed in good shape by its home project, and wired into the graph as an edge on its home-project id.
