@@ -85,33 +85,27 @@ A seat that muster has just handed the effort to breaks it too, because it may h
 ### Reconstruct, on every wake
 
 3. **Read the top bead.** `bd show <top-bead>` gives the effort's goal, what has been settled, and the `effort_slug`. The top bead describes the effort and only that. Its roster and its edges come from the graph below it, so a description that restates them is a stale copy to delete, not a picture to complete.
-4. **Sort the graph.** `bd ready` and `bd blocked`, filtered to the effort's beads, show what can start and what waits on a dependency. **Neither lists the whole effort.** `bd ready` leaves out anything `in_progress` or `blocked`, and `bd blocked` reports beads with unmet dependency edges, not beads whose status is `blocked`. A bead parked by status appears in neither. The top bead's tree in `bdi` is what lists the effort: the top bead and everything it depends on, followed transitively across trackers. Parent links put no bead in the effort, so don't walk them.
+4. **Sort the graph with `bdi`, never with `bd ready` or `bd blocked`.** Neither reads an edge into another tracker, so each lists a bead as ready while its foreign dependency is still open. bdi reads the top bead's tree: the top bead and everything it depends on, followed transitively across trackers, never through a parent link. First run `bd gate check --type=gh:pr`, so a merged pull request's gate is already closed. Then read the tree from your project's directory, and never scope the read with `--project`, because a blocker in a project left out then reads as not ready:
 
    ```bash
-   bdi --json --all <project>:<top-bead> | jq -r --arg p <project> '
-     .trees[] | select(.project == $p) | .nodes[] | "\(.project):\(.id) \(.status)"' | sort -u
+   bdi --beads --brief <project>:<top-bead> | jq -r '
+     (.unread_trees[], .failed_projects[] | "unread \(tojson)"),
+     (.ready[] | "ready \(.project):\(.id) \(.labels | join(",")) \(.title)"),
+     (.ready_gates[] | "gate \(.project):\(.id) \(.title)"),
+     (.delivered[] | "delivered \(.project):\(.id) \(.title)"),
+     (.in_delivery[] | "delivery \(.project):\(.id) \([.pull_requests[] | "\(.repo)#\(.number) gate \(.gate)"] | join(" "))"),
+     (.waiting[] | "waiting \(.project):\(.id) \(.status) on \([.unmet_dependencies[] | "\(.project):\(.id)"] | join(","))")'
    ```
 
-   **Neither reads a dependency on another project's bead.** `bd ready` lists a bead as ready while its foreign dependency is still open, and `bd dep list` and `bd dep tree` don't show the edge. `bd list --id <bead> --json` does, under `dependencies`. Before a ready bead counts as startable, read its dependencies there, and read the status of each foreign one through `bdi`:
-
-   ```bash
-   bdi --json --all --project <their-project> <their-project>:<their-id> \
-     | jq -r '[.. | objects | select(.id? == "<their-id>" and has("status")) | .status] | first'
-   ```
-
-   A foreign dependency that is not closed puts the bead in push-gate state 6.
-
-   **A ready bead may already be delivered.** Whoever runs `bd gate check` closes the gate of every merged pull request in the tracker, and the bead behind it goes ready. Before you start a ready bead, list its closed pull-request gates. Where `gh pr view` says one's pull request merged, the bead's work has landed, so close the bead rather than start it. A gate on a pull request outside the effort only held the bead back, so this listing leaves it out:
-
-   ```bash
-   bd gate list <bead> --all --json \
-     | jq -r '.[]? | select(.await_type == "gh:pr" and .status == "closed" and .metadata.outside_effort != "true") | "\(.metadata.repo)#\(.await_id)"'
-   ```
-
-   A ready bead that depends on a closed outcome step of a delivery molecule is delivered too, so close it.
+   - **`ready`** beads can start. A ready bead labelled `human` is a question that waits on the human, push-gate state 3, and no worker starts on it. A ready bead in another project is still yours to staff, born in that project.
+   - **`gate`** lines are ready gates, and a ready gate is a wait, not an action. A gate in a delivery molecule is a step, read as *A bead delivered by a formula* says. A gate on a pull request outside the effort holds its bead in push-gate state 6.
+   - **`delivered`** beads have landed: their own pull request's gate has closed, or the outcome step of their molecule has. Close each one rather than start it.
+   - **`delivery`** beads are in delivery, push-gate state 4, behind the open gate of their own pull request or the open outcome step of their molecule.
+   - **`waiting`** lines are every other bead, with its status and the dependencies it still waits on. An `in_progress` bead has a seat, or had one. A bead parked by status, `blocked` or `deferred`, appears here too.
+   - **`unread`** names a tracker bdi could not read. A bead whose blocker sits there is reported as `held-by-unread`, never as ready. Read again next wake, as step 5 says.
 
    **A ready bead whose parent names a live seat belongs to that seat.** The seat works its parent's small beads one at a time, so start no worker on it.
-5. **Review the graph for errors.** bdi reports every edge in the effort's tree that leads nowhere. First run `bd gate check --type=gh:pr`, so a merged pull request's gate is already closed. Then read the top bead's tree from your project's directory. bdi also reads each blocker in another project, where bdi's config states that project's prefix:
+5. **Review the graph for errors.** bdi reports every edge in the effort's tree that leads nowhere. Read the top bead's tree from your project's directory. bdi also reads each blocker in another project, where bdi's config states that project's prefix:
 
    ```bash
    bdi --json --all <project>:<top-bead> | jq -r --arg p <project> '
@@ -154,7 +148,7 @@ A seat that muster has just handed the effort to breaks it too, because it may h
 
       `<worker>` is the dead seat's own name, the sender of its posts in its working topic. `bd unclaim` releases only an `in_progress` bead, and leaves it `open`. Where another seat now holds the bead, it changes nothing and names the holder, so leave that claim alone.
 
-      Its dependency on its question bead keeps it out of `bd ready` until the human answers, and an open pull-request gate keeps it out until the merge. Then start a fresh worker on it in the next `-r` topic, with the answer quoted from the question bead in its brief. Where the bead is a step of a delivery molecule, brief the worker on the work bead that waits on that molecule, and it sits on the step again. A bead that waited on a permission or an action is ready at once, and its fresh worker asks again.
+      Its dependency on its question bead keeps it out of bdi's `ready` until the human answers, and an open pull-request gate keeps it out until the merge. Then start a fresh worker on it in the next `-r` topic, with the answer quoted from the question bead in its brief. Where the bead is a step of a delivery molecule, brief the worker on the work bead that waits on that molecule, and it sits on the step again. A bead that waited on a permission or an action is ready at once, and its fresh worker asks again.
    2. **Otherwise an open `gh:pr` gate or an open outcome step of a delivery molecule means the bead is in delivery**, as *A bead closes on merge* and *A bead delivered by a formula* say. No seat is on the bead itself, so never relay to it and never start a worker on it. Poll its pull request, or read its molecule, whose steps show any seat still working it.
 
    ```bash
@@ -164,16 +158,7 @@ A seat that muster has just handed the effort to breaks it too, because it may h
 
    `--limit 0` matters. The default is 50 rows, and a truncated list quietly turns a sleeping worker's bead into one you might start over.
 
-   The beads in delivery are the ones `bd blocked` lists behind an open `gh:pr` gate. List each with its pull request and its gate:
-
-   ```bash
-   bd blocked --json | jq -r --argjson gates "$(bd gate list --limit 0 --json)" '
-     .[] as $b | ($gates // [])[]
-     | select(.await_type == "gh:pr" and .metadata.outside_effort != "true" and (.id as $g | $b.blocked_by | index($g)))
-     | "\($b.id) \(.metadata.repo)#\(.await_id) gate \(.id)"'
-   ```
-
-   Under a delivery formula, the bead this lists is a step of a molecule, and the bead in delivery is the work bead that depends on that molecule's outcome step.
+   The beads in delivery are the `delivery` lines of step 4, each with its pull request and its gate. Under a delivery formula, the line names the work bead that waits on its molecule's outcome step.
 
    **Last, check every open or in-progress effort bead that names a berth.** A seat sits on the bead it is working, which under a delivery formula is a step of its molecule. A bead in delivery should name none, and one that does names a seat that left without finishing. Check each berth other than your own, and clear each bead whose berth is no longer its seat, as *Watching the berths you started* says:
 
@@ -199,8 +184,8 @@ The wake ritual tells you the state. The push gate is what you owe before you re
 3. **A surfaced ask.** It waits only on the human, as an open question bead labelled `human` that the strand depends on, or as an action filed where your host keeps the human's actions, or in the decisions topic where it keeps none.
 4. **In delivery.** The bead sits behind the open `gh:pr` gate of its own pull request, or behind the open outcome step of a delivery molecule where no seat sits on a step and the ready steps are not the worker's. It has no seat, correctly. What you owe it is the watch in *Watching your pull requests*, or the reading in *A bead delivered by a formula*, not a new worker.
 5. **Capped.** The strand could start, but its repo already holds this effort's limit of unmerged pull requests. Only a merge releases it.
-6. **Blocked by a dependency.** `bd` shows an unmet blocker other than the bead's own pull-request gate, such as a gate on a pull request outside the effort, or `bdi` reads a foreign dependency as not closed. A worker started here would build on code that is not on the default branch yet.
-7. **Deferred to a date.** The strand cannot start before a known date, and its bead records it with `bd defer <bead> --until <date>`. bd returns the bead to `bd ready` once the date passes, whether or not any steward is still running, so the date survives your session.
+6. **Blocked by a dependency.** bdi lists the bead as waiting on a dependency other than its own pull request's gate or its molecule's outcome step, such as a gate on a pull request outside the effort, or a bead in another project that is not closed. A worker started here would build on code that is not on the default branch yet.
+7. **Deferred to a date.** The strand cannot start before a known date, and its bead records it with `bd defer <bead> --until <date>`. The date lives on the bead, so it survives your session.
 
 States 4 to 7 are all waits, and in an effort that delivers through pull requests most strands sit in one of them at any moment.
 
@@ -230,7 +215,7 @@ You bloat, and force expensive compaction, by pulling detail of the work into yo
 
 ## One bead, one worker, one context
 
-Size the effort so a single worker can finish each bead without itself compacting. The bead graph is your plan for parallelism and for context: independent beads run in parallel, and a bead too big for one context is split before it is handed out. Wire dependencies with `bd dep add` so that `bd ready` tells you, and a restarted you, what can start now.
+Size the effort so a single worker can finish each bead without itself compacting. The bead graph is your plan for parallelism and for context: independent beads run in parallel, and a bead too big for one context is split before it is handed out. Wire dependencies with `bd dep add` so that bdi's `ready` tells you, and a restarted you, what can start now.
 
 A bead may be a parent whose small beads one worker finishes together, under one pull request. Brief the parent, and the worker takes its small beads with it.
 
@@ -281,11 +266,11 @@ The worker reads the rest from the repo: whether a pull request opens as a draft
 
 ### A bead closes on merge, never when its pull request opens
 
-The worker opens the pull request, blocks its bead on it with a `gh:pr` gate that names the repo, leaves the bead `open`, and leaves. The gate keeps the bead out of `bd ready`. **You close that bead, and only once the pull request merges.** The merge closes the gate and the bead goes ready, but its work is finished, so close it rather than start a worker on it.
+The worker opens the pull request, blocks its bead on it with a `gh:pr` gate that names the repo, leaves the bead `open`, and leaves. The gate holds the bead in delivery. **You close that bead, and only once the pull request merges.** The merge closes the gate, and bdi then lists the bead as `delivered` rather than `ready`, so close it rather than start a worker on it.
 
 **The human's review or merge of a pull request is not an action.** The gate that holds the bead is the one record of it, and the human sees it in the tracker. File nothing for it and post nothing about it.
 
-A bead that is not closed blocks its dependents, so none of them reaches `bd ready` until the code it needs is on the default branch. Close a bead when its pull request opens and dependents can start against unmerged work, which is how an effort becomes a tower of stacked pull requests that can only be reviewed bottom up.
+A bead that is not closed blocks its dependents, so none of them is ready until the code it needs is on the default branch. Close a bead when its pull request opens and dependents can start against unmerged work, which is how an effort becomes a tower of stacked pull requests that can only be reviewed bottom up.
 
 The same rule tells you how to wire new work. A bead that needs another bead's unlanded code gets a `bd dep add`, never a branch based on the other's pull request. A bead that needs a pull request from outside the effort, such as another person's, waits behind a `gh:pr` gate that names the repo, with the bead left `open`. Mark the gate `outside_effort`, so that nothing reads the bead as in delivery of its own pull request:
 
@@ -298,22 +283,16 @@ A bead that merely has to land later, or would edit the same file, gets no edge.
 
 ### A bead delivered by a formula
 
-The work bead depends on its molecule's outcome step, the one step labelled `outcome`, and stays `open` behind it. The worker pours the molecule when it claims, before it writes any code, so the bead waits there for the whole of its work. The outcome step closes once the work has landed, and only then does the bead go ready. Close it at that point, rather than start a worker on it. The worker's note on the bead names the molecule and its outcome step.
+The work bead depends on its molecule's outcome step, the one step labelled `outcome`, and stays `open` behind it. The worker pours the molecule when it claims, before it writes any code, so the bead waits there for the whole of its work. The outcome step closes once the work has landed, and only then does bdi list the bead as `delivered`. Close it at that point, rather than start a worker on it. The worker's note on the bead names the molecule and its outcome step.
 
 At each wake, read each open molecule's steps through `bdi`, in your project or another. A step's title states the outcome it reaches, and only its description says who acts, so read the descriptions too:
 
 ```bash
-steps=$(bdi --json --all --project <project> <project>:<molecule> \
-  | jq --arg m <molecule> '[.trees[] | reduce .nodes[] as $n ({at: null, ids: []};
-      if $n.id == $m then .at = $n.depth
-      elif .at == null then .
-      elif $n.depth <= .at then .at = null
-      elif $n.depth == .at + 1 and $n.edge == "parent-child" then .ids += [$n.id]
-      else . end) | .ids[]] | unique')
-bdi --beads --project <project> \
-  | jq -r --argjson steps "$steps" '.beads[] | select(.id as $i | $steps | index($i))
-           | "\(.id) \(.status) ready=\(.ready) seat=\(.metadata.agent_pane // "none") blocked_by=\(.blocked_by | join(",")) \(.title)\n  \(.description)"'
+bdi --beads --parent <project>:<molecule> \
+  | jq -r '.beads[] | "\(.id) \(.status) ready=\(.ready) seat=\(.metadata.agent_pane // "none") blocked_by=\(.blocked_by | join(",")) \(.title)\n  \(.description)"'
 ```
+
+bdi reads only your own project unless told otherwise, so for a molecule in another project add `--all-projects`.
 
 Act on each open step that is ready by the actor its title and description name. A gate is a step like any other, and it is ready once nothing before it is open:
 
@@ -497,7 +476,7 @@ Then act on `state` first:
 | `OPEN`, not a draft, every check green, **and the repo's declared policy says its agents merge on green** | Merge it with `gh pr merge <n> -R "$OWNER/$REPO" --squash --delete-branch`, then act on the `MERGED` row in the same pass. Without that policy this row does not exist, and the merge is the human's. |
 | `OPEN`, `reviewDecision: CHANGES_REQUESTED`, or a failing check | Start a rework seat on the same bead, with the review comments in the brief. |
 | `OPEN`, `mergeStateStatus: BEHIND` or `DIRTY` | Start a rework seat on the same bead to rebase. |
-| `MERGED` | Close its gate with `bd gate resolve <gate>`, close the bead, fast-forward the main checkout as *Advancing the chain* says, then re-check `bd ready`. |
+| `MERGED` | Close its gate with `bd gate resolve <gate>`, close the bead, fast-forward the main checkout as *Advancing the chain* says, then sort the graph again as *Reconstruct* step 4 says. |
 | `CLOSED` | Nobody will merge it, and its gate stays open. File a question bead, asking whether to reopen it, redo it, or drop the bead. A bead in delivery on a dead pull request blocks its dependents for ever. Once the human answers, close the gate with `bd gate resolve <gate>`, unless they reopen the pull request. |
 
 **Under a delivery formula, the molecule decides who reviews and who merges.** The row that waits on the human and the merge-on-green row give way to the molecule's ready steps, as *A bead delivered by a formula* says. On `MERGED`, close the gate but not the bead: the bead closes once its outcome step has.
@@ -513,7 +492,7 @@ A rework seat is an ordinary start with two differences:
 
 ## Advancing the chain
 
-On every completion, merge or unblock, update the bead graph, see what `bd ready` now offers, and start the next workers. You close this loop again and again, ready then brief then start then watch then relay, until the top bead closes. A quiet moment is not the end. It is a prompt to run the push gate again.
+On every completion, merge or unblock, update the bead graph, sort it again as *Reconstruct* step 4 says, and start the next workers. You close this loop again and again, ready then brief then start then watch then relay, until the top bead closes. A quiet moment is not the end. It is a prompt to run the push gate again.
 
 **Keep your project's main checkout current as work lands.** After every merge or direct push into your project, fast-forward the main checkout with `git pull --ff-only --no-recurse-submodules`. `sign-on` births every seat there, so a stale checkout hands the next worker stale instructions and stale skills. If the fast-forward refuses, leave the tree alone, because it may hold the human's uncommitted work, and raise it in the decisions topic.
 

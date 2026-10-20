@@ -162,6 +162,8 @@ The slash-only skill sets `disable-model-invocation: true`, because plugin skill
 
 The skills contain no multiplexer syntax. They call only `sign-on` and `berth`. Coordination runs over [commy](https://github.com/CodeForBreakfast/commy), with each effort indexed in a `boatyard` topic in its project's channel, and the [beads](https://github.com/gastownhall/beads) graph is the system of record. A worker records its berth id as `agent_pane` on the bead it is working, so bead viewers can draw the berth against its work. A steward claims its top bead, so `tally` on any machine can tell a running effort from a parked one.
 
+Readiness comes from `bdi`, the reader in [beady-eye](https://github.com/CodeForBreakfast/beady-eye), because an effort's edges cross trackers and `bd ready` and `bd blocked` do not follow an edge into another tracker. The steward and `muster` judge from the top bead's tree in `bdi` what can start, what waits and what is in delivery, and `tally` reads every effort through it. `bd` stays for looking a record up by id, label, metadata or closed status.
+
 ## Packaging
 
 - **One repository, one Claude Code plugin, `boatyard`.** It holds the skills and puts the executables in its `bin/`, which reaches the Bash tool's path.
