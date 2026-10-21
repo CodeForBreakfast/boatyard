@@ -153,17 +153,17 @@ berth close "$seat"
 check "closing the seat leaves it" true "$(exists "$steward")"
 berth close "$steward"
 
-echo "# a concierge starts an effort apart from itself"
+echo "# a seat with a standing role starts an effort apart from itself"
 
-concierge=$(berth open --as independent --cwd "$work" --label concierge -- true)
-steward=$(BERTH_ID=$concierge berth open --as independent --cwd "$work" --label effort -- true)
+standing=$(berth open --as independent --cwd "$work" --label standing -- true)
+steward=$(BERTH_ID=$standing berth open --as independent --cwd "$work" --label effort -- true)
 check "it opens a workspace of its own" false \
-  "$([ "$(pane "$concierge" workspace_id)" = "$(pane "$steward" workspace_id)" ] && echo true || echo false)"
-check "the concierge's workspace keeps its label" concierge \
-  "$(workspace_label "$(pane "$concierge" workspace_id)")"
+  "$([ "$(pane "$standing" workspace_id)" = "$(pane "$steward" workspace_id)" ] && echo true || echo false)"
+check "the standing seat's workspace keeps its label" standing \
+  "$(workspace_label "$(pane "$standing" workspace_id)")"
 berth close "$steward"
-check "closing it leaves the concierge" true "$(exists "$concierge")"
-berth close "$concierge"
+check "closing it leaves the standing seat" true "$(exists "$standing")"
+berth close "$standing"
 
 echo "# a berth takes focus only when asked to"
 

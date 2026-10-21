@@ -1,6 +1,6 @@
 ---
 name: muster
-description: Turns a body of work, usually beads that already exist and possibly spread across several projects, into one boatyard effort that a steward can drive cold, then hands it to a steward: a person's own seat takes the effort over, and a seat with a standing role starts one with sign-on. Builds and wires the bead graph, shapes other projects' slices with their concierges over commy, and checks the graph can be driven before the launch. Use only when invoked by name, as `/boatyard:muster` or an explicit instruction to muster an effort.
+description: Turns a body of work, usually beads that already exist and possibly spread across several projects, into one boatyard effort that a steward can drive cold, then hands it to a steward: a person's own seat takes the effort over, and a seat with a standing role starts one with sign-on. Builds and wires the bead graph, shapes other projects' slices over commy with whoever answers in each project's channel, and checks the graph can be driven before the launch. Use only when invoked by name, as `/boatyard:muster` or an explicit instruction to muster an effort.
 argument-hint: <beads, a label or a query naming the work>
 ---
 
@@ -33,11 +33,11 @@ Muster work of **any size**: one small bead in this project, a handful of local 
 Never run `bd` against another project's tracker, not even to read it. Two things follow:
 
 1. **A foreign strand enters the graph as a dependency on its home-project bead.** `bd dep add <local-bead> <foreign-id>` is written in your tracker and sits where the real dependency is: on the local bead that waits for the foreign work, or on the top bead where the foreign work is itself part of the goal. No local bead stands in for it. Readiness is read through `bdi`, because `bd ready` does not follow an edge into another tracker.
-2. **Foreign tracker work goes through that project's concierge, over commy.** You post in the foreign project's channel, and its concierge or an active agent finds, creates, shapes and wires the beads there and reports their ids back to you.
+2. **Foreign tracker work goes through that project's channel, over commy.** You post there, and whoever answers for that project finds, creates, shapes and wires the beads in its tracker and reports their ids back to you.
 
 ## Scope the effort
 
-The human points you at the work: bead ids, a label or a query in this project, or a mix of local beads and slices in named projects. Read the local beads directly. Handle foreign slices through the concierge, never by reading their tracker.
+The human points you at the work: bead ids, a label or a query in this project, or a mix of local beads and slices in named projects. Read the local beads directly. Handle foreign slices through their project's channel, never by reading their tracker.
 
 ## Choose or file the top bead
 
@@ -63,15 +63,15 @@ Each bead must also be briefable: it needs a clear deliverable, a definition of 
 
 In a single-project effort there is nothing to do here, so go straight to wiring.
 
-For each other project the effort touches, hold a working session with its concierge in that project's channel. The concierge knows that tracker and that domain, so lean on it. The session produces a shaped, wired bead that both sides agree on.
+For each other project the effort touches, hold a working session in that project's channel with whoever answers there. They know that tracker and that domain, so lean on them. The session produces a shaped, wired bead that both sides agree on.
 
 1. **Post the strand's context** in the foreign channel, in a topic named for the effort: what the effort is, and which slice that project owns.
-2. **Find or create the beads.** Some slices already have beads and some don't. Work with the concierge to find the beads that cover the slice, or to create new ones, and take its lead on how to decompose the slice, where its edges sit, and whether something already covers it.
+2. **Find or create the beads.** Some slices already have beads and some don't. Work with them to find the beads that cover the slice, or to create new ones, and take their lead on how to decompose the slice, where its edges sit, and whether something already covers it.
 3. **Get the slice into shape.** It must be filed as outcomes, context-sized, briefable, and **wired inside its home tracker so that one worker can drive it to done without an unwired stall**. A half-wired foreign slice is a stall the steward will hit mid-effort, so land it now.
-4. **Collect the ids and the ready state** the concierge reports.
-5. **Wire it in** with `bd dep add` from the waiting local bead, or the top bead, to the foreign id the concierge reported.
+4. **Collect the ids and the ready state** they report.
+5. **Wire it in** with `bd dep add` from the waiting local bead, or the top bead, to the foreign id they reported.
 
-A foreign project that does not answer, or pushes back on shape or feasibility, is a blocker to raise with the human. Don't cover it with an edge to work nobody agreed to.
+Where nobody answers in a foreign project's channel, reach that project as your host asks. A foreign project that still does not answer, or pushes back on shape or feasibility, is a blocker to raise with the human. Don't cover it with an edge to work nobody agreed to.
 
 ## Wire the graph and make the top bead a cold-restart record
 
@@ -108,7 +108,7 @@ Before you start the steward, confirm that the graph can be driven. All of these
 - The top bead states the outcome and its evidence, the effort's shape and what is settled, and carries the effort slug in its metadata. It restates nothing the graph holds.
 - Every edge is a real dependency, and beads that would collide in one file have had their structure considered.
 
-For a graph that is not trivial, give **one** throwaway subagent an adversarial review of it, and keep only its verdict. Its brief: hunt for edges that only order work, colliding beads a better structure would separate, missing blockers including work built on unmerged code, beads that state a task rather than an observable outcome, a release or deployment wired upstream of the work it ships, beads reached only through a parent link, oversized beads, unwired foreign strands, and a top bead that would not let a cold steward rebuild the effort. Fix what it finds. This review is your own quality check, not a gate on the human. Where your seat may not start subagents, as a concierge's often may not, the review does not run, and the checks above remain the real bar.
+For a graph that is not trivial, give **one** throwaway subagent an adversarial review of it, and keep only its verdict. Its brief: hunt for edges that only order work, colliding beads a better structure would separate, missing blockers including work built on unmerged code, beads that state a task rather than an observable outcome, a release or deployment wired upstream of the work it ships, beads reached only through a parent link, oversized beads, unwired foreign strands, and a top bead that would not let a cold steward rebuild the effort. Fix what it finds. This review is your own quality check, not a gate on the human. Where your seat may not start subagents, the review does not run, and the checks above remain the real bar.
 
 **When your seat will take the effort over itself, the review always runs, even on a trivial graph.** A fresh steward is what proves the graph can be driven cold, and a seat that has held the whole conversation is not fresh. So add one more line to the subagent's brief: rebuild the effort from the top bead alone, and report every fact the effort needs that the beads do not hold.
 
@@ -119,7 +119,7 @@ For a graph that is not trivial, give **one** throwaway subagent an adversarial 
 Who becomes the steward depends on the role your seat already holds. Decide it from that role, and don't ask the person.
 
 - **A seat a person works in takes the effort over itself,** in the berth where the person talked it through. No second steward starts.
-- **A seat with a standing role, such as a concierge,** keeps that role, so it starts a separate steward.
+- **A seat with a standing role,** such as one that answers in its project's channel, keeps that role, so it starts a separate steward.
 
 You create none of the effort's commy topics and no line in the project's `boatyard` index. The steward opens its topics and registers the effort in the index when it binds, and it names its own berth.
 
@@ -142,7 +142,7 @@ The steward's berth is independent of yours, so closing your seat leaves the ste
 
 If `sign-on` fails, report its message. Where the message says your seat is in no multiplexer, because no backend is named or your seat is in no pane, give the human the line `/boatyard:steward <top-bead>` to start by hand, and say which project the top bead lives in. Where it opened a berth and then got stuck, its message names that berth, so pass the name on for the human to read and close.
 
-**You do not close your own seat.** A concierge that musters an effort from its own seat has to outlive the preparation. Sign off, and whatever role you had before carries on.
+**You do not close your own seat.** A seat with a standing role that musters an effort has to outlive the preparation. Sign off, and whatever role you had before carries on.
 
 ## Sign off
 

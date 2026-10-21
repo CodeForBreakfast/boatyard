@@ -180,7 +180,7 @@ The wake ritual tells you the state. The push gate is what you owe before you re
 1. **Done.** It has landed on the repo's default branch, which with pull requests means merged rather than opened, and its bead says so.
 2. **Staffed and live.** An accountable worker is on it and has reported recently, through a post, a commit or a bead update. Under a delivery formula the worker sits on a step of the bead's molecule, not on the bead. A worker that has gone dark is not this state, and neither is a bead handed to a channel nobody picked up.
 
-   **Nor is a foreign bead that another project accepted, filed, and promised to report back on.** It looks like everything you wanted: a fast reply, a real bead id, a named owner. It is still a place in a queue, and it moves on that project's priorities rather than your effort's. The question is not whether someone accepted it. The question is whether a seat is running on it right now. If not, start one born in that project, and say so in that project's channel so its concierge can stand it down if it would rather own the scheduling.
+   **Nor is a foreign bead that another project accepted, filed, and promised to report back on.** It looks like everything you wanted: a fast reply, a real bead id, a named owner. It is still a place in a queue, and it moves on that project's priorities rather than your effort's. The question is not whether someone accepted it. The question is whether a seat is running on it right now. If not, start one born in that project, and say so in that project's channel so whoever answers there can stand it down if that project would rather own the scheduling.
 3. **A surfaced ask.** It waits only on the human, as an open question bead labelled `human` that the strand depends on, or as an action filed where your host keeps the human's actions, or in the decisions topic where it keeps none.
 4. **In delivery.** The bead sits behind the open `gh:pr` gate of its own pull request, or behind the open outcome step of a delivery molecule where no seat sits on a step and the ready steps are not the worker's. It has no seat, correctly. What you owe it is the watch in *Watching your pull requests*, or the reading in *A bead delivered by a formula*, not a new worker.
 5. **Capped.** The strand could start, but its repo already holds this effort's limit of unmerged pull requests. Only a merge releases it.
@@ -325,7 +325,7 @@ Count **this effort's beads in delivery whose pull request is still `OPEN`**, gr
 The cap exists because review is one human's serial attention.
 ### A pull request in another project
 
-The foreign-born worker gates its home bead on the pull request in the same way, in its home tracker, and reports the pull request into your working topic. Your `bd` cannot see that gate, so count the pull request against that repo's cap from the report. When it merges, post to the foreign project's channel so its concierge closes the bead. Never reach into another project's tracker to do it yourself.
+The foreign-born worker gates its home bead on the pull request in the same way, in its home tracker, and reports the pull request into your working topic. Your `bd` cannot see that gate, so count the pull request against that repo's cap from the report. When it merges, post to the foreign project's channel so whoever answers there closes the bead. Never reach into another project's tracker to do it yourself.
 
 ## Starting a worker
 
@@ -406,7 +406,7 @@ Starting workers is a **loop**, not a kickoff. Start one at each ready bead, and
 
 **When the next bead belongs to another project**, with its own tracker and its own access, the seat is born in that project. It claims that project's bead and reports into your working topic. Never start a seat in your project that `cd`s into a foreign tree, and never point a worker at a bead in a tracker it was not born in.
 
-**Don't hand the bead to that project's concierge and wait.** A concierge answers read-only questions and files beads. It is not a worker, so an implementation request parked in its channel fails push-gate state 2 as soon as no seat is on it. The moment a strand is real work, it is a seat you start.
+**Don't hand the bead to that project's channel and wait.** Whoever answers there may file the bead, but filing is not working it, so an implementation request parked in a channel fails push-gate state 2 as soon as no seat is on it. The moment a strand is real work, it is a seat you start.
 
 ## The decisions topic carries the human's actions
 
@@ -524,7 +524,7 @@ When the top bead has closed:
 - **You start seats yourself.** What goes to the human as an action is only what they alone can do, such as a credential or a deploy.
 - **You don't decide the human's calls.** Architecture, money and external commitments go on a question bead.
 - **One effort, possibly across projects.** You run in the project where the top bead lives. Work in another tracker is wired into your graph by an edge on its home-project id, and its readiness is read through `bdi`.
-- **Concierges are not part of your effort.** Never route anything to the human through a concierge, and read your workers' state from your own working topics.
+- **Other projects' channels are not part of your effort.** Never route anything to the human through whoever answers in another project's channel, and read your workers' state from your own working topics.
 - **Don't work around permission prompts.** If a command you need yourself is refused, ask the human for it in your own berth, as for a worker's permission.
 
 ## Before a compaction
