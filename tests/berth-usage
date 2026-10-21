@@ -13,10 +13,10 @@ failures=0
 calls="$work/calls"
 
 cp "${1:?}" "$work/berth"
-cat >"$work/berth-recorder" <<'ADAPTER'
-#!/usr/bin/env bash
-echo "$*" >>"$(dirname "$(readlink -f "$0")")/calls"
-ADAPTER
+{
+  echo "#!$BASH"
+  echo 'echo "$*" >>"$(dirname "$(readlink -f "$0")")/calls"'
+} >"$work/berth-recorder"
 chmod +x "$work/berth-recorder"
 
 check() { # <what> <want> <got>
