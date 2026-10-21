@@ -23,7 +23,7 @@ boatyard is one developer's daily setup, published as it is. It supports one mul
 - **herdr**, with the agents running inside it.
 - **Claude Code.**
 - **A beads tracker** for each project an effort touches, and the `bd` client.
-- **[commy](https://github.com/CodeForBreakfast/commy)**, which carries the messages between the steward, its workers and you.
+- **[commy](https://github.com/CodeForBreakfast/commy)**, which carries the messages between the steward, its workers and you. It needs a Zulip realm.
 - **[beady-eye](https://github.com/CodeForBreakfast/beady-eye)**, which wakes an agent when a bead it waits on changes, and whose `bdi` reads readiness across trackers.
 - **GitHub and its `gh` client**, for a repo that takes work through pull requests. A repo hosted anywhere else takes its work by a direct push.
 - **Nix**, if you install the packages from the flake. Without it, you need `bash`, `coreutils`, `git` and `jq` on the path.
@@ -81,7 +81,27 @@ Compaction is off unless a session opts in. `sign-on` opts in every seat it laun
 
 Naming a folder to `sign-on` is the decision to trust it. `sign-on` records the folder as trusted in Claude Code's config, so Claude Code runs the folder's hooks and MCP servers without asking. It says so on stderr when it does. The trust stays in the config after the seat has gone, so a person who opens that folder later gets no prompt. `sign-on` refuses to trust the home folder or the root.
 
-Each seat needs permission to run `berth` and `sign-on`. bd leases a claim for a limited time, so the host also has to renew the claims of its running seats.
+Each seat needs permission to run `berth` and `sign-on`.
+
+### Keeping claims alive
+
+bd leases every claim for 5 minutes. A claim whose lease lapses looks like a dead seat, and `bd reclaim` hands its bead back. boatyard ships no renewer, so the host runs one for every seat that is running, including a seat that is asleep.
+
+`bd heartbeat` renews one claim, and only as the actor that holds it. This loop renews every claim in a tracker once a minute. Run it from the project's checkout, under a service manager or in a spare pane:
+
+```sh
+while true; do
+  bd list --status in_progress --json | jq -r '.[] | "\(.id) \(.assignee)"' |
+    while read -r id actor; do bd heartbeat --actor "$actor" "$id"; done
+  sleep 60
+done
+```
+
+Each project has its own tracker, so run one loop per project. Leases are kept on the machine that granted them, so run the loop there.
+
+### commy
+
+commy runs on a [Zulip](https://zulip.com) realm, which you host or rent, and boatyard cannot run without one. commy's own README lists what it needs from the realm: a user that may create bots, and that user's API key. Set commy up before you start a seat.
 
 ## A first seat
 
