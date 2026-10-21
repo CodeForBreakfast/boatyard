@@ -25,6 +25,7 @@ boatyard is one developer's daily setup, published as it is. It supports one mul
 - **A beads tracker** for each project an effort touches, and the `bd` client.
 - **[commy](https://github.com/CodeForBreakfast/commy)**, which carries the messages between the steward, its workers and you.
 - **[beady-eye](https://github.com/CodeForBreakfast/beady-eye)**, which wakes an agent when a bead it waits on changes, and whose `bdi` reads readiness across trackers.
+- **GitHub and its `gh` client**, for a repo that takes work through pull requests. A repo hosted anywhere else takes its work by a direct push.
 - **Nix**, if you install the packages from the flake. Without it, you need `bash`, `coreutils`, `git` and `jq` on the path.
 
 ## Install

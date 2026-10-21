@@ -164,6 +164,8 @@ The skills contain no multiplexer syntax. They call only `sign-on` and `berth`. 
 
 Readiness comes from `bdi`, the reader in [beady-eye](https://github.com/CodeForBreakfast/beady-eye), because an effort's edges cross trackers and `bd ready` and `bd blocked` do not follow an edge into another tracker. The steward and `muster` judge from the top bead's tree in `bdi` what can start, what waits and what is in delivery, and `tally` reads every effort through it. `bd` stays for looking a record up by id, label, metadata or closed status.
 
+Pull requests are GitHub's. The skills read, wait on and merge them with `gh` and bd's `gh:pr` gates, so a repo hosted anywhere else takes its work by a direct push.
+
 ## Packaging
 
 - **One repository, one Claude Code plugin, `boatyard`.** It holds the skills and puts the executables in its `bin/`, which reaches the Bash tool's path.
