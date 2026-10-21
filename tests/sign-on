@@ -239,16 +239,20 @@ config=${CLAUDE_CONFIG_DIR:-$HOME}/.claude.json
 jq '.theme = "a-theme"' "$config" >"$work/config" && cp "$work/config" "$config"
 mkdir -p "$work/untrusted"
 id=$(SIGN_ON_CLAUDE=$(seat untrusted rest 2) SIGN_ON_GATE=$gate \
-  sign-on --as independent --cwd "$work/untrusted" "$prompt")
+  sign-on --as independent --cwd "$work/untrusted" "$prompt" 2>"$work/untrusted.err")
 check "a seat launched into an untrusted folder gets past its gate" 0 "$?"
+check "and sign-on says on stderr that it trusts the folder" true \
+  "$(contains "$(cat "$work/untrusted.err")" "trusts $work/untrusted")"
 check "and reaches its prompt" true "$(contains "$(berth read "$id")" "────────")"
 check "Claude Code's config trusts the folder" true "$(trusts "$work/untrusted")"
 check "and keeps the rest of the config" a-theme "$(jq -r .theme "$config")"
 check "sign-on leaves Claude Code's config lock free" false "$(test -e "$config.lock" && echo true || echo false)"
 
 inode=$(stat -c %i "$config")
-SIGN_ON_CLAUDE=$(seat trusted rest 0) sign-on --as independent --cwd "$work/untrusted" "$prompt" >/dev/null
+SIGN_ON_CLAUDE=$(seat trusted rest 0) sign-on --as independent --cwd "$work/untrusted" "$prompt" \
+  >/dev/null 2>"$work/trusted.err"
 check "a folder already trusted leaves the config as it was" "$inode" "$(stat -c %i "$config")"
+check "and sign-on says nothing of it" "" "$(cat "$work/trusted.err")"
 
 mkdir -p "$work/held" "$config.lock"
 SIGN_ON_CLAUDE=$(seat held rest 0) sign-on --as independent --cwd "$work/held" "$prompt" >/dev/null &
@@ -298,6 +302,18 @@ fails "a gate that does not clear" "$gate" \
 fails "a seat beside a caller in no pane" pane \
   SIGN_ON_CLAUDE="$(seat nowhere rest 0)" sign-on --as independent --beside --cwd "$work/project" "$prompt"
 check "and no berth opens for it" false "$(test -f "$work/nowhere/args" && echo true || echo false)"
+
+mkdir -p "$work/home"
+fails_to_trust() { # <what> <folder> <environment>...
+  local what=$1 folder=$2
+  shift 2
+  fails "$what" "more than one project" \
+    env "$@" SIGN_ON_CLAUDE="$(seat broad rest 0)" sign-on --as independent --cwd "$folder" "$prompt"
+}
+fails_to_trust "the home folder" "$work/home" HOME="$work/home" CLAUDE_CONFIG_DIR="$work/home"
+check "and the config does not trust it" false "$(trusts "$work/home")"
+fails_to_trust "the root" / HOME="$work/home" CLAUDE_CONFIG_DIR="$work/home"
+check "and no berth opens for either" false "$(test -f "$work/broad/args" && echo true || echo false)"
 
 fails "a launch on a host short of memory" memory \
   SIGN_ON_CLAUDE="$(seat cramped rest 0)" SIGN_ON_MIN_MEMORY=1000000 \
