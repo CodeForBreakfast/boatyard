@@ -1,0 +1,78 @@
+#!/usr/bin/env bash
+# berth's front end: --help and -h print the usage and change nothing, and a
+# label never starts with a dash. It runs against an adapter that records
+# every call, so it needs no backend. See docs/design.md, "The port: berth".
+#
+# Run it with berth on the path.
+#
+# Needs: bash, coreutils.
+set -uo pipefail
+
+work=$(mktemp -d)
+failures=0
+calls="$work/calls"
+
+cp "$(readlink -f "$(command -v berth)")" "$work/berth"
+cat >"$work/berth-recorder" <<'ADAPTER'
+#!/usr/bin/env bash
+echo "$*" >>"$(dirname "$(readlink -f "$0")")/calls"
+ADAPTER
+chmod +x "$work/berth-recorder"
+
+check() { # <what> <want> <got>
+  if [ "$2" = "$3" ]; then
+    echo "ok: $1"
+  else
+    echo "FAIL: $1: wanted '$2', got '$3'"
+    failures=$((failures + 1))
+  fi
+}
+
+reached_adapter() {
+  [ -s "$calls" ] && echo true || echo false
+}
+
+prints_usage() { # <what> <command>...
+  local what=$1 out status
+  shift
+  : >"$calls"
+  out=$("$@" 2>&1)
+  status=$?
+  check "$what: succeeds" 0 "$status"
+  check "$what: prints the usage" true "$(case $out in usage:*) echo true ;; *) echo false ;; esac)"
+  check "$what: reaches no adapter" false "$(reached_adapter)"
+}
+
+refuses() { # <what> <command>...
+  local what=$1 err
+  shift
+  : >"$calls"
+  if err=$("$@" 2>&1 >/dev/null); then
+    echo "FAIL: $what: it succeeded"
+    failures=$((failures + 1))
+  else
+    check "$what: gives a reason" true "$([ -n "$err" ] && echo true || echo false)"
+  fi
+  check "$what: reaches no adapter" false "$(reached_adapter)"
+}
+
+export BERTH_BACKEND=recorder BERTH_ID=any-berth
+berth="$work/berth"
+
+prints_usage "berth --help" "$berth" --help
+prints_usage "berth -h" "$berth" -h
+for verb in serve stop yard id open name list send-text send-key wait-text read state close; do
+  prints_usage "berth $verb --help" "$berth" "$verb" --help
+  prints_usage "berth $verb -h" "$berth" "$verb" -h
+done
+prints_usage "berth name --help with no backend named" env -u BERTH_BACKEND "$berth" name --help
+
+refuses "name refuses a label that starts with a dash" "$berth" name --verbose
+refuses "name refuses a dashed label for a named berth" "$berth" name some-berth -x
+
+: >"$calls"
+"$berth" name some-berth "a plain label"
+check "name still sets a plain label" "name some-berth a plain label" "$(cat "$calls")"
+
+rm -rf "$work"
+exit $((failures > 0))
