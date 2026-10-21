@@ -28,12 +28,19 @@ in
       touch $out
     '';
 
+    berth-usage = pkgs.runCommand "berth-usage"
+      { nativeBuildInputs = [ pkgs.bash pkgs.coreutils ]; } ''
+      bash ${../../tests/berth-usage} ${../../bin/berth}
+      touch $out
+    '';
+
     berth-shellcheck = pkgs.runCommand "berth-shellcheck"
       { nativeBuildInputs = [ pkgs.shellcheck ]; } ''
       shellcheck ${../../bin/berth} ${../../bin/berth-herdr} ${../../bin/berth-herdr-state} \
         ${../../tests/with-herdr-yard} ${../../tests/berth-contract} ${../../tests/herdr-layout} \
         ${../../tests/herdr-state} ${../../tests/herdr-lost-agent} ${../../tests/herdr-caller} \
-        ${../../tests/herdr-shell-start} ${../../tests/herdr-binary}
+        ${../../tests/herdr-shell-start} ${../../tests/herdr-binary} \
+        ${../../tests/berth-usage}
       touch $out
     '';
   };

@@ -33,8 +33,8 @@
 # Needs: bash, coreutils, and whatever the adapter needs.
 set -euo pipefail
 
-usage() {
-  cat >&2 <<'EOF'
+print_usage() {
+  cat <<'EOF'
 usage: berth serve <yard>
        berth stop <yard>
        berth yard
@@ -50,6 +50,10 @@ usage: berth serve <yard>
        berth state [<id>]
        berth close [<id>]
 EOF
+}
+
+usage() {
+  print_usage >&2
   exit 2
 }
 
@@ -59,8 +63,10 @@ die() {
 }
 
 [ $# -gt 0 ] || usage
+case "${1:-}" in -h | --help) print_usage; exit 0 ;; esac
 verb=$1
 shift
+case "${1:-}" in -h | --help) print_usage; exit 0 ;; esac
 
 [ -n "${BERTH_BACKEND:-}" ] ||
   die "no backend named. Set BERTH_BACKEND, for example to herdr."
@@ -96,6 +102,7 @@ case "$verb" in
     exec "$adapter" open "$as" "$place" "$focus" "$(cd "$cwd" && pwd)" "$label" "${BERTH_ID:-}" "$@"
     ;;
   name | send-text | send-key)
+    [ "$verb" != name ] || [[ ${*: -1} != -* ]] || die "a label cannot start with a dash."
     case $# in
       1) exec "$adapter" "$verb" "${BERTH_ID:-}" "$1" ;;
       2) exec "$adapter" "$verb" "$1" "$2" ;;
