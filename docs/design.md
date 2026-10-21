@@ -112,6 +112,7 @@ It is written first. Its obligations beyond straight mapping:
 - **Waiting for the shell.** herdr starts every pane with a shell, so the adapter types the berth's command into it. It types only once the shell has settled alone in the foreground, because a child of the shell's start-up, such as a dev shell's hook, can read the terminal and swallow typed input.
 - **Screen source.** `wait-text` matches herdr's recent output, not only the visible frame. A pane shorter than the text it waits for never shows all of it at once.
 - **Package parameter.** herdr's package is a parameter, so a host can supply a platform-specific build.
+- **The host's herdr.** A host can name the herdr binary the adapter runs, with `BERTH_HERDR` set to its path. Without it, the adapter runs the packaged herdr. A macOS host that re-signs herdr needs this, because macOS ties its Local-Network grant to the binary's path. The adapter takes the binary from a variable and not from the caller's `PATH`, because a herdr host usually has some herdr on its `PATH`, and the packaged one would quietly give way to it.
 
 ## `sign-on`
 

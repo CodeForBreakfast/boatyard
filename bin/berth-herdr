@@ -10,6 +10,7 @@
 set -euo pipefail
 
 here=$(dirname "$(readlink -f "$0")")
+herdr=${BERTH_HERDR:-herdr}
 # herdr sets HERDR_SESSION in a pane of a named session, and not in one of the
 # default session, so a caller that is not a berth still finds its own yard.
 yard=${BERTH_YARD:-${HERDR_SESSION:-default}}
@@ -45,7 +46,7 @@ herdr_failed() { # <herdr's output> <herdr arguments>...
 # yard.
 herdr_call() {
   local out status=0
-  out=$(env -u HERDR_SOCKET_PATH herdr --session "$yard" "$@" 2>&1) || status=$?
+  out=$(env -u HERDR_SOCKET_PATH "$herdr" --session "$yard" "$@" 2>&1) || status=$?
   if [ "$status" != 0 ]; then
     herdr_failed "$out" "$@"
     return
@@ -283,13 +284,13 @@ name() {
 }
 
 yard_running() {
-  env -u HERDR_SOCKET_PATH herdr --session "$yard" status server --json | jq -e .running >/dev/null
+  env -u HERDR_SOCKET_PATH "$herdr" --session "$yard" status server --json | jq -e .running >/dev/null
 }
 
 serve() {
   yard=$1
   ! yard_running || die "the yard $yard is already being served."
-  exec env -u HERDR_SOCKET_PATH herdr --session "$yard" server
+  exec env -u HERDR_SOCKET_PATH "$herdr" --session "$yard" server
 }
 
 stop() {
