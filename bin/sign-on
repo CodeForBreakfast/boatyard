@@ -138,6 +138,11 @@ trusted() {
   jq -e --arg d "$folder" '.projects[$d].hasTrustDialogAccepted == true' "$config" >/dev/null 2>&1
 }
 if ! trusted; then
+  # Claude Code trusts a folder outside a repository together with the folders
+  # beneath it, so these would trust every project on the host.
+  if [ "$folder" = / ] || [ "$folder" = "$(cd "$HOME" && pwd -P)" ]; then
+    die "trusting $folder would make Claude Code trust more than one project. Launch the seat in a project's folder."
+  fi
   lock=$config.lock
   for _ in $(seq 1 300); do
     mkdir "$lock" 2>/dev/null && break
@@ -162,6 +167,7 @@ if ! trusted; then
     fi
     mv "$new" "$file"
   ) || die "could not record in $config that Claude Code trusts $folder."
+  echo "sign-on: Claude Code now trusts $folder, with its hooks and MCP servers, and keeps trusting it after the seat has gone." >&2
 fi
 
 # An empty BOATYARD_COMPACT_THRESHOLD opts the seat in to the plugin's

@@ -79,6 +79,8 @@ boatyard.packages.${system}.sign-on.override {
 
 Compaction is off unless a session opts in. `sign-on` opts in every seat it launches. To opt in every session, turn on the plugin's `compactAtRest` setting.
 
+Naming a folder to `sign-on` is the decision to trust it. `sign-on` records the folder as trusted in Claude Code's config, so Claude Code runs the folder's hooks and MCP servers without asking. It says so on stderr when it does. The trust stays in the config after the seat has gone, so a person who opens that folder later gets no prompt. `sign-on` refuses to trust the home folder or the root.
+
 Each seat needs permission to run `berth` and `sign-on`. bd leases a claim for a limited time, so the host also has to renew the claims of its running seats.
 
 ## A first seat
