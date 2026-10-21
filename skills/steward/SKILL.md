@@ -132,42 +132,23 @@ A seat that muster has just handed the effort to breaks it too, because it may h
    - **`held-by-unread` or a `tracker` line means a tracker gave bdi no answer.** The edge is not at fault. Read again next wake, and if the same tracker still fails, post in its project's channel.
    - **`not-read` means bdi read none of the projects that may hold the id.** Either their trackers failed, or bdi's config states none of their prefixes. The edge is not at fault. Read again next wake. If the line stays, raise the missing prefix with the human as an action, because the configuration bdi reads is theirs.
    - **`held-by-several` means two projects share the id's prefix.** The fix is in the configuration bdi reads, not in the graph, so raise it with the human as an action.
-6. **Find the beads where a seat sleeps or the work is in delivery, and sort them in this order:**
+6. **Find the beads where a seat sits or the work is in delivery, and sort them in this order:**
 
-   1. **`blocked_on=human` means a seat went to sleep there, not that it is still alive.** A seat that dies asleep leaves the key behind. Check whether the berth named in the bead's `agent_pane` is still its seat, as *Watching the berths you started* says.
-
-      **A berth that is still its seat means a live seat is asleep there.** It waits on the open `human` bead it depends on, which is its question. With no such bead, it waits on a permission or an action. This wins even when the bead also sits behind an open pull-request gate, which is exactly the case for a rework seat that hit a question mid-rebase. The seat watches the bead its wait ends on, and that watch wakes it. Don't poll its pull request.
-
-      **Otherwise the seat died asleep, and nothing will wake it.** Hand the bead back to the graph:
+   1. **A bead that names a berth had a seat, and the seat may since have died.** A seat sits on the bead it is working, which under a delivery formula is a step of its molecule. It names its berth in `agent_pane`. List every such bead but your own:
 
       ```bash
-      bd update <id> --unset-metadata blocked_on \
-                     --unset-metadata agent_pane --unset-metadata working_topic
-      bd unclaim <id> --if-assignee "<worker>"
+      bd list --has-metadata-key agent_pane --status open,in_progress --limit 0 --json \
+        | jq -r --arg me "$(berth id)" '.[] | select(.metadata.agent_pane != $me) | "\(.id) \(.status) \(.metadata.agent_pane)"'
       ```
 
-      `<worker>` is the dead seat's own name, the sender of its posts in its working topic. `bd unclaim` releases only an `in_progress` bead, and leaves it `open`. Where another seat now holds the bead, it changes nothing and names the holder, so leave that claim alone.
+      `--limit 0` matters. The default is 50 rows, and a truncated list quietly turns a sleeping worker's bead into one you might start over. The list covers the whole tracker, so skip a bead outside the effort. Its seat may sit in a yard your `berth list` cannot see. Check whether each berth is still its bead's seat, as *Watching the berths you started* says.
 
-      Its dependency on its question bead keeps it out of bdi's `ready` until the human answers, and an open pull-request gate keeps it out until the merge. Then start a fresh worker on it in the next `-r` topic, with the answer quoted from the question bead in its brief. Where the bead is a step of a delivery molecule, brief the worker on the work bead that waits on that molecule, and it sits on the step again. A bead that waited on a permission or an action is ready at once, and its fresh worker asks again.
+      **A berth that is still its seat means a live seat is there, awake or asleep.** It sleeps on a question when the bead it sits on depends on an open `human` bead, which `bd human list --json` lists. It sleeps on a permission or an action when its latest post in its working topic asks for one. This wins even when the bead also sits behind an open pull-request gate, which is exactly the case for a rework seat that hit a question mid-rebase. The seat watches the bead its wait ends on, and that watch wakes it. Don't poll its pull request.
+
+      **Otherwise the seat died, and nothing will wake it.** Hand the bead back to the graph as *Watching the berths you started* says. A dependency on a question bead keeps it out of bdi's `ready` until the human answers, and an open pull-request gate keeps it out until the merge. Then start a fresh worker on it in the next `-r` topic, with any answer quoted from the question bead in its brief. Where the bead is a step of a delivery molecule, brief the worker on the work bead that waits on that molecule, and it sits on the step again. A bead whose seat died waiting on a permission or an action is ready at once, and its fresh worker asks again.
    2. **Otherwise an open `gh:pr` gate or an open outcome step of a delivery molecule means the bead is in delivery**, as *A bead closes on merge* and *A bead delivered by a formula* say. No seat is on the bead itself, so never relay to it and never start a worker on it. Poll its pull request, or read its molecule, whose steps show any seat still working it.
 
-   ```bash
-   bd list --has-metadata-key blocked_on --limit 0 --json
-   bd human list --json
-   ```
-
-   `--limit 0` matters. The default is 50 rows, and a truncated list quietly turns a sleeping worker's bead into one you might start over.
-
    The beads in delivery are the `delivery` lines of step 4, each with its pull request and its gate. Under a delivery formula, the line names the work bead that waits on its molecule's outcome step.
-
-   **Last, check every open or in-progress effort bead that names a berth.** A seat sits on the bead it is working, which under a delivery formula is a step of its molecule. A bead in delivery should name none, and one that does names a seat that left without finishing. Check each berth other than your own, and clear each bead whose berth is no longer its seat, as *Watching the berths you started* says:
-
-   ```bash
-   bd list --has-metadata-key agent_pane --status open,in_progress --limit 0 --json \
-     | jq -r --arg me "$(berth id)" '.[] | select(.metadata.agent_pane != $me) | "\(.id) \(.status) \(.metadata.agent_pane)"'
-   ```
-
-   The list covers the whole tracker, so skip a bead outside the effort. Its seat may sit in a yard your `berth list` cannot see.
 7. **Match your watches to the effort's waits.** Every open question bead a sleeping worker depends on, every foreign dependency that holds a bead in push-gate state 6, and every bead in delivery gets a beady-eye `watch`. The bead in delivery to watch is the work bead: under a delivery formula, the bead that waits on the outcome step, and otherwise the bead behind its own `gh:pr` gate. It goes ready once that step or gate closes. Name the project for a foreign bead. Compare beady-eye's `watching` list against those waits. Watch what is missing, which after a fresh start is all of them, and `unwatch` what no longer holds anything up.
 8. **Read the topics.** Read the decisions topic and each active worker's working topic: who is mid-flight, who is blocked, and what has been asked of the human. After a compaction you are still subscribed to every topic an earlier you created. The only subscription you might still owe is to a topic someone else created.
 
@@ -395,10 +376,10 @@ Starting workers is a **loop**, not a kickoff. Start one at each ready bead, and
   bd unclaim <bead> --if-assignee "<worker>"    # only a bead left in_progress
   ```
 
-  Name the worker as *Reconstruct* says for a seat that died asleep.
+  `<worker>` is the dead seat's own name, the sender of its posts in its working topic. `bd unclaim` releases only an `in_progress` bead, and leaves it `open`. Where another seat now holds the bead, it changes nothing and names the holder, so leave that claim alone.
 
-  A bead with `blocked_on=human` is handed back as *Reconstruct* says instead. Only a bead in your own tracker is yours to clear. For a seat born in another project, post the bead and its berth in that project's channel.
-- **Reclaim a berth that did not close itself.** On the success path a finished worker posts its sign-off, reacts `wave` to its brief, and closes its own berth. A worker that crashed first leaves its berth open. If a berth is still open after its worker waved, or `berth state` reads it `at-rest` long after the worker went dark without waving, close it with `berth close <id>` and clear its bead as the bullet above says. **Never close the berth of a bead that is `blocked` with `blocked_on=human`.** That worker is asleep on purpose, waiting for you to wake it. The exception is a worker you have confirmed dark: you relayed, and it never acknowledged by its checkpoint. A dead worker cannot clear its own `blocked_on`, so close its berth and hand its bead back as *Reconstruct* says for a seat that died asleep.
+  Only a bead in your own tracker is yours to clear. For a seat born in another project, post the bead and its berth in that project's channel.
+- **Reclaim a berth that did not close itself.** On the success path a finished worker posts its sign-off, reacts `wave` to its brief, and closes its own berth. A worker that crashed first leaves its berth open. If a berth is still open after its worker waved, or `berth state` reads it `at-rest` long after the worker went dark without waving, close it with `berth close <id>` and clear its bead as the bullet above says. **Never close the berth of a sleeping worker.** *Reconstruct* step 6 says how to tell one. That worker is asleep on purpose, waiting for you to wake it. The exception is a worker you have confirmed dark: you relayed, and it never acknowledged by its checkpoint. Close its berth and hand its bead back as *Reconstruct* says for a seat that died.
 - **The terminal is not a channel.** Relay answers by posting to the working topic, which is what a sleeping worker listens on. Read a worker's progress from its topic. Never type into its berth to coordinate, and use `berth read` only to diagnose a stalled worker. Coordination state that travels through a screen breaks the principle that makes seats restartable.
 - **Seats are a real cost.** Each worker draws on the account's usage limits. Start what the critical path needs, not a worker for every ready bead by reflex.
 
