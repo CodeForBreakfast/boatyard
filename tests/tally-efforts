@@ -75,7 +75,14 @@ cat > "$work/beads.json" <<'EOF'
   {"project": "chandlery", "id": "ch-2.1", "status": "in_progress", "issue_type": "task", "ready": true,
    "blocked_by": [], "agent": null, "labels": [],
    "assignee": "stock-worker", "lease_expires_at": "2099-01-01T00:00:00Z",
-   "metadata": {"effort_slug": "stock-sync"}}
+   "metadata": {"effort_slug": "stock-sync"}},
+
+  {"project": "shipwright", "id": "ex-7", "status": "open", "issue_type": "feature", "ready": false,
+   "blocked_by": ["ch-4"], "agent": null, "labels": [], "metadata": {"effort_slug": "sail-loft"}},
+  {"project": "chandlery", "id": "ch-4", "status": "open", "issue_type": "task", "ready": false,
+   "blocked_by": ["ch-5"], "agent": null, "labels": [], "metadata": {}},
+  {"project": "chandlery", "id": "ch-5", "status": "open", "issue_type": "task", "ready": true,
+   "blocked_by": [], "agent": null, "labels": ["human"], "title": "Which canvas weight?", "metadata": {}}
 ]}
 EOF
 
@@ -95,7 +102,7 @@ effort() { # <top> <jq filter>
 }
 
 check "one line per effort, folding the effort another depends on and the shared slug" \
-  '["ch-2","ch-3","ex-1","ex-3"]' "$(jq -sc 'map(.top) | sort' <<<"$output")"
+  '["ch-2","ch-3","ex-1","ex-3","ex-7"]' "$(jq -sc 'map(.top) | sort' <<<"$output")"
 
 check "an effort with no steward says so" 'null' "$(effort ex-1 .steward)"
 check "ready work counts across trackers" '2' "$(effort ex-1 .ready)"
@@ -110,6 +117,9 @@ check "a claim on a bead other than the top is not the steward" 'null' "$(effort
 check "a gate and a question are not ready work, a folded effort's top is" '1' "$(effort ex-3 .ready)"
 check "a gate is listed as a wait" '["ex-5"]' "$(effort ex-3 .gates)"
 check "a question labelled human is an ask" '[{"id":"ex-4","title":"Which survey window?"}]' "$(effort ex-3 .asks)"
+
+check "a question behind a blocker in another project is an ask" \
+  '[{"id":"ch-5","title":"Which canvas weight?"}]' "$(effort ex-7 .asks)"
 
 check "a shared slug takes the parent as top" '["ch-2.1"]' "$(effort ch-2 .also)"
 check "a checkout under ~ is expanded" \
