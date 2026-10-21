@@ -79,6 +79,8 @@ Each adapter maps its backend's states onto these four and corrects its backend'
 
 A verb given no id acts on `BERTH_ID`, the calling berth. So a worker closes itself with a bare `berth close`.
 
+A berth's label is the name by which a person picks a seat out in the multiplexer, such as in a panel that lists its agents. A seat names itself only through `berth name` or `sign-on --label`, and never through the multiplexer's own agent or title fields. A worker's label stays its bead id, because a steward checks that a seat is alive by matching its berth's label to the bead it sits on.
+
 `read` is for diagnosis only, for example a steward checking on a stalled worker. Coordination state never travels through a screen. The skills state that rule, because the port cannot enforce it.
 
 ### Environment
