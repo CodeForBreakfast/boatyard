@@ -9,10 +9,10 @@ Boatyard runs coding agents in terminal multiplexer panes and coordinates them. 
 In scope now:
 
 - The orchestration skills and the launcher.
-- A persistent set of long-lived agents, which starts at login under a service manager.
+- Long-lived agents for a host that runs them under a service manager. `berth serve` runs a yard's backend under the service manager, and `sign-on` opens each agent from a caller that is not a berth.
 - Compaction at rest, by a mod in the plugin.
 
-Later: the integrations that serve interactive panes only. These are the agent-state hooks, the statusline, review tabs and window-manager keybinds. They go on calling their multiplexer directly until they are moved.
+Later: the integrations that serve interactive panes only, such as agent-state hooks, a statusline, review tabs and window-manager keybinds. Until the port serves them, they call their multiplexer directly.
 
 ## Layers
 
@@ -38,7 +38,7 @@ The port knows only terminal mechanics. It knows nothing about Claude Code. The 
 - **Yard.** One backend session that holds berths, such as a herdr server session.
 - **Berth.** One terminal in which a process runs, usually an agent. A berth id is opaque to consumers. An adapter may use its backend's native id, and the herdr adapter does, returning herdr's pane id verbatim.
 - **Relationship.** Every berth is opened in a relationship to its opener:
-  - **independent**: it starts its own line of work, as a steward or a persistent agent does.
+  - **independent**: it starts its own line of work, as a steward or a long-lived agent does.
   - **worker**: it does part of the opener's work. The adapter keeps an opener's workers together.
   - **tender**: an auxiliary view beside the opener, such as a bead-graph viewer. It is usually not an agent.
 
@@ -135,7 +135,7 @@ Each launch states its own relationship, working directory, label and prompt. A 
 
 A seat is born in its repository's main checkout, never in a linked worktree. Claude Code reads its instructions, skills and trust state from the launch directory and cannot re-read them after a `cd`.
 
-The persistent set's start-up script calls `sign-on` too, so the gate logic exists once.
+A host that starts long-lived agents from a script calls `sign-on` there too, so the gate logic exists once.
 
 ## Compaction
 
@@ -169,7 +169,7 @@ Pull requests are GitHub's. The skills read, wait on and merge them with `gh` an
 ## Packaging
 
 - **One repository, one Claude Code plugin, `boatyard`.** It holds the skills and puts the executables in its `bin/`, which reaches the Bash tool's path.
-- **One flake exporting two packages:** `berth` and `sign-on`. The packages matter as much as the plugin. The persistent set starts under a service manager, which does not see the plugin's `bin/`.
+- **One flake exporting two packages:** `berth` and `sign-on`. The packages matter as much as the plugin. A service manager does not see the plugin's `bin/`, so a host that runs agents under one installs the packages.
 - **Host inputs.** The multiplexer package, the Claude Code command and flags, and the settings path are all package arguments or configuration. A host supplies its own.
 - **A host keeps its seats' claims alive.** A bd claim's lease lapses unless something renews it, and `tally` reads a steward as live only while its top bead's lease is. The host renews the claims of every running seat, including a seat that is asleep.
 - **A host allows the plugin's mod.** Where a host's managed settings limit mods to its organization's, the compaction mod does not load until the host allows it.
@@ -182,23 +182,7 @@ Pull requests are GitHub's. The skills read, wait on and merge them with `gh` an
   - For herdr, it runs a throwaway server with `HOME` redirected and every `HERDR_*` variable unset. An inherited `HERDR_SOCKET_PATH` would otherwise drive the live session. The server runs inside the nix build sandbox, so the suite is a flake check.
   - herdr treats a process named `claude` as an agent and reads its state from the screen. The suite drives the states with a stand-in process of that name, not with Claude Code.
 - **Unit tests.** The compaction mod's rule has its own tests, run by `claude plugin test` against a stand-in engine. So does each adapter's mapping from backend states to the four port states, including the herdr parked-on-background-work and lost-agent corrections.
-- **End to end.** One real effort runs on `steward` and `worker` before any previous system is retired.
-
-## Migration from an existing herdr-based setup
-
-Build beside the existing system under the new names. The two share one herdr server without colliding. Every command, environment variable, state file and index topic is new, and each pane is launched by one system and compacted by that system's own monitor. The existing system stays untouched until the last step.
-
-The work lands in three places: this repository, the host configuration that packages the old launcher and the persistent set, and the user's Claude Code configuration, which holds the old skills, the statusline, the settings and the hooks.
-
-1. Build `berth` with the herdr adapter and its contract suite.
-2. Build `sign-on`.
-3. Write `steward` and `worker`. Install the packages and the plugin on one host, and allow `berth` and `sign-on` in the permission settings the seats run under. Then run one real effort, its steward started by hand with `sign-on` and indexed in a `boatyard` topic.
-4. Move the persistent set, one host at a time, because each host has its own service manager. Its server runs under `berth serve`, and its start-up script opens each agent with `sign-on`.
-5. Write `muster` and `tally`. Switch every skill that starts an effort to `muster`, so that no new effort starts on the old system. `tally` reads both the old and the new index topics until the last old effort closes.
-6. Compact every seat with the plugin's mod. `sign-on` opts each seat it launches in to it, with the launch's threshold where one is given.
-7. When the last old effort has closed, retire the old skills, the old launcher and the old monitor. Remove their names from the hooks, the settings and the other skills that mention them, and tell each project to do the same in its own notes. Each old index topic gets one closing line pointing at `boatyard`.
-
-The migration is done when no search of the host configuration or the Claude Code configuration finds the old skill, launcher and monitor names, and no raw multiplexer calls remain in the in-scope files.
+- **End to end.** One real effort runs on `steward` and `worker`.
 
 ## Open decisions
 
