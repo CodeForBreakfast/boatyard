@@ -1,4 +1,4 @@
-import type { On, SessionUsage } from 'claude-code'
+import type { On, RenderSurface, SessionUsage } from 'claude-code'
 import { expect, mock, test } from 'claude-code/testing'
 
 // Auto-compact runs at 160000 tokens, so 160000 is the space usable before it.
@@ -33,9 +33,10 @@ function usageAt(tokens: number | undefined): SessionUsage {
 
 // The engine beneath the plugin: a session whose context holds `tokens`, and
 // a count of the compactions the plugin asks for.
-function session(on: On, tokens: number | undefined, env: Record<string, string> = {}) {
+function session(on: On, tokens: number | undefined, env: Record<string, string> = {}, surfaces: readonly RenderSurface[] = ['terminal']) {
   const compactions = { count: 0 }
   mock.env(on, env)
+  on('session.surfaces', () => ({ value: surfaces }))
   on('session.usage', () => ({ value: usageAt(tokens) }))
   on('session.compact', () => {
     compactions.count += 1
@@ -134,6 +135,12 @@ test('an empty override opts in at the plugin setting, and says nothing', { opti
 
 test('an empty override leaves a session above the plugin setting alone', { options: { compactThreshold: 50 } }, async ($, on) => {
   const compactions = session(on, tokensAtFree(60), { BOATYARD_COMPACT_THRESHOLD: '' })
+  await $.turn.complete({ ...TURN, reason: 'answer' })
+  expect(compactions.count).toBe(0)
+})
+
+test('leaves a headless session alone', async ($, on) => {
+  const compactions = session(on, tokensAtFree(10), OPTED_IN, [])
   await $.turn.complete({ ...TURN, reason: 'answer' })
   expect(compactions.count).toBe(0)
 })

@@ -30,6 +30,9 @@ export const register: Register = (on, options) => {
     if (e.agentId !== undefined || e.reason !== 'answer') return answered
     if (options.compactAtRest !== true && (await $.env.get('BOATYARD_COMPACT_THRESHOLD')) === undefined) return answered
 
+    // The engine refuses a compact in a -p or SDK session, which draws nowhere.
+    if ((await $.session.surfaces()).length === 0) return answered
+
     const free = await freeBeforeAutoCompact($)
     if (free !== undefined && free < (await thresholdFor($, options))) {
       await $.session.compact()
