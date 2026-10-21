@@ -15,7 +15,7 @@ calls="$work/calls"
 cp "${1:?}" "$work/berth"
 {
   echo "#!$BASH"
-  echo 'echo "$*" >>"$(dirname "$(readlink -f "$0")")/calls"'
+  echo "echo \"\$*\" >>'$calls'"
 } >"$work/berth-recorder"
 chmod +x "$work/berth-recorder"
 
