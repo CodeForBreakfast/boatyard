@@ -46,10 +46,12 @@ check "a rework seat's claim takes a bead behind its gate" in_progress "$(status
 check "the claim leaves the gate open" open "$(status_of "$gate")"
 
 # A seat asleep on a question, as the skill leaves it: still in progress under
-# its claim, marked only by blocked_on.
+# its claim, waiting on its question bead.
 sleeping=$(quiet_bd create --silent --title "sleeping")
 quiet_bd update "$sleeping" --claim --actor sleeper >/dev/null
-quiet_bd update "$sleeping" --set-metadata blocked_on=human --actor sleeper >/dev/null
+question=$(quiet_bd create --silent --labels human --title "question")
+quiet_bd dep add "$sleeping" "$question" >/dev/null
+check "a seat waiting on its question stays in progress" in_progress "$(status_of "$sleeping")"
 check "a sleeping seat keeps its claim's lease" true \
   "$(quiet_bd show "$sleeping" --json | jq '.[0].lease_expires_at != null')"
 output=$(bd update "$sleeping" --claim --actor another 2>&1)

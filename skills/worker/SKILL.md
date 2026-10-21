@@ -83,17 +83,7 @@ Post to the working topic at meaningful moments: a milestone reached, a plan cha
 
 You will most often stall on something only the human can give you: an answer to a question, a credential, a deploy. When that happens, **don't exit and don't spin.** Starting a seat again costs the human work, and sleeping costs nothing. Where your host's `CLAUDE.md`, or a document it names, says how a seat reaches the human, that rule wins over this section.
 
-1. **Record it on your bead, and mark the bead you sit on as a sleeping seat.** Note on your bead what is done and what is left, then:
-
-   ```bash
-   bd update <bead> --set-metadata blocked_on=human
-   ```
-
-   `blocked_on=human` says only that a live seat is asleep here. Without it, a rework seat's bead looks like a bead in delivery, because both sit behind an open pull-request gate, and the steward would poll the pull request instead of waking you. **Leave the bead `in_progress`.** bd keeps a claim's lease only while its bead is in progress, so setting it `blocked` would drop the lease that shows you are alive. When you wake, clear the key:
-
-   ```bash
-   bd update <bead> --unset-metadata blocked_on
-   ```
+1. **Record it on your bead, and stay on the bead you sit on.** Note on your bead what is done and what is left. **Leave the bead you sit on `in_progress`, with your claim and your berth on it.** That is how the steward tells a live seat from a bead in delivery, which no seat sits on, even where both sit behind an open pull-request gate. bd keeps a claim's lease only while its bead is in progress, so setting it `blocked` would drop the lease that shows you are alive.
 2. **If it is a question, put it on its own bead, labelled `human`.** That label is the human's queue, which `bd human list` reads. Where your host has you review a question before it goes out, do that first, and if the review lets you settle the question yourself, settle it and record why instead of asking. The bead carries one question, worded so the human can answer it cold. File it in your own tracker, and make the bead you sit on wait on it:
 
    ```bash
@@ -106,15 +96,15 @@ You will most often stall on something only the human can give you: an answer to
 4. **Post to your working topic.** For a question, post a one-line pointer to its bead, because the question lives on the bead and never only in the post. An action only the human can take, such as supplying a credential, is not a question and gets no question bead: post the action itself, and the steward takes it to the human. Never ask the human directly, and never ask with `AskUserQuestion` or any prompt in your terminal. Nobody watches a worker's berth.
 5. **Sleep.** Stay open to inbound messages, with no scheduled re-check. Your watch wakes you when the bead changes. The steward relays the human's word on an action, and relays a closed question bead while beady-eye says its watcher is down. Each relay also mentions you, and a mention reaches you even after your subscription has lapsed.
 6. **On a message from beady-eye, act on the bead it names.** A comment, or any change that leaves the bead open, does not end your wait. Read it with `bd show`, answer on the bead if the human asked you something there, and sleep again. A bead that closed, or went from its tracker, ends the wait. `unwatch` it, then resume.
-7. **Resume.** Rebuild your context first, because the compactor may have compacted you while you slept. Re-read your brief, `bd show` your bead and its notes, and read your working topic since your last post. Then read the answer on the closed question bead with `bd show`. An answer that does not settle the question is still an answer: file a fresh question only if you still need one. Re-check whatever fact you were waiting on, such as a secret now existing or a commit having landed, then clear `blocked_on` from the bead you sit on, as step 1 says. Post to your working topic that you are awake and resuming, because the steward is waiting for that post, and continue in place.
+7. **Resume.** Rebuild your context first, because the compactor may have compacted you while you slept. Re-read your brief, `bd show` your bead and its notes, and read your working topic since your last post. Then read the answer on the closed question bead with `bd show`. An answer that does not settle the question is still an answer: file a fresh question only if you still need one. Re-check whatever fact you were waiting on, such as a secret now existing or a commit having landed. Post to your working topic that you are awake and resuming, because the steward is waiting for that post, and continue in place.
 
 ## Getting the human's permission
 
 Permission is the one thing you ever need from the human in your berth. When your host's permission mode refuses a command you need, only the human can let it through, and they have to do it in your berth. A permission classifier judges a command by the conversation of the seat that runs it, so an approval given on a bead or on commy never reaches it. An approval typed in your berth clears it only if it names the action.
 
-1. **Mark the bead you sit on as a sleeping seat,** as step 1 of *Block and sleep* says. File no question bead for a permission.
+1. **Record it on your bead, and stay on the bead you sit on,** as step 1 of *Block and sleep* says. File no question bead for a permission.
 2. **Post the ask to your working topic:** the exact command, why the work needs it, and how to reach your berth. The steward takes it to the human.
-3. **Sleep.** The human types their approval into your berth and names the action, such as "go ahead and copy the key". A bare "I approve" does not clear it. Or they run the command there themselves, which always works, and tell you to carry on. Run the command if they approved it, or check its result if they ran it. Then clear `blocked_on` from the bead you sit on, as step 1 of *Block and sleep* says, and continue.
+3. **Sleep.** The human types their approval into your berth and names the action, such as "go ahead and copy the key". A bare "I approve" does not clear it. Or they run the command there themselves, which always works, and tell you to carry on. Run the command if they approved it, or check its result if they ran it, and continue.
 
 When a command stops at an approval prompt instead, you cannot post. Stay at the prompt. `berth state` reads `blocked`, and the steward sends the human to it.
 
@@ -180,8 +170,7 @@ If that push is rejected because the branch is protected, the repo's statement w
    If your bead turns out to need code from a bead whose pull request has not merged, that is a missing dependency. Post it to the working topic and block and sleep, watching the bead you need. It closes when its pull request merges, and that wakes you. The steward wires the dependency, or stands you down instead. If you are stood down, record where you got to on your bead, hand back the bead you sit on, and close your seat as *Finish* describes, without claiming the deliverable is done:
 
    ```bash
-   bd update <bead> --unset-metadata blocked_on \
-                  --unset-metadata working_topic --unset-metadata agent_pane
+   bd update <bead> --unset-metadata working_topic --unset-metadata agent_pane
    bd unclaim <bead>
    ```
 
