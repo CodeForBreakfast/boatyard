@@ -1,4 +1,5 @@
-# herdr is an argument so that a host can supply its own build of it.
+# herdr is an argument so that a host can supply its own build of it. A host
+# can instead name a herdr binary at run time with BERTH_HERDR.
 { lib, stdenvNoCC, makeWrapper, bash, coreutils, jq, herdr }:
 
 stdenvNoCC.mkDerivation {
@@ -15,7 +16,8 @@ stdenvNoCC.mkDerivation {
   installPhase = ''
     install -Dm755 -t $out/bin berth berth-herdr berth-herdr-state
     wrapProgram $out/bin/berth --prefix PATH : ${lib.makeBinPath [ coreutils ]}
-    wrapProgram $out/bin/berth-herdr --prefix PATH : ${lib.makeBinPath [ coreutils herdr jq ]}
+    wrapProgram $out/bin/berth-herdr --prefix PATH : ${lib.makeBinPath [ coreutils jq ]} \
+      --set-default BERTH_HERDR ${herdr}/bin/herdr
     wrapProgram $out/bin/berth-herdr-state --prefix PATH : ${lib.makeBinPath [ jq ]}
   '';
 

@@ -1,0 +1,63 @@
+#!/usr/bin/env bash
+# berth serve runs the herdr a host names in BERTH_HERDR, and the packaged
+# herdr when the host names none. See docs/design.md, "The herdr adapter".
+#
+# Run it under with-herdr-yard.
+#
+# Needs: bash, coreutils, herdr, jq, berth.
+set -uo pipefail
+
+: "${BERTH_BACKEND:?}"
+work=$(mktemp -d)
+failures=0
+
+check() { # <what> <want> <got>
+  if [ "$2" = "$3" ]; then
+    echo "ok: $1"
+  else
+    echo "FAIL: $1: wanted '$2', got '$3'"
+    failures=$((failures + 1))
+  fi
+}
+
+mkdir "$work/bin"
+stand_in=$work/bin/herdr
+cat >"$stand_in" <<EOF
+#!$BASH
+echo "\$*" >>"$work/stand-in.log"
+case "\$*" in *status*) echo '{"running":false}' ;; esac
+EOF
+chmod +x "$stand_in"
+
+echo "# a host that names its herdr"
+
+BERTH_HERDR=$stand_in timeout 10 berth serve named >/dev/null 2>&1
+check "berth serve runs the named herdr's server" "--session named server" \
+  "$(tail -n 1 "$work/stand-in.log" 2>/dev/null)"
+
+echo "# a host that names no herdr, with another herdr earlier on its PATH"
+
+rm -f "$work/stand-in.log"
+unset BERTH_HERDR
+PATH=$work/bin:$PATH berth serve unnamed >"$work/serve.log" 2>&1 &
+serving=$!
+trap 'kill "$serving" 2>/dev/null' EXIT
+for _ in $(seq 1 100); do
+  herdr --session unnamed status server --json 2>/dev/null | jq -e .running >/dev/null && break
+  sleep 0.1
+done
+check "berth serve runs the packaged herdr's server" true \
+  "$(herdr --session unnamed status server --json | jq .running)"
+check "it never runs the herdr on the PATH" false \
+  "$([ -e "$work/stand-in.log" ] && echo true || echo false)"
+
+berth stop unnamed
+wait "$serving"
+trap - EXIT
+
+echo
+if [ "$failures" -gt 0 ]; then
+  echo "$failures failed."
+  exit 1
+fi
+echo "berth serve runs the herdr the host names, and the packaged one otherwise."
