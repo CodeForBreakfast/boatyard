@@ -15,7 +15,7 @@
 #   SIGN_ON_MIN_MEMORY     the memory the host must have available for a seat
 #                          to start, in GiB. 0 turns the check off.
 #
-# Needs: bash, coreutils, git, berth.
+# Needs: bash, coreutils, git, jq, berth.
 set -euo pipefail
 
 usage() {
@@ -124,6 +124,44 @@ if top=$(git -C "$cwd" rev-parse --show-toplevel 2>/dev/null); then
     echo "sign-on: $cwd is in a linked worktree, so the seat is born in its main checkout, $main." >&2
     cwd=$main
   fi
+  folder=$main
+else
+  folder=$(cd "$cwd" && pwd -P) || die "cannot enter $cwd."
+fi
+
+# Claude Code asks whether to trust a folder it has never opened, with "No,
+# exit" focused, so a seat started there would stall or quit. It keeps the
+# answer in its global config, so sign-on records it there first, under the
+# lock Claude Code itself takes to write that file.
+config=${CLAUDE_CONFIG_DIR:-$HOME}/.claude.json
+trusted() {
+  jq -e --arg d "$folder" '.projects[$d].hasTrustDialogAccepted == true' "$config" >/dev/null 2>&1
+}
+if ! trusted; then
+  lock=$config.lock
+  for _ in $(seq 1 300); do
+    mkdir "$lock" 2>/dev/null && break
+    # Claude Code's lock library refreshes a lock it holds every few seconds
+    # and takes over one older than ten.
+    # ponytail: two takers of one abandoned lock can race; Claude Code's own
+    # library has the same window.
+    age=$(($(date +%s) - $(stat -c %Y "$lock" 2>/dev/null || date +%s)))
+    [ "$age" -le 10 ] || rmdir "$lock" 2>/dev/null || true
+    sleep 0.1
+  done
+  [ -d "$lock" ] || die "could not take Claude Code's config lock, $lock, within 30s."
+  (
+    trap 'rm -f "${new:-}"; rmdir "$lock"' EXIT
+    file=$(readlink -f "$config")
+    new=$(mktemp "$file.XXXXXX")
+    if [ -e "$file" ]; then
+      jq --arg d "$folder" '.projects[$d].hasTrustDialogAccepted = true' "$file" >"$new"
+      chmod --reference="$file" "$new"
+    else
+      jq -n --arg d "$folder" '.projects[$d].hasTrustDialogAccepted = true' >"$new"
+    fi
+    mv "$new" "$file"
+  ) || die "could not record in $config that Claude Code trusts $folder."
 fi
 
 # An empty BOATYARD_COMPACT_THRESHOLD opts the seat in to the plugin's

@@ -39,6 +39,7 @@ eventually() { # <command>...
 }
 
 gate="I am using this for local development"
+trust_prompt="Is this a project you created or one you trust?"
 
 # A backend knows Claude Code by its process name, so a copy of bash named
 # claude stands in for it. It shows the gate until it has had the given
@@ -48,6 +49,18 @@ cp "$(command -v bash)" "$work/claude"
 cat >"$work/stand-in" <<EOF
 prompt_box() { printf '\n────────\n❯ \n────────\n'; }
 screen=\$1 enters=\$2
+# Like Claude Code, it asks first whether to trust a folder its config does
+# not trust, nor any folder above it, with the answer that quits focused.
+trusted=\$PWD
+until jq -e --arg d "\$trusted" '.projects[\$d].hasTrustDialogAccepted == true' \\
+  "\${CLAUDE_CONFIG_DIR:-\$HOME}/.claude.json" >/dev/null 2>&1; do
+  if [ "\$trusted" = / ]; then
+    printf '$trust_prompt\n❯ No, exit\n  Yes, I trust this folder\n'
+    read -r _
+    exit 1
+  fi
+  trusted=\$(dirname "\$trusted")
+done
 if [ "\$enters" -gt 0 ]; then
   printf 'Loading development channels\n❯ 1. $gate\n  2. Exit\n'
   while [ "\$enters" -gt 0 ]; do
@@ -81,6 +94,11 @@ exec "$work/claude" --norc --noprofile "$work/stand-in" $2 $3
 EOF
   chmod +x "$work/$1/seat"
   printf '%s\n' "$work/$1/seat"
+}
+
+trusts() { # <dir>
+  jq -e --arg d "$(cd "$1" && pwd -P)" '.projects[$d].hasTrustDialogAccepted == true' \
+    "${CLAUDE_CONFIG_DIR:-$HOME}/.claude.json" >/dev/null 2>&1 && echo true || echo false
 }
 
 recorded() { # <name> <variable>
@@ -213,6 +231,39 @@ SIGN_ON_CLAUDE=$(seat sub rest 0) \
   sign-on --as independent --cwd "$work/repo/sub" "$prompt" >/dev/null 2>"$work/sub.err"
 check "a directory inside the main checkout stays as given" "$work/repo/sub" "$(cat "$work/sub/pwd")"
 check "and sign-on says nothing of it" "" "$(cat "$work/sub.err")"
+check "a folder in a repository is trusted at the repository's top" true "$(trusts "$work/repo")"
+
+echo "# a folder Claude Code has never trusted"
+
+config=${CLAUDE_CONFIG_DIR:-$HOME}/.claude.json
+jq '.theme = "a-theme"' "$config" >"$work/config" && cp "$work/config" "$config"
+mkdir -p "$work/untrusted"
+id=$(SIGN_ON_CLAUDE=$(seat untrusted rest 2) SIGN_ON_GATE=$gate \
+  sign-on --as independent --cwd "$work/untrusted" "$prompt")
+check "a seat launched into an untrusted folder gets past its gate" 0 "$?"
+check "and reaches its prompt" true "$(contains "$(berth read "$id")" "────────")"
+check "Claude Code's config trusts the folder" true "$(trusts "$work/untrusted")"
+check "and keeps the rest of the config" a-theme "$(jq -r .theme "$config")"
+check "sign-on leaves Claude Code's config lock free" false "$(test -e "$config.lock" && echo true || echo false)"
+
+inode=$(stat -c %i "$config")
+SIGN_ON_CLAUDE=$(seat trusted rest 0) sign-on --as independent --cwd "$work/untrusted" "$prompt" >/dev/null
+check "a folder already trusted leaves the config as it was" "$inode" "$(stat -c %i "$config")"
+
+mkdir -p "$work/held" "$config.lock"
+SIGN_ON_CLAUDE=$(seat held rest 0) sign-on --as independent --cwd "$work/held" "$prompt" >/dev/null &
+waiter=$!
+sleep 1
+check "while Claude Code holds its config lock, sign-on waits" false "$(trusts "$work/held")"
+rmdir "$config.lock"
+wait "$waiter"
+check "and records the trust once the lock is free" true "$(trusts "$work/held")"
+
+mkdir -p "$work/abandoned" "$config.lock"
+touch -d '1 minute ago' "$config.lock"
+SIGN_ON_CLAUDE=$(seat abandoned rest 0) sign-on --as independent --cwd "$work/abandoned" "$prompt" >/dev/null
+check "a lock left behind by a Claude Code that died is taken over" true "$(trusts "$work/abandoned")"
+check "and freed" false "$(test -e "$config.lock" && echo true || echo false)"
 
 echo "# a caller that is not a berth"
 

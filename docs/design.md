@@ -118,9 +118,10 @@ It is written first. Its obligations beyond straight mapping:
 
 `sign-on` launches Claude Code in a berth:
 
-1. It asks `berth yard` which yard it is in, so that it works from a pane that is not a berth, then opens a berth through `berth open`.
-2. It starts the configured Claude Code command in that berth, opted in to the compaction mod.
-3. It gets past the startup gate: `berth wait-text` for the gate's text, then `berth send-key Enter`, repeated until `berth read` no longer shows the gate. `wait-text` cannot tell when the gate has gone, because it searches recent output.
+1. It records in Claude Code's global config that Claude Code trusts the seat's folder. That folder is the repository's top level, or the launch directory outside a repository. Claude Code otherwise asks about a folder it has never opened, with "No, exit" focused, so pressing Enter there would end the seat. sign-on writes the config under the lock that Claude Code takes for it, and leaves the rest of the file as it was.
+2. It asks `berth yard` which yard it is in, so that it works from a pane that is not a berth, then opens a berth through `berth open`.
+3. It starts the configured Claude Code command in that berth, opted in to the compaction mod.
+4. It gets past the startup gate: `berth wait-text` for the gate's text, then `berth send-key Enter`, repeated until `berth read` no longer shows the gate. `wait-text` cannot tell when the gate has gone, because it searches recent output.
 
 The host supplies the site-specific parts as configuration:
 

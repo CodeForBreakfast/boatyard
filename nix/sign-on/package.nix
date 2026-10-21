@@ -4,7 +4,7 @@
 # one.
 #
 # berth is not a dependency: sign-on uses whichever the host puts on the path.
-{ lib, stdenvNoCC, makeWrapper, bash, coreutils, git
+{ lib, stdenvNoCC, makeWrapper, bash, coreutils, git, jq
 , claudeCommand ? "claude"
 , startupGate ? null
 , mcpStartupTimeout ? null
@@ -25,7 +25,7 @@ stdenvNoCC.mkDerivation {
 
   installPhase = ''
     install -Dm755 -t $out/bin sign-on
-    wrapProgram $out/bin/sign-on --prefix PATH : ${lib.makeBinPath [ coreutils git ]} \
+    wrapProgram $out/bin/sign-on --prefix PATH : ${lib.makeBinPath [ coreutils git jq ]} \
       --set-default SIGN_ON_CLAUDE ${lib.escapeShellArg claudeCommand} \
       --set-default SIGN_ON_START_TIMEOUT ${toString startupTimeout} \
       --set-default SIGN_ON_MIN_MEMORY ${toString minAvailableMemory} \
