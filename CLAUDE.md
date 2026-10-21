@@ -16,7 +16,7 @@ These are decided and changed here, and nowhere else:
   the plugin that carries them.
 - **The packaging.** The flake, its packages and checks, and the rules for how
   a host supplies its multiplexer and Claude Code command.
-- **The design.** `docs/design.md`, and the migration steps it sets out.
+- **The design.** `docs/design.md`.
 
 A user's deployment, configuration and data live with that user, not here.
 
