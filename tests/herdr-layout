@@ -37,6 +37,8 @@ check "each independent berth has its own workspace" false \
 check "the workspace takes the berth's label" "first line" "$(workspace_label "$workspace")"
 berth name "$first" "renamed line"
 check "naming the berth names its workspace" "renamed line" "$(workspace_label "$workspace")"
+check "naming the berth names its workspace's first tab" "renamed line" \
+  "$(herdr --session "$BERTH_YARD" tab list --workspace "$workspace" | jq -r '.result.tabs[0].label')"
 
 echo "# workers share a tab in their opener's workspace"
 
