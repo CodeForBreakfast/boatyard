@@ -35,7 +35,7 @@ A user's deployment, configuration and data live with that user, not here.
   and plugin, and owns the persistent agent set, its service units, and the
   Claude Code settings, permissions and hooks.
 - **Tooling a deployment ran before boatyard.** Whoever runs boatyard retires
-  its old fleet skills, launcher and monitor.
+  whatever it replaces.
 - **The work an effort does.** Each effort's repo owns its own code and its own
   beads. boatyard only coordinates the seats.
 
