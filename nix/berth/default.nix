@@ -29,8 +29,8 @@ in
     '';
 
     berth-usage = pkgs.runCommand "berth-usage"
-      { nativeBuildInputs = [ berth pkgs.bash pkgs.coreutils ]; } ''
-      bash ${../../tests/berth-usage}
+      { nativeBuildInputs = [ pkgs.bash pkgs.coreutils ]; } ''
+      bash ${../../tests/berth-usage} ${../../bin/berth}
       touch $out
     '';
 

@@ -3,7 +3,7 @@
 # label never starts with a dash. It runs against an adapter that records
 # every call, so it needs no backend. See docs/design.md, "The port: berth".
 #
-# Run it with berth on the path.
+# Run it with the path of the berth script, bin/berth, as its argument.
 #
 # Needs: bash, coreutils.
 set -uo pipefail
@@ -12,7 +12,7 @@ work=$(mktemp -d)
 failures=0
 calls="$work/calls"
 
-cp "$(readlink -f "$(command -v berth)")" "$work/berth"
+cp "${1:?}" "$work/berth"
 cat >"$work/berth-recorder" <<'ADAPTER'
 #!/usr/bin/env bash
 echo "$*" >>"$(dirname "$(readlink -f "$0")")/calls"
@@ -57,21 +57,21 @@ refuses() { # <what> <command>...
 }
 
 export BERTH_BACKEND=recorder BERTH_ID=any-berth
-berth="$work/berth"
+berth=(bash "$work/berth")
 
-prints_usage "berth --help" "$berth" --help
-prints_usage "berth -h" "$berth" -h
+prints_usage "berth --help" "${berth[@]}" --help
+prints_usage "berth -h" "${berth[@]}" -h
 for verb in serve stop yard id open name list send-text send-key wait-text read state close; do
-  prints_usage "berth $verb --help" "$berth" "$verb" --help
-  prints_usage "berth $verb -h" "$berth" "$verb" -h
+  prints_usage "berth $verb --help" "${berth[@]}" "$verb" --help
+  prints_usage "berth $verb -h" "${berth[@]}" "$verb" -h
 done
-prints_usage "berth name --help with no backend named" env -u BERTH_BACKEND "$berth" name --help
+prints_usage "berth name --help with no backend named" env -u BERTH_BACKEND "${berth[@]}" name --help
 
-refuses "name refuses a label that starts with a dash" "$berth" name --verbose
-refuses "name refuses a dashed label for a named berth" "$berth" name some-berth -x
+refuses "name refuses a label that starts with a dash" "${berth[@]}" name --verbose
+refuses "name refuses a dashed label for a named berth" "${berth[@]}" name some-berth -x
 
 : >"$calls"
-"$berth" name some-berth "a plain label"
+"${berth[@]}" name some-berth "a plain label"
 check "name still sets a plain label" "name some-berth a plain label" "$(cat "$calls")"
 
 rm -rf "$work"
