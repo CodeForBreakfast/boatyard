@@ -189,6 +189,25 @@ check "the command gets the launch's flags and no first message" "--model a-mode
   "$(tr '\n' ' ' <"$work/idle/args" | sed 's/ $//')"
 check "the gate is gone from the screen" false "$(contains "$(berth read "$id")" "$gate")"
 
+echo "# each seat claims as an actor of its own"
+
+# The yard's own environment reaches every berth, so a host that sets an actor
+# there would otherwise make every seat the same one.
+export BEADS_ACTOR=host-actor
+BERTH_ID=$opener SIGN_ON_CLAUDE=$(seat actor_a rest 0) sign-on --as worker --cwd "$work/project" "$prompt" >/dev/null
+BERTH_ID=$opener SIGN_ON_CLAUDE=$(seat actor_b rest 0) sign-on --as worker --cwd "$work/project" "$prompt" >/dev/null
+actor_a=$(recorded actor_a BEADS_ACTOR)
+actor_b=$(recorded actor_b BEADS_ACTOR)
+check "a seat runs with an actor of its own, not the host's" true \
+  "$([ -n "$actor_a" ] && [ "$actor_a" != host-actor ] && echo true || echo false)"
+check "the actor says what kind of seat it is" worker "${actor_a%%-*}"
+check "two seats get different actors" true "$([ "$actor_a" != "$actor_b" ] && echo true || echo false)"
+unset BEADS_ACTOR
+BERTH_ID=$opener SIGN_ON_CLAUDE=$(seat actor_c rest 0) sign-on --as tender --cwd "$work/project" "$prompt" >/dev/null
+check "a seat launched with no actor in its environment gets one" tender "$(recorded actor_c BEADS_ACTOR | cut -d- -f1)"
+BERTH_ID=$opener SIGN_ON_CLAUDE=$(seat actor_d rest 0) sign-on --as worker --cwd "$work/project" --env BEADS_ACTOR=named "$prompt" >/dev/null
+check "an actor the launch names wins" named "$(recorded actor_d BEADS_ACTOR)"
+
 echo "# a caller can land on the seat"
 
 # The herdr layout suite proves that berth honours --focus, so here a berth
