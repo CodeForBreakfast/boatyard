@@ -173,7 +173,12 @@ fi
 
 # An empty BOATYARD_COMPACT_THRESHOLD opts the seat in to the plugin's
 # compaction mod at the plugin's own threshold.
-command=(env ${SIGN_ON_MCP_TIMEOUT:+"MCP_TIMEOUT=$SIGN_ON_MCP_TIMEOUT"} "BOATYARD_COMPACT_THRESHOLD=$threshold"
+#
+# Each seat claims and writes beads as an actor of its own. bd otherwise falls
+# back to the git user, which would make every seat the person who runs the
+# host. An --env of the same name comes later and wins.
+actor=$as-$(od -An -N4 -tx1 /dev/urandom | tr -d ' \n')
+command=(env ${SIGN_ON_MCP_TIMEOUT:+"MCP_TIMEOUT=$SIGN_ON_MCP_TIMEOUT"} "BOATYARD_COMPACT_THRESHOLD=$threshold" "BEADS_ACTOR=$actor"
   "${env[@]}" "$claude" "${flags[@]}" "${prompt[@]}")
 id=$(berth open --as "$as" ${place:+"$place"} ${focus:+--focus} --cwd "$cwd" ${label:+--label "$label"} -- "${command[@]}")
 
