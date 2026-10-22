@@ -122,7 +122,8 @@ It is written first. Its obligations beyond straight mapping:
    Naming a folder to sign-on is the decision to trust it, with the folder's hooks and MCP servers. sign-on says on stderr each time it records trust that Claude Code did not already hold. The trust stays in the config after the seat has gone, so a person who opens that folder later gets no prompt. Claude Code trusts a folder outside a repository together with the folders beneath it, so sign-on refuses to record trust for the user's home folder or the root. It adds no allowlist and no opt-in. Whoever can run sign-on can already run code as the user through the settings and environment it passes to the seat, so the boundary is who may run it.
 2. It asks `berth yard` which yard it is in, so that it works from a pane that is not a berth, then opens a berth through `berth open`.
 3. It starts the configured Claude Code command in that berth, opted in to the compaction mod.
-4. It gets past the startup gate: `berth wait-text` for the gate's text, then `berth send-key Enter`, repeated until `berth read` no longer shows the gate. `wait-text` cannot tell when the gate has gone, because it searches recent output.
+4. It gets past the startup gate: `berth wait-text` for the gate's text, then `berth read` before every `berth send-key Enter`. It presses Enter only while the gate is on the screen and sign-on recognises nothing else there. `wait-text` cannot tell when the gate has gone, because it searches recent output, so the screen says it cleared.
+   On Claude Code's trust dialog, or on a screen it does not recognise before its first Enter, sign-on sends no key. It leaves the berth open and exits non-zero, naming the berth, the seat's folder and what it saw. A person decides what a folder may run, so sign-on never answers the trust dialog.
 
 The host supplies the site-specific parts as configuration:
 

@@ -87,6 +87,7 @@ done
 
 claude=${SIGN_ON_CLAUDE:-claude}
 gate=${SIGN_ON_GATE:-}
+trust_prompt="Is this a project you created or one you trust?"
 start_timeout=${SIGN_ON_START_TIMEOUT:-180}
 min_memory=${SIGN_ON_MIN_MEMORY:-8}
 
@@ -184,17 +185,26 @@ if [ -n "$gate" ]; then
   berth wait-text "$id" "$gate" --timeout "$start_timeout" 2>/dev/null ||
     stuck "did not show the gate '$gate' within ${start_timeout}s"
   # wait-text goes on finding the gate in recent output after it has gone,
-  # so the screen is what says it cleared.
-  cleared=""
-  for _ in $(seq 1 10); do
-    berth send-key "$id" Enter
-    sleep 1
-    case "$(berth read "$id")" in
-      *"$gate"*) ;;
-      *) cleared=1 && break ;;
+  # so the screen is what says it cleared. An Enter goes only to a screen that
+  # shows the gate and nothing else sign-on knows. Claude Code's trust dialog
+  # is never answered, because a person decides what a folder may run.
+  cleared="" sent=0
+  while [ -z "$cleared" ]; do
+    screen=$(berth read "$id")
+    case "$screen" in
+      *"$trust_prompt"*) stuck "shows Claude Code's trust dialog for $folder, which sign-on never answers" ;;
+      *"$gate"*)
+        [ "$sent" -lt 10 ] || stuck "still shows the gate '$gate' after ten Enters"
+        berth send-key "$id" Enter
+        sent=$((sent + 1))
+        sleep 1
+        ;;
+      *)
+        [ "$sent" -gt 0 ] || stuck "shows a screen sign-on does not recognise, not the gate '$gate'"
+        cleared=1
+        ;;
     esac
   done
-  [ -n "$cleared" ] || stuck "still shows the gate '$gate' after ten Enters"
 else
   # A backend may read a starting agent as active before it has read the
   # screen, so the first state after gone cannot tell a gate from a turn.

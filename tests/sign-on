@@ -61,10 +61,17 @@ until jq -e --arg d "\$trusted" '.projects[\$d].hasTrustDialogAccepted == true' 
   fi
   trusted=\$(dirname "\$trusted")
 done
+# A screen that buries the gate under something else, so that wait-text
+# still finds the gate in recent output while the screen shows another.
+if [ "\$screen" = mystery ]; then
+  printf 'Loading development channels\n❯ 1. $gate\n  2. Exit\n'
+  for _ in \$(seq 1 200); do echo; done
+fi
 if [ "\$enters" -gt 0 ]; then
   printf 'Loading development channels\n❯ 1. $gate\n  2. Exit\n'
   while [ "\$enters" -gt 0 ]; do
     read -r _
+    echo x >>"\$KEYS"
     enters=\$((enters - 1))
   done
   # Scrolled away rather than cleared, so the gate stays in the recent
@@ -76,8 +83,11 @@ while :; do
   case \$screen in
     rest) printf '\e]0;✳ Claude\a'; prompt_box ;;
     turn) printf '\e]0;⠂ Claude\a✻ Thinking… (esc to interrupt)\n' ;;
+    trust) printf '$trust_prompt\n❯ No, exit\n  Yes, I trust this folder\n' ;;
+    mystery) printf 'Select a theme\n❯ 1. Dark\n  2. Light\n' ;;
   esac
   read -r screen
+  echo x >>"\$KEYS"
 done
 EOF
 
@@ -90,6 +100,7 @@ seat() { # <name> <screen> <enters the gate takes>
 printf '%s\n' "\$@" >"$work/$1/args"
 env >"$work/$1/env"
 pwd >"$work/$1/pwd"
+export KEYS="$work/$1/keys"
 exec "$work/claude" --norc --noprofile "$work/stand-in" $2 $3
 EOF
   chmod +x "$work/$1/seat"
@@ -268,6 +279,28 @@ touch -d '1 minute ago' "$config.lock"
 SIGN_ON_CLAUDE=$(seat abandoned rest 0) sign-on --as independent --cwd "$work/abandoned" "$prompt" >/dev/null
 check "a lock left behind by a Claude Code that died is taken over" true "$(trusts "$work/abandoned")"
 check "and freed" false "$(test -e "$config.lock" && echo true || echo false)"
+
+echo "# a screen that is not the gate"
+
+keys() { # <name>
+  if [ -f "$work/$1/keys" ]; then wc -l <"$work/$1/keys" | tr -d ' '; else echo 0; fi
+}
+
+err=$(SIGN_ON_CLAUDE="$(seat dialog trust 1)" SIGN_ON_GATE=$gate \
+  sign-on --as independent --cwd "$work/project" "$prompt" 2>&1 >/dev/null)
+check "a trust dialog after the first Enter fails" 1 "$?"
+check "and the first Enter was the only key sent" 1 "$(keys dialog)"
+check "and sign-on names the trust dialog" true "$(contains "$err" "trust dialog")"
+check "and the seat's folder" true "$(contains "$err" "$work/project")"
+check "and the berth" true "$(contains "$err" "berth ")"
+check "and leaves the berth open" true \
+  "$(berth list | jq -r --arg id "$(sed -n 's/.*the berth \([^ ]*\) .*/\1/p' <<<"$err")" 'any(.[]; .id == $id)')"
+
+err=$(SIGN_ON_CLAUDE="$(seat mystery mystery 0)" SIGN_ON_GATE=$gate \
+  sign-on --as independent --cwd "$work/project" "$prompt" 2>&1 >/dev/null)
+check "a screen it does not recognise fails" 1 "$?"
+check "and no key was sent to it" 0 "$(keys mystery)"
+check "and sign-on says it does not recognise the screen" true "$(contains "$err" "does not recognise")"
 
 echo "# a caller that is not a berth"
 
