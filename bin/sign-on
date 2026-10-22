@@ -130,46 +130,16 @@ else
   folder=$(cd "$cwd" && pwd -P) || die "cannot enter $cwd."
 fi
 
-# Claude Code asks whether to trust a folder it has never opened, with "No,
-# exit" focused, so a seat started there would stall or quit. It keeps the
-# answer in its global config, so sign-on records it there first, under the
-# lock Claude Code itself takes to write that file.
+# Claude Code asks whether to trust a folder when neither the folder nor any
+# folder above it is trusted in its config. A person answers that, never
+# sign-on.
 config=${CLAUDE_CONFIG_DIR:-$HOME}/.claude.json
-trusted() {
-  jq -e --arg d "$folder" '.projects[$d].hasTrustDialogAccepted == true' "$config" >/dev/null 2>&1
-}
-if ! trusted; then
-  # Claude Code trusts a folder outside a repository together with the folders
-  # beneath it, so these would trust every project on the host.
-  if [ "$folder" = / ] || [ "$folder" = "$(cd "$HOME" && pwd -P)" ]; then
-    die "trusting $folder would make Claude Code trust more than one project. Launch the seat in a project's folder."
-  fi
-  lock=$config.lock
-  for _ in $(seq 1 300); do
-    mkdir "$lock" 2>/dev/null && break
-    # Claude Code's lock library refreshes a lock it holds every few seconds
-    # and takes over one older than ten.
-    # ponytail: two takers of one abandoned lock can race; Claude Code's own
-    # library has the same window.
-    age=$(($(date +%s) - $(stat -c %Y "$lock" 2>/dev/null || date +%s)))
-    [ "$age" -le 10 ] || rmdir "$lock" 2>/dev/null || true
-    sleep 0.1
-  done
-  [ -d "$lock" ] || die "could not take Claude Code's config lock, $lock, within 30s."
-  (
-    trap 'rm -f "${new:-}"; rmdir "$lock"' EXIT
-    file=$(readlink -f "$config")
-    new=$(mktemp "$file.XXXXXX")
-    if [ -e "$file" ]; then
-      jq --arg d "$folder" '.projects[$d].hasTrustDialogAccepted = true' "$file" >"$new"
-      chmod --reference="$file" "$new"
-    else
-      jq -n --arg d "$folder" '.projects[$d].hasTrustDialogAccepted = true' >"$new"
-    fi
-    mv "$new" "$file"
-  ) || die "could not record in $config that Claude Code trusts $folder."
-  echo "sign-on: Claude Code now trusts $folder, with its hooks and MCP servers, and keeps trusting it after the seat has gone." >&2
-fi
+trusted=$(cd "$cwd" && pwd -P)
+until jq -e --arg d "$trusted" '.projects[$d].hasTrustDialogAccepted == true' "$config" >/dev/null 2>&1; do
+  [ "$trusted" != / ] ||
+    die "Claude Code does not trust $folder. A person decides what a folder may run, so open it in Claude Code once and answer its trust dialog, then sign the seat on again."
+  trusted=$(dirname "$trusted")
+done
 
 # An empty BOATYARD_COMPACT_THRESHOLD opts the seat in to the plugin's
 # compaction mod at the plugin's own threshold.
