@@ -107,11 +107,6 @@ EOF
   printf '%s\n' "$work/$1/seat"
 }
 
-trusts() { # <dir>
-  jq -e --arg d "$(cd "$1" && pwd -P)" '.projects[$d].hasTrustDialogAccepted == true' \
-    "${CLAUDE_CONFIG_DIR:-$HOME}/.claude.json" >/dev/null 2>&1 && echo true || echo false
-}
-
 recorded() { # <name> <variable>
   eventually test -f "$work/$1/env"
   sed -n "s/^$2=//p" "$work/$1/env"
@@ -121,6 +116,10 @@ export SIGN_ON_START_TIMEOUT=30
 # The host running these tests may be short of memory, so only the tests of
 # the memory floor set one.
 export SIGN_ON_MIN_MEMORY=0
+# A person has trusted the folder that holds every test's project, as they
+# would have opened a project before signing a seat on there.
+config=${CLAUDE_CONFIG_DIR:-$HOME}/.claude.json
+jq -n --arg d "$(cd "$work" && pwd -P)" '.projects[$d].hasTrustDialogAccepted = true' >"$config"
 mkdir -p "$work/project" "$work/extra"
 prompt="/boatyard:worker #project/effort-bead, then read this project's \"brief\" \$HOME \`id\` &"
 
@@ -261,43 +260,24 @@ SIGN_ON_CLAUDE=$(seat sub rest 0) \
   sign-on --as independent --cwd "$work/repo/sub" "$prompt" >/dev/null 2>"$work/sub.err"
 check "a directory inside the main checkout stays as given" "$work/repo/sub" "$(cat "$work/sub/pwd")"
 check "and sign-on says nothing of it" "" "$(cat "$work/sub.err")"
-check "a folder in a repository is trusted at the repository's top" true "$(trusts "$work/repo")"
 
-echo "# a folder Claude Code has never trusted"
+echo "# a folder Claude Code does not trust"
 
-config=${CLAUDE_CONFIG_DIR:-$HOME}/.claude.json
-jq '.theme = "a-theme"' "$config" >"$work/config" && cp "$work/config" "$config"
-mkdir -p "$work/untrusted"
-id=$(SIGN_ON_CLAUDE=$(seat untrusted rest 2) SIGN_ON_GATE=$gate \
-  sign-on --as independent --cwd "$work/untrusted" "$prompt" 2>"$work/untrusted.err")
-check "a seat launched into an untrusted folder gets past its gate" 0 "$?"
-check "and sign-on says on stderr that it trusts the folder" true \
-  "$(contains "$(cat "$work/untrusted.err")" "trusts $work/untrusted")"
-check "and reaches its prompt" true "$(contains "$(berth read "$id")" "────────")"
-check "Claude Code's config trusts the folder" true "$(trusts "$work/untrusted")"
-check "and keeps the rest of the config" a-theme "$(jq -r .theme "$config")"
-check "sign-on leaves Claude Code's config lock free" false "$(test -e "$config.lock" && echo true || echo false)"
-
-inode=$(stat -c %i "$config")
-SIGN_ON_CLAUDE=$(seat trusted rest 0) sign-on --as independent --cwd "$work/untrusted" "$prompt" \
-  >/dev/null 2>"$work/trusted.err"
-check "a folder already trusted leaves the config as it was" "$inode" "$(stat -c %i "$config")"
-check "and sign-on says nothing of it" "" "$(cat "$work/trusted.err")"
-
-mkdir -p "$work/held" "$config.lock"
-SIGN_ON_CLAUDE=$(seat held rest 0) sign-on --as independent --cwd "$work/held" "$prompt" >/dev/null &
-waiter=$!
-sleep 1
-check "while Claude Code holds its config lock, sign-on waits" false "$(trusts "$work/held")"
-rmdir "$config.lock"
-wait "$waiter"
-check "and records the trust once the lock is free" true "$(trusts "$work/held")"
-
-mkdir -p "$work/abandoned" "$config.lock"
-touch -d '1 minute ago' "$config.lock"
-SIGN_ON_CLAUDE=$(seat abandoned rest 0) sign-on --as independent --cwd "$work/abandoned" "$prompt" >/dev/null
-check "a lock left behind by a Claude Code that died is taken over" true "$(trusts "$work/abandoned")"
-check "and freed" false "$(test -e "$config.lock" && echo true || echo false)"
+# Outside the trusted folder that holds the other tests' projects.
+outside=$(mktemp -d)
+mkdir -p "$outside/untrusted" "$outside/declined"
+jq --arg d "$(cd "$outside/declined" && pwd -P)" '.projects[$d].hasTrustDialogAccepted = false' \
+  "$config" >"$work/config" && cp "$work/config" "$config"
+for folder in untrusted declined; do
+  err=$(SIGN_ON_CLAUDE=$(seat "$folder" rest 0) \
+    sign-on --as independent --cwd "$outside/$folder" "$prompt" 2>&1 >/dev/null)
+  check "a launch into the $folder folder fails" 1 "$?"
+  check "and sign-on names the folder" true "$(contains "$err" "$outside/$folder")"
+  check "and says a person opens it in Claude Code" true "$(contains "$err" "open it in Claude Code")"
+  check "and no berth opens for it" false "$(test -f "$work/$folder/args" && echo true || echo false)"
+done
+check "sign-on leaves Claude Code's config as it was" "$(cat "$work/config")" "$(cat "$config")"
+rm -rf "$outside"
 
 echo "# a screen that is not the gate"
 
@@ -354,18 +334,6 @@ fails "a gate that does not clear" "$gate" \
 fails "a seat beside a caller in no pane" pane \
   SIGN_ON_CLAUDE="$(seat nowhere rest 0)" sign-on --as independent --beside --cwd "$work/project" "$prompt"
 check "and no berth opens for it" false "$(test -f "$work/nowhere/args" && echo true || echo false)"
-
-mkdir -p "$work/home"
-fails_to_trust() { # <what> <folder> <environment>...
-  local what=$1 folder=$2
-  shift 2
-  fails "$what" "more than one project" \
-    env "$@" SIGN_ON_CLAUDE="$(seat broad rest 0)" sign-on --as independent --cwd "$folder" "$prompt"
-}
-fails_to_trust "the home folder" "$work/home" HOME="$work/home" CLAUDE_CONFIG_DIR="$work/home"
-check "and the config does not trust it" false "$(trusts "$work/home")"
-fails_to_trust "the root" / HOME="$work/home" CLAUDE_CONFIG_DIR="$work/home"
-check "and no berth opens for either" false "$(test -f "$work/broad/args" && echo true || echo false)"
 
 fails "a launch on a host short of memory" memory \
   SIGN_ON_CLAUDE="$(seat cramped rest 0)" SIGN_ON_MIN_MEMORY=1000000 \
