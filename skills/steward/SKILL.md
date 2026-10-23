@@ -149,6 +149,8 @@ A seat that muster has just handed the effort to breaks it too, because it may h
    2. **Otherwise an open `gh:pr` gate or an open outcome step of a delivery molecule means the bead is in delivery**, as *A bead closes on merge* and *A bead delivered by a formula* say. No seat is on the bead itself, so never relay to it and never start a worker on it. Poll its pull request, or read its molecule, whose steps show any seat still working it.
 
    The beads in delivery are the `delivery` lines of step 4, each with its pull request and its gate. Under a delivery formula, the line names the work bead that waits on its molecule's outcome step.
+
+   Then close the berths you started that are no longer on open work, as *Watching the berths you started* says. A berth whose bead no longer names it appears in none of the lists above.
 7. **Match your watches to the effort's waits.** Every open question bead a sleeping worker depends on, every foreign dependency that holds a bead in push-gate state 6, and every bead in delivery gets a beady-eye `watch`. The bead in delivery to watch is the work bead: under a delivery formula, the bead that waits on the outcome step, and otherwise the bead behind its own `gh:pr` gate. It goes ready once that step or gate closes. Name the project for a foreign bead. Compare beady-eye's `watching` list against those waits. Watch what is missing, which after a fresh start is all of them, and `unwatch` what no longer holds anything up.
 8. **Read the topics.** Read the decisions topic and each active worker's working topic: who is mid-flight, who is blocked, and what has been asked of the human. After a compaction you are still subscribed to every topic an earlier you created. The only subscription you might still owe is to a topic someone else created.
 
@@ -379,7 +381,21 @@ Starting workers is a **loop**, not a kickoff. Start one at each ready bead, and
   `<worker>` is the dead seat's own name, the sender of its posts in its working topic. `bd unclaim` releases only an `in_progress` bead, and leaves it `open`. Where another seat now holds the bead, it changes nothing and names the holder, so leave that claim alone.
 
   Only a bead in your own tracker is yours to clear. For a seat born in another project, post the bead and its berth in that project's channel.
-- **Reclaim a berth that did not close itself.** On the success path a finished worker posts its sign-off, reacts `wave` to its brief, and closes its own berth. A worker that crashed first leaves its berth open. If a berth is still open after its worker waved, or `berth state` reads it `at-rest` long after the worker went dark without waving, close it with `berth close <id>` and clear its bead as the bullet above says. **Never close the berth of a sleeping worker.** *Reconstruct* step 6 says how to tell one. That worker is asleep on purpose, waiting for you to wake it. The exception is a worker you have confirmed dark: you relayed, and it never acknowledged by its checkpoint. Close its berth and hand its bead back as *Reconstruct* says for a seat that died.
+- **Clean up the berths you started at every wake.** On the success path a finished worker posts its sign-off, reacts `wave` to its brief, and closes its own berth. A worker that stops short of that leaves its berth open, and so does a seat that never took up its brief. The beads cannot find either berth, because its bead no longer names it or never did. So walk the berths themselves. Yours are the worker berths whose parent is your own berth:
+
+  ```bash
+  berth list | jq -r --arg me "$(berth id)" \
+    '.[] | select(.parent == $me and .relationship == "worker" and .state != "gone") | "\(.id) \(.state) \(.label)"'
+  ```
+
+  A berth's label is the bead its seat sits on. Read that bead with `bd show`, and close the berth with `berth close <id>` when either of these holds:
+
+  - **The bead is closed.**
+  - **The bead does not name the berth in `agent_pane`, and the berth reads `at-rest`.** The worker let the bead go and stopped, or the seat never claimed it. A seat moving to its next bead reads `working`, so it is left alone.
+
+  Then clear the bead as the bullet above says. A seat whose latest post in its working topic waits on you, such as for a missing brief or a refused claim, is asleep on you, so answer it instead. A label your tracker does not hold belongs to a seat born in another project, so leave that berth alone.
+
+  **Never close the berth of a sleeping worker.** Its bead still names its berth, so the clean-up never reaches it, and *Reconstruct* step 6 says how to tell one. That worker is asleep on purpose, waiting for you to wake it. The exception is a worker you have confirmed dark: you relayed, and it never acknowledged by its checkpoint. Close its berth and hand its bead back as *Reconstruct* says for a seat that died.
 - **The terminal is not a channel.** Relay answers by posting to the working topic, which is what a sleeping worker listens on. Read a worker's progress from its topic. Never type into its berth to coordinate, and use `berth read` only to diagnose a stalled worker. Coordination state that travels through a screen breaks the principle that makes seats restartable.
 - **Seats are a real cost.** Each worker draws on the account's usage limits. Start what the critical path needs, not a worker for every ready bead by reflex.
 
