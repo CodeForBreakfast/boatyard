@@ -46,18 +46,21 @@ The port knows only terminal mechanics. It knows nothing about Claude Code. The 
 
   An independent berth opens apart from its opener by default, in a place of its own. It may open **beside** its opener instead, so that a line of work started from a seat a person works in opens next to them. Or it may open in a **tab**, a view of its own near its opener, so that it sits with the opener's line of work without taking room from the opener's screen. A berth beside its opener or in a tab is still independent, so closing either one leaves the other.
 
-### Agent states
+### Berth and agent states
 
-A consumer needs only these four states:
+A berth's state says only whether its pane is there. It is `open`, or `gone` once the pane no longer exists. A berth does not stand in for its agent, so a berth running a bead viewer, or one whose agent has exited to its shell, is `open`.
 
-| State | Meaning |
+The agent in a berth has a state of its own, and a consumer needs only these three:
+
+| Agent state | Meaning |
 |---|---|
 | `active` | A turn is in flight. |
 | `at-rest` | The agent is at its prompt. This includes an agent parked while background work runs, and one whose last turn errored. |
 | `blocked` | The agent is waiting on a human, for example at a permission prompt. |
-| `gone` | No agent is in the berth, or the berth no longer exists. |
 
-Each adapter maps its backend's states onto these four and corrects its backend's known mistakes. For example, herdr reports a pane parked on background work as working. The herdr adapter detects that case from herdr's rule-evaluation trace and reports `at-rest`.
+A berth with no agent in it, open or gone, has no agent state.
+
+Each adapter maps its backend's agent states onto these three and corrects its backend's known mistakes. For example, herdr reports a pane parked on background work as working. The herdr adapter detects that case from herdr's rule-evaluation trace and reports `at-rest`.
 
 ### Verbs
 
@@ -69,12 +72,13 @@ Each adapter maps its backend's states onto these four and corrects its backend'
 | `berth id` | Prints the calling berth's id. A caller that is not a berth gets the id of the pane it runs in, which stands in for it as it does for every other verb. |
 | `berth open --as independent\|worker\|tender --cwd <dir> [--label <text>] [--beside \| --tab] [--focus] -- <command>` | Opens a berth and prints its id. With `--beside`, an independent berth opens beside its opener rather than apart. With `--tab`, it opens in a tab near its opener. With `--focus`, the person watching the yard lands on the new berth. Without it, their focus stays where it was. A labelled tender opens once in a line of work: where its opener's line of work already holds a tender with that label, `open` makes the opener its parent and prints its id, and runs no command. |
 | `berth name [<id>] <label>` | Labels a berth. On an independent berth that opened apart or in a tab, the label also names whatever the adapter groups under it. |
-| `berth list [<yard>]` | Prints the berths as JSON: id, label, relationship, parent, state and agent session. A berth's agent session is the id its agent goes by, such as a Claude Code session id. It is null for a berth whose state is `gone`, such as one running a bead viewer. |
+| `berth list [<yard>]` | Prints the berths as JSON: id, label, relationship, parent, state, agent state and agent session. A berth's agent session is the id its agent goes by, such as a Claude Code session id. The agent state and the agent session are both null for a berth with no agent in it, such as one running a bead viewer. |
 | `berth send-text [<id>] <text>` | Types text into a berth. |
 | `berth send-key [<id>] <key>` | Sends one key, such as `Enter`. |
 | `berth wait-text [<id>] <text> --timeout <s>` | Blocks until the text appears within one line on screen, or fails at the timeout. The text is literal, because each backend has its own regular expression dialect. |
 | `berth read [<id>]` | Prints the visible screen as plain text. |
-| `berth state [<id>]` | Prints one of the four states. |
+| `berth state [<id>]` | Prints `open` or `gone`. |
+| `berth agent-state [<id>]` | Prints the agent's state, or `none` for a berth with no agent in it. |
 | `berth close [<id>]` | Closes a berth. |
 
 A verb given no id acts on `BERTH_ID`, the calling berth. So a worker closes itself with a bare `berth close`.
@@ -99,7 +103,7 @@ Where a verb needs the caller, such as a worker's opener or the opener a berth o
 
 ### Errors
 
-- A berth that no longer exists reports state `gone` and exits 0. That is an answer, not a failure.
+- A berth that no longer exists reports state `gone`, and agent state `none`, and exits 0. That is an answer, not a failure.
 - If the backend is unreachable, or the adapter cannot do what was asked, `berth` exits non-zero with a message that names the adapter.
 - Nothing falls back silently.
 
@@ -108,9 +112,9 @@ Where a verb needs the caller, such as a worker's opener or the opener a berth o
 It is written first. Its obligations beyond straight mapping:
 
 - **Layout.** An independent berth becomes a workspace. One opened beside its opener splits the opener's pane instead, and shares its workspace. One opened in a tab becomes a new tab in the opener's workspace, and takes the berth's label. Naming an independent berth that opened apart names its workspace and the workspace's first tab, which holds the berth. Naming one that opened in a tab names its tab. Workers share a tab in their opener's workspace and split it until a split would leave a pane too short to work in, or too narrow for Claude Code's startup gate to fit on one line. Then they open another tab. A tender splits beside its opener, and a line of work is a workspace when `open` looks for a tender with the same label. The choice of split direction lives here.
-- **The parked-on-background-work correction** described under Agent states.
-- **The lost-agent correction.** Where a wrapper renames Claude Code's process, as Nix's does, herdr names it from its argv, and skips reading argv while the process waits on the disk, as under swap. Enough misses clear the agent, and herdr may not look again for minutes. The session reported at Claude Code's start-up survives, so a pane with no agent, a session, and a foreground process other than its shell reads `active`, not `gone`.
-- **The agent session.** A berth's agent session is the id that herdr reports as the pane's `agent_session`. herdr keeps that id after the agent leaves, so the adapter lists none for a berth that reads `gone`.
+- **The parked-on-background-work correction** described under Berth and agent states.
+- **The lost-agent correction.** Where a wrapper renames Claude Code's process, as Nix's does, herdr names it from its argv, and skips reading argv while the process waits on the disk, as under swap. Enough misses clear the agent, and herdr may not look again for minutes. The session reported at Claude Code's start-up survives, so a pane with no agent, a session, and a foreground process other than its shell has the agent state `active`, not none.
+- **The agent session.** A berth's agent session is the id that herdr reports as the pane's `agent_session`. herdr keeps that id after the agent leaves, so the adapter lists none for a berth with no agent state.
 - **The cascade.** herdr keeps a workspace's other panes when its first pane closes, so the adapter closes them itself. It closes a whole workspace only for the independent berth that opened it, and only while no other independent berth lives there. Any other berth closes its own pane.
 - **Waiting for the shell.** herdr starts every pane with a shell, so the adapter types the berth's command into it. It types only once the shell has settled alone in the foreground, because a child of the shell's start-up, such as a dev shell's hook, can read the terminal and swallow typed input.
 - **Screen source.** `wait-text` matches herdr's recent output, not only the visible frame. A pane shorter than the text it waits for never shows all of it at once.
@@ -131,7 +135,7 @@ It is written first. Its obligations beyond straight mapping:
 The host supplies the site-specific parts as configuration:
 
 - the Claude Code command, including any wrapper, environment setup and flags;
-- the startup gate's text, because the gate comes from the host's flags. With none configured, `sign-on` returns once the agent has shown, and the steward finds a gate nobody configured as a blocked berth;
+- the startup gate's text, because the gate comes from the host's flags. With none configured, `sign-on` returns once the agent has shown, and the steward finds a gate nobody configured as a blocked agent;
 - the MCP start-up timeout;
 - how long an agent may take to show its gate, or to show at all;
 - the memory the host must have available before a seat starts, 8 GiB by default.
@@ -185,10 +189,10 @@ Pull requests are GitHub's. The skills read, wait on and merge them with `gh` an
 
 ## Testing
 
-- **Port contract suite.** One suite states what every adapter must do: open in each relationship, list, name, send-text, send-key, wait-text, read, state across all four states, close, and the cascade when an independent berth closes. It runs against every adapter.
+- **Port contract suite.** One suite states what every adapter must do: open in each relationship, list, name, send-text, send-key, wait-text, read, state, agent state across all three agent states and none, close, and the cascade when an independent berth closes. It runs against every adapter.
   - For herdr, it runs a throwaway server with `HOME` redirected and every `HERDR_*` variable unset. An inherited `HERDR_SOCKET_PATH` would otherwise drive the live session. The server runs inside the nix build sandbox, so the suite is a flake check.
   - herdr treats a process named `claude` as an agent and reads its state from the screen. The suite drives the states with a stand-in process of that name, not with Claude Code.
-- **Unit tests.** The compaction mod's rule has its own tests, run by `claude plugin test` against a stand-in engine. So does each adapter's mapping from backend states to the four port states, including the herdr parked-on-background-work and lost-agent corrections.
+- **Unit tests.** The compaction mod's rule has its own tests, run by `claude plugin test` against a stand-in engine. So does each adapter's mapping from backend states to the port's agent states, including the herdr parked-on-background-work and lost-agent corrections.
 - **End to end.** One real effort runs on `steward` and `worker`.
 
 ## Open decisions

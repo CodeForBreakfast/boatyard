@@ -28,7 +28,7 @@ check() { # <what> <want> <got>
 settles() { # <what> <id> <want>
   local got _
   for _ in $(seq 1 100); do
-    got=$(berth state "$2")
+    got=$(berth agent-state "$2")
     [ "$got" = "$3" ] && break
     sleep 0.1
   done
@@ -51,7 +51,7 @@ viewer=$(berth open --as independent --cwd "$work" -- sleep 600)
 check "a berth with no agent is listed with no agent session" null "$(agent_session "$viewer")"
 
 berth send-key "$agent" Enter
-settles "a berth whose agent has left" "$agent" gone
+settles "a berth whose agent has left" "$agent" none
 check "a berth whose agent has left is listed with no agent session" null "$(agent_session "$agent")"
 
 berth close "$agent"

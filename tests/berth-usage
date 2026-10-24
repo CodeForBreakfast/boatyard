@@ -61,7 +61,7 @@ berth=(bash "$work/berth")
 
 prints_usage "berth --help" "${berth[@]}" --help
 prints_usage "berth -h" "${berth[@]}" -h
-for verb in serve stop yard id open name list send-text send-key wait-text read state close; do
+for verb in serve stop yard id open name list send-text send-key wait-text read state agent-state close; do
   prints_usage "berth $verb --help" "${berth[@]}" "$verb" --help
   prints_usage "berth $verb -h" "${berth[@]}" "$verb" -h
 done

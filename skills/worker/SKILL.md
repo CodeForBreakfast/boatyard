@@ -107,7 +107,7 @@ Permission is the one thing you ever need from the human in your berth. When you
 2. **Post the ask to your working topic:** the exact command, why the work needs it, and how to reach your berth. The steward takes it to the human.
 3. **Sleep.** The human types their approval into your berth and names the action, such as "go ahead and copy the key". A bare "I approve" does not clear it. Or they run the command there themselves, which always works, and tell you to carry on. Run the command if they approved it, or check its result if they ran it, and continue.
 
-When a command stops at an approval prompt instead, you cannot post. Stay at the prompt. `berth state` reads `blocked`, and the steward sends the human to it.
+When a command stops at an approval prompt instead, you cannot post. Stay at the prompt. `berth agent-state` reads `blocked`, and the steward sends the human to it.
 
 ## Stay in lane
 
