@@ -88,7 +88,7 @@ check "a tender's parent is its opener" "$independent" "$(field "$tender" parent
 check "a tender's command learns its own BERTH_ID" "$tender" "$(recorded "$work/tender" BERTH_ID)"
 
 check "every id is distinct" 4 "$(printf '%s\n' "$independent" "$worker" "$second_worker" "$tender" | sort -u | wc -l)"
-check "the list is JSON with the port's fields" true "$(berth list | jq 'all(.[]; keys == ["id", "label", "parent", "relationship", "state"])')"
+check "the list is JSON with the port's fields" true "$(berth list | jq 'all(.[]; keys == ["agent_session", "id", "label", "parent", "relationship", "state"])')"
 
 echo "# yard"
 
@@ -211,6 +211,7 @@ berth close "$agent"
 
 shell=$(berth open --as independent --cwd "$work" -- sleep 600)
 settles "a berth running something other than an agent" "$shell" gone
+check "a berth running something other than an agent holds no agent session" null "$(field "$shell" agent_session)"
 berth close "$shell"
 
 echo "# close"

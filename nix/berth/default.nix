@@ -18,6 +18,7 @@ in
     berth-contract-herdr = herdrSuite "berth-contract";
     berth-herdr-layout = herdrSuite "herdr-layout";
     berth-herdr-lost-agent = herdrSuite "herdr-lost-agent";
+    berth-herdr-session = herdrSuite "herdr-session";
     berth-herdr-caller = herdrSuite "herdr-caller";
     berth-herdr-shell-start = herdrSuite "herdr-shell-start";
     berth-herdr-binary = herdrSuite "herdr-binary";
@@ -39,7 +40,7 @@ in
       shellcheck ${../../bin/berth} ${../../bin/berth-herdr} ${../../bin/berth-herdr-state} \
         ${../../tests/with-herdr-yard} ${../../tests/berth-contract} ${../../tests/herdr-layout} \
         ${../../tests/herdr-state} ${../../tests/herdr-lost-agent} ${../../tests/herdr-caller} \
-        ${../../tests/herdr-shell-start} ${../../tests/herdr-binary} \
+        ${../../tests/herdr-shell-start} ${../../tests/herdr-binary} ${../../tests/herdr-session} \
         ${../../tests/berth-usage}
       touch $out
     '';
