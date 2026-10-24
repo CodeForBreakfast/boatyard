@@ -116,10 +116,10 @@ annotate() { # <pane> <jq filter over $answer> <call>...
   jq -c --argjson answer "$answer" "$filter" <<<"$pane"
 }
 
-# Prints the port state of a pane herdr has described. herdr's rule trace
+# Prints the agent state of a pane herdr has described. herdr's rule trace
 # goes with a working agent, and the pane's processes with an agent herdr has
 # lost, because that is where herdr's mistakes lie.
-pane_state() { # <pane>
+pane_agent_state() { # <pane>
   local pane=$1 id status=0
   id=$(jq -r .pane_id <<<"$pane")
   # shellcheck disable=SC2016 # jq expands $answer
@@ -132,7 +132,7 @@ pane_state() { # <pane>
   fi
   case $status in
     0) "$here/berth-herdr-state" <<<"$pane" ;;
-    3) echo gone ;;
+    3) echo none ;;
     *) exit "$status" ;;
   esac
 }
@@ -336,28 +336,40 @@ list() {
   panes=$(herdr_result pane list)
   berths=$(jq -c '[.panes[] | select(.tokens.berth_relationship)]' <<<"$panes")
   for id in $(jq -r '.[].pane_id' <<<"$berths"); do
-    state=$(pane_state "$(jq -c --arg id "$id" '.[] | select(.pane_id == $id)' <<<"$berths")")
+    state=$(pane_agent_state "$(jq -c --arg id "$id" '.[] | select(.pane_id == $id)' <<<"$berths")")
     states=$(jq -c --arg id "$id" --arg state "$state" '.[$id] = $state' <<<"$states")
   done
   # herdr keeps an agent's session once the agent has left.
   jq --argjson states "$states" '
-    [.[] | {
+    [.[] | ($states[.pane_id] | if . == "none" then null else . end) as $agent | {
       id: .pane_id,
       label: (.label // null),
       relationship: .tokens.berth_relationship,
       parent: (.tokens.berth_parent // null),
-      state: $states[.pane_id],
-      agent_session: (if $states[.pane_id] == "gone" then null else .agent_session.value? // null end)
+      state: "open",
+      agent_state: $agent,
+      agent_session: (if $agent == null then null else .agent_session.value? // null end)
     }]' <<<"$berths"
 }
 
 state() {
+  local id status=0
+  id=$(berth_id "$1")
+  pane_get "$id" >/dev/null || status=$?
+  case $status in
+    0) echo open ;;
+    3) echo gone ;;
+    *) exit "$status" ;;
+  esac
+}
+
+agent_state() {
   local id pane status=0
   id=$(berth_id "$1")
   pane=$(pane_get "$id") || status=$?
   case $status in
-    0) pane_state "$pane" ;;
-    3) echo gone ;;
+    0) pane_agent_state "$pane" ;;
+    3) echo none ;;
     *) exit "$status" ;;
   esac
 }
@@ -408,5 +420,6 @@ case "$verb" in
   send-key) send_key "$@" ;;
   wait-text) wait_text "$@" ;;
   read) read_screen "$@" ;;
+  agent-state) agent_state "$@" ;;
   *) die "berth passed an unknown verb, $verb." ;;
 esac

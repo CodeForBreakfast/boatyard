@@ -364,12 +364,12 @@ Starting workers is a **loop**, not a kickoff. Start one at each ready bead, and
 ### Watching the berths you started
 
 - **What ties a seat to its work** is the `agent_pane` and `agent_session` on the bead the seat sits on. That is the bead you briefed it on, or under a delivery formula the step of that bead's molecule it is working. `sign-on` labels the berth with the bead you brief, the worker names its berth after each bead it moves to, and you set neither yourself.
-- **`berth state <id>` reads `blocked` when a worker is waiting at a permission prompt.** Only the human can clear it, so take it to them as *A worker's permission goes to the human in your berth* says.
-- **A bead names a berth only while that berth is its seat.** A seat that dies before it finishes leaves its berth on its bead, and a berth id is reused once its berth closes. A stale `agent_pane` then joins the bead to whatever seat takes the id next. The berth is still the bead's seat only while `berth list` holds its id, labelled with the bead's id, in a state other than `gone`:
+- **`berth agent-state <id>` reads `blocked` when a worker is waiting at a permission prompt.** Only the human can clear it, so take it to them as *A worker's permission goes to the human in your berth* says.
+- **A bead names a berth only while that berth is its seat.** A seat that dies before it finishes leaves its berth on its bead, and a berth id is reused once its berth closes. A stale `agent_pane` then joins the bead to whatever seat takes the id next. The berth is still the bead's seat only while `berth list` holds its id, labelled with the bead's id, with an agent in it. A berth whose Claude Code has exited to its shell is still open, but it holds no agent, so its seat is dead:
 
   ```bash
   berth list | jq --arg id <berth> --arg bead <bead> \
-    'any(.[]; .id == $id and .label == $bead and .state != "gone")'
+    'any(.[]; .id == $id and .label == $bead and .agent_state != null)'
   ```
 
   When that prints `false`, and whenever you close a berth yourself, clear the bead in the same step. A bead left `in_progress` is also released from its dead seat's claim, because a claimed bead with no seat reads as a live worker and refuses every other seat's claim and close:
@@ -387,13 +387,14 @@ Starting workers is a **loop**, not a kickoff. Start one at each ready bead, and
 
   ```bash
   berth list | jq -r --arg me "$(berth id)" \
-    '.[] | select(.parent == $me and .relationship == "worker" and .state != "gone") | "\(.id) \(.state) \(.label)"'
+    '.[] | select(.parent == $me and .relationship == "worker") | "\(.id) \(.agent_state // "none") \(.label)"'
   ```
 
-  A berth's label is the bead its seat sits on. Read that bead with `bd show`, and close the berth with `berth close <id>` when either of these holds:
+  A berth's label is the bead its seat sits on. Read that bead with `bd show`, and close the berth with `berth close <id>` when any of these holds:
 
   - **The bead is closed.**
-  - **The bead does not name the berth in `agent_pane`, and the berth reads `at-rest`.** The worker let the bead go and stopped, or the seat never claimed it. A seat moving to its next bead reads `working`, so it is left alone.
+  - **The berth holds no agent.** Its Claude Code has exited to the shell, so the seat is dead whatever its bead says. `sign-on` returns only once the agent has shown, so a seat you started is never caught still starting.
+  - **The bead does not name the berth in `agent_pane`, and the berth's agent reads `at-rest`.** The worker let the bead go and stopped, or the seat never claimed it. A seat moving to its next bead reads `active`, so it is left alone.
 
   Then clear the bead as the bullet above says. A seat whose latest post in its working topic waits on you, such as for a missing brief or a refused claim, is asleep on you, so answer it instead. A label your tracker does not hold belongs to a seat born in another project, so leave that berth alone.
 
@@ -421,7 +422,7 @@ One topic per effort, `#<project>/<effort>-decisions`:
 
 ### A worker's permission goes to the human in your berth
 
-A permission is the one ask that does not go in the decisions topic. A worker that needs the human's approval for a command posts the command and how to reach its berth to its working topic. A worker stuck at an approval prompt reads `blocked` in `berth state` instead, and its berth id is the `agent_pane` on its bead.
+A permission is the one ask that does not go in the decisions topic. A worker that needs the human's approval for a command posts the command and how to reach its berth to its working topic. A worker stuck at an approval prompt reads `blocked` in `berth agent-state` instead, and its berth id is the `agent_pane` on its bead.
 
 Tell the human in your own berth: which worker, the command, why the work needs it, and how to reach the worker's berth. They approve in the worker's berth and name the action. Or they run the command there themselves, which always works, and tell the worker to carry on. An approval they give anywhere else never reaches the worker, because a permission classifier judges a command by the conversation of the seat that runs it. So don't relay an approval they give you, and don't file a question bead for it.
 

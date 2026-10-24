@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# The herdr adapter's mapping from herdr's agent states to the port's four,
-# with its corrections. See docs/design.md, "Agent states" and "Testing".
+# The herdr adapter's mapping from herdr's agent states to the port's agent
+# states, with its corrections. See docs/design.md, "Agent states" and "Testing".
 #
 # Run it with berth-herdr-state on the path.
 #
@@ -35,7 +35,7 @@ maps() { # <want> <what> <pane>
 
 echo "# straight mappings"
 
-maps gone "a pane with no agent" "$(pane "" unknown)"
+maps none "a pane with no agent" "$(pane "" unknown)"
 maps at-rest "an idle agent" "$(pane claude idle)"
 maps at-rest "an agent whose turn is done" "$(pane claude "done")"
 maps blocked "a blocked agent" "$(pane claude blocked)"
@@ -66,9 +66,9 @@ lost() { # <foreground process group> <shell pid>
 }
 
 maps active "a session whose process holds the foreground" "$(lost 200 100)"
-maps gone "a session whose shell is back in the foreground" "$(lost 100 100)"
-maps gone "a session with no foreground group" "$(lost null 100)"
-maps gone "a session with no process info" \
+maps none "a session whose shell is back in the foreground" "$(lost 100 100)"
+maps none "a session with no foreground group" "$(lost null 100)"
+maps none "a session with no process info" \
   "$(jq -c 'del(.process_info)' <<<"$(lost 200 100)")"
 
 echo "# what it does not know"

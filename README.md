@@ -8,7 +8,7 @@ boatyard is one developer's daily setup, published as it is. It supports one mul
 
 ## What is in it
 
-- **`berth`** is a small command for opening, naming, reading and closing terminal panes, and for asking whether the agent in one is busy, at rest, waiting on a person or gone. The skills only ever talk to the multiplexer through it, and herdr is its first backend.
+- **`berth`** is a small command for opening, naming, reading and closing terminal panes, for asking whether one is still open, and for asking whether the agent in one is busy, at rest or waiting on a person. The skills only ever talk to the multiplexer through it, and herdr is its first backend.
 - **`sign-on`** launches Claude Code in a new berth and gets it past Claude Code's startup prompt.
 - **The Claude Code plugin** carries four skills and the compaction mod:
   - `muster` turns a body of work into an effort a steward can drive.

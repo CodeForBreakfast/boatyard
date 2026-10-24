@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
-# berth-herdr-state: the port state of a herdr pane. It reads nothing but its
-# input, so it is tested without a yard. See docs/design.md, "Agent states".
+# berth-herdr-state: the port's agent state for a herdr pane. It reads nothing
+# but its input, so it is tested without a yard. See docs/design.md, "Agent
+# states".
 #
 # Reads a pane as `herdr pane get` describes one, with `evaluated_rules` from
 # `herdr agent explain --json` added when herdr says the agent is working, and
 # `process_info` from `herdr pane process-info` when herdr has no agent but
 # still holds an agent session.
-# Prints active, at-rest, blocked or gone.
+# Prints active, at-rest, blocked or none.
 #
 # Needs: bash, jq.
 set -euo pipefail
@@ -33,7 +34,7 @@ exec jq -r '
     and .process_info.foreground_process_group_id != null
     and .process_info.foreground_process_group_id != .process_info.shell_pid;
 
-  if .agent == null then (if lost then "active" else "gone" end)
+  if .agent == null then (if lost then "active" else "none" end)
   elif .agent_status == "idle" or .agent_status == "done" then "at-rest"
   elif .agent_status == "blocked" then "blocked"
   elif .agent_status == "working" then (if parked then "at-rest" else "active" end)

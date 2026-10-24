@@ -182,11 +182,11 @@ if [ -n "$gate" ]; then
   done
 else
   # A backend may read a starting agent as active before it has read the
-  # screen, so the first state after gone cannot tell a gate from a turn.
-  # Once the agent has shown, a gate nobody configured is the watching
-  # steward's to find, as a blocked berth.
+  # screen, so the first agent state after none cannot tell a gate from a
+  # turn. Once the agent has shown, a gate nobody configured is the watching
+  # steward's to find, as a blocked agent.
   deadline=$((SECONDS + start_timeout))
-  until [ "$(berth state "$id")" != gone ]; do
+  until [ "$(berth agent-state "$id")" != none ]; do
     [ "$SECONDS" -lt "$deadline" ] || stuck "still has no agent after ${start_timeout}s"
     sleep 1
   done

@@ -17,6 +17,7 @@
 #   wait-text <id> <text> <seconds>
 #   read <id>
 #   state <id>
+#   agent-state <id>
 #   close <id>
 #
 # serve execs the backend, so that a service manager supervises the real
@@ -48,6 +49,7 @@ usage: berth serve <yard>
        berth wait-text [<id>] <text> --timeout <seconds>
        berth read [<id>]
        berth state [<id>]
+       berth agent-state [<id>]
        berth close [<id>]
 EOF
 }
@@ -136,7 +138,7 @@ case "$verb" in
     [ $# -le 1 ] || usage
     exec "$adapter" list "${1:-}"
     ;;
-  read | state | close)
+  read | state | agent-state | close)
     case $# in
       0) exec "$adapter" "$verb" "${BERTH_ID:-}" ;;
       1) exec "$adapter" "$verb" "$1" ;;

@@ -88,7 +88,7 @@ check "a tender's parent is its opener" "$independent" "$(field "$tender" parent
 check "a tender's command learns its own BERTH_ID" "$tender" "$(recorded "$work/tender" BERTH_ID)"
 
 check "every id is distinct" 4 "$(printf '%s\n' "$independent" "$worker" "$second_worker" "$tender" | sort -u | wc -l)"
-check "the list is JSON with the port's fields" true "$(berth list | jq 'all(.[]; keys == ["agent_session", "id", "label", "parent", "relationship", "state"])')"
+check "the list is JSON with the port's fields" true "$(berth list | jq 'all(.[]; keys == ["agent_session", "agent_state", "id", "label", "parent", "relationship", "state"])')"
 
 echo "# yard"
 
@@ -178,17 +178,22 @@ while :; do
 done
 EOF
 
-# A backend may take a few seconds to read a screen, so a state is awaited
-# rather than read once.
+# A backend may take a few seconds to read a screen, so an agent state is
+# awaited rather than read once. The list holds null where agent-state
+# prints none.
 settles() { # <what> <id> <want>
-  local got _
+  local got listed _
   for _ in $(seq 1 200); do
-    got=$(berth state "$2")
+    got=$(berth agent-state "$2")
     [ "$got" = "$3" ] && break
     sleep 0.1
   done
+  listed=$3
+  [ "$listed" != none ] || listed=null
   check "$1 reads $3" "$3" "$got"
-  check "$1 is listed as $3" "$3" "$(field "$2" state)"
+  check "$1 is listed as $3" "$listed" "$(field "$2" agent_state)"
+  check "$1 is open" open "$(berth state "$2")"
+  check "$1 is listed as open" open "$(field "$2" state)"
 }
 
 shows() { # <id> <screen>
@@ -204,13 +209,15 @@ shows "$agent" parked
 settles "an agent parked while background work runs" "$agent" at-rest
 shows "$agent" permission
 settles "an agent at a permission prompt" "$agent" blocked
-check "state with no id reads the calling berth" blocked "$(BERTH_ID=$agent berth state)"
+check "agent-state with no id reads the calling berth" blocked "$(BERTH_ID=$agent berth agent-state)"
+check "state with no id reads the calling berth" open "$(BERTH_ID=$agent berth state)"
 shows "$agent" leave
-settles "a berth whose agent has left" "$agent" gone
+settles "a berth whose agent has left for its shell" "$agent" none
+check "a berth whose agent has left holds no agent session" null "$(field "$agent" agent_session)"
 berth close "$agent"
 
 shell=$(berth open --as independent --cwd "$work" -- sleep 600)
-settles "a berth running something other than an agent" "$shell" gone
+settles "a berth running something other than an agent" "$shell" none
 check "a berth running something other than an agent holds no agent session" null "$(field "$shell" agent_session)"
 berth close "$shell"
 
@@ -219,6 +226,7 @@ echo "# close"
 berth close "$second_worker"
 check "a closed berth is not listed" false "$(listed "$second_worker")"
 check "a closed berth reports gone" gone "$(berth state "$second_worker")"
+check "a closed berth holds no agent" none "$(berth agent-state "$second_worker")"
 check "closing a worker leaves its opener" true "$(listed "$independent")"
 check "closing a worker leaves its sibling" true "$(listed "$worker")"
 berth close "$second_worker"
@@ -341,6 +349,8 @@ refused "open needs a relationship it knows" berth open --as stranger --cwd "$wo
 refused "open needs a command" berth open --as independent --cwd "$work"
 state=$(berth state "$independent")
 check "state on a gone berth answers and exits 0" "gone 0" "$state $?"
+state=$(berth agent-state "$independent")
+check "agent-state on a gone berth answers and exits 0" "none 0" "$state $?"
 
 err=$(env BERTH_YARD=no-such-yard berth list 2>&1 >/dev/null) && status=0 || status=$?
 check "an unreachable yard fails" 1 "$([ "$status" != 0 ] && echo 1 || echo 0)"
