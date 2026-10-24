@@ -37,7 +37,7 @@ If the brief is incomplete or contradicts the bead, don't guess. Post the discre
 Two beads matter to you, and without a delivery formula they are the same bead:
 
 - **Your bead** is the one your brief names. It is your system of record, so your notes go on it. It is either one bead, or a parent whose small beads you work together.
-- **The bead you sit on** carries your seat: your berth in `agent_pane`, your topic in `working_topic`, and the status that says the work is moving. It is the lowest bead that covers everything you are working. Without a delivery formula, that is your bead. Under one, it is the step of the formula you are working.
+- **The bead you sit on** carries your seat: your berth in `agent_pane`, your Claude Code session in `agent_session`, your topic in `working_topic`, and the status that says the work is moving. It is the lowest bead that covers everything you are working. Without a delivery formula, that is your bead. Under one, it is the step of the formula you are working.
 
 As soon as you have oriented:
 
@@ -49,7 +49,8 @@ As soon as you have oriented:
    ```bash
    bd update <bead> --claim
    bd update <bead> --set-metadata working_topic=<channel>/<topic> \
-                    --set-metadata agent_pane="$BERTH_ID"
+                    --set-metadata agent_pane="$BERTH_ID" \
+                    --set-metadata agent_session="$CLAUDE_CODE_SESSION_ID"
    berth name <bead>
    ```
 
@@ -57,7 +58,7 @@ As soon as you have oriented:
 
    Your topic is not always the one a steward would guess. A rework seat gets `-r2` or `-r3`, and a replacement steward can learn your topic only from the bead. Without it, the steward relays into the wrong topic and you sleep through an answer that was sent.
 
-   `agent_pane` is how a bead viewer draws your berth against the bead you sit on, and your berth's label is how the steward checks that the berth is still that bead's seat. **Keep the three together:** when you move to another bead, clear both keys from the bead you leave, claim the next as above, and name your berth after it. **Clear the keys and release your claim whenever you let a bead go**, as *Deliver* and *Finish* say. Your berth id can be reused for another seat, and a bead still naming it then blanks the agent on both beads. A bead still assigned to you refuses every other seat's claim and close, even after you close it, because a reopened bead keeps its assignee. So release a bead before you close it too:
+   `agent_pane` and `agent_session` are how a bead viewer draws your seat against the bead you sit on, and your berth's label is how the steward checks that the berth is still that bead's seat. **Keep them together:** when you move to another bead, clear every key from the bead you leave, claim the next as above, and name your berth after it. **Clear the keys and release your claim whenever you let a bead go**, as *Deliver* and *Finish* say. Your berth id can be reused for another seat, and a bead still naming it then blanks the agent on both beads. **A `/clear` starts a new session.** If you keep the bead you sit on after one, write your new `agent_session` on it, or the viewer loses you. A bead still assigned to you refuses every other seat's claim and close, even after you close it, because a reopened bead keeps its assignee. So release a bead before you close it too:
 
    ```bash
    bd unclaim <bead>
@@ -148,7 +149,8 @@ The first line names the default. A line with `for` names the formula for one ki
 2. **Work the steps in order, and sit on each one that is yours while you work it.** `bd mol current <molecule>` shows which steps are done and which are ready. A step's title states the outcome it reaches, and its description says who acts. Read the description with `bd show <step>`. A step whose description names the seat or the delivering seat is yours, merges included. Claim each as *Claim* says before you start it. When it is done, let it go and close it:
 
    ```bash
-   bd update <step> --unset-metadata agent_pane --unset-metadata working_topic
+   bd update <step> --unset-metadata agent_pane --unset-metadata agent_session \
+                    --unset-metadata working_topic
    bd unclaim <step>
    bd close <step>
    ```
@@ -170,7 +172,8 @@ If that push is rejected because the branch is protected, the repo's statement w
    If your bead turns out to need code from a bead whose pull request has not merged, that is a missing dependency. Post it to the working topic and block and sleep, watching the bead you need. It closes when its pull request merges, and that wakes you. The steward wires the dependency, or stands you down instead. If you are stood down, record where you got to on your bead, hand back the bead you sit on, and close your seat as *Finish* describes, without claiming the deliverable is done:
 
    ```bash
-   bd update <bead> --unset-metadata working_topic --unset-metadata agent_pane
+   bd update <bead> --unset-metadata working_topic --unset-metadata agent_pane \
+                    --unset-metadata agent_session
    bd unclaim <bead>
    ```
 
@@ -198,7 +201,8 @@ When the deliverable meets the brief's definition of done, wind the seat down in
 1. **Let go of the bead you sit on, and bring your bead up to date.** Clear every key that says a seat is on the bead you sit on, if you still sit on one, and release your claim on it:
 
    ```bash
-   bd update <bead> --unset-metadata agent_pane --unset-metadata working_topic
+   bd update <bead> --unset-metadata agent_pane --unset-metadata agent_session \
+                    --unset-metadata working_topic
    bd unclaim <bead>
    ```
 

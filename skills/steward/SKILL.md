@@ -63,10 +63,11 @@ A seat that muster has just handed the effort to breaks it too, because it may h
      ```bash
      bd reclaim --id <top-bead> --older-than 0s
      bd update <top-bead> --claim
-     bd update <top-bead> --set-metadata agent_pane="$(berth id)"
+     bd update <top-bead> --set-metadata agent_pane="$(berth id)" \
+                          --set-metadata agent_session="$CLAUDE_CODE_SESSION_ID"
      ```
 
-     A steward that closed or died leaves a claim whose lease has lapsed, and `bd reclaim` hands that claim back so yours can take it. If the claim still refuses, another steward holds the effort live. Say so in the coordination topic and close your berth. A replacement steward overwrites the berth when it binds. **Release the claim and clear the berth when you finish.**
+     A steward that closed or died leaves a claim whose lease has lapsed, and `bd reclaim` hands that claim back so yours can take it. If the claim still refuses, another steward holds the effort live. Say so in the coordination topic and close your berth. A replacement steward overwrites the berth and session when it binds. A `/clear` starts a new session, so a steward that keeps the effort after one writes its new `agent_session` on the top bead. **Release the claim and clear the berth and session when you finish.**
    - **Keep one bead viewer for the effort beside you**, focused on the top bead and labelled with the effort:
 
      ```bash
@@ -128,7 +129,7 @@ A seat that muster has just handed the effort to breaks it too, because it may h
    - **`not-held` means no tracker holds the id.** First `bd show` the id. If your tracker holds it, the edge is sound and bdi could not draw it, so leave it. Otherwise the bead was deleted, mistyped or never filed. Point the edge at the bead the waiting bead's description says it waits for, where you can find it. Remove the edge where that work is done or dropped. Where you cannot tell what the edge was for, file a question bead.
    - **A gate that lacks its pull request never closes.** Give it what its bead's pull request says is missing, with `bd update <gate> --set-metadata repo=<owner>/<repo>` or `bd update <gate> --await-id <n>`.
    - **A cycle means a bead waits on one of its own forebears.** Remove the edge the plan contradicts, where the plan makes clear which edge that is, and file a question bead where it does not.
-   - **`stale-pane` means a closed bead still names a berth.** Clear it with `bd update <bead> --unset-metadata agent_pane`. `orphan-claim` and `stale-claim` mean a seat went dark, which *Every stall is yours to break* covers.
+   - **`stale-pane` means a closed bead still names a berth.** Clear it with `bd update <bead> --unset-metadata agent_pane --unset-metadata agent_session`. `orphan-claim` and `stale-claim` mean a seat went dark, which *Every stall is yours to break* covers.
    - **`held-by-unread` or a `tracker` line means a tracker gave bdi no answer.** The edge is not at fault. Read again next wake, and if the same tracker still fails, post in its project's channel.
    - **`not-read` means bdi read none of the projects that may hold the id.** Either their trackers failed, or bdi's config states none of their prefixes. The edge is not at fault. Read again next wake. If the line stays, raise the missing prefix with the human as an action, because the configuration bdi reads is theirs.
    - **`held-by-several` means two projects share the id's prefix.** The fix is in the configuration bdi reads, not in the graph, so raise it with the human as an action.
@@ -362,7 +363,7 @@ Starting workers is a **loop**, not a kickoff. Start one at each ready bead, and
 
 ### Watching the berths you started
 
-- **What ties a seat to its work** is the `agent_pane` on the bead the seat sits on. That is the bead you briefed it on, or under a delivery formula the step of that bead's molecule it is working. `sign-on` labels the berth with the bead you brief, the worker names its berth after each bead it moves to, and you set neither yourself.
+- **What ties a seat to its work** is the `agent_pane` and `agent_session` on the bead the seat sits on. That is the bead you briefed it on, or under a delivery formula the step of that bead's molecule it is working. `sign-on` labels the berth with the bead you brief, the worker names its berth after each bead it moves to, and you set neither yourself.
 - **`berth state <id>` reads `blocked` when a worker is waiting at a permission prompt.** Only the human can clear it, so take it to them as *A worker's permission goes to the human in your berth* says.
 - **A bead names a berth only while that berth is its seat.** A seat that dies before it finishes leaves its berth on its bead, and a berth id is reused once its berth closes. A stale `agent_pane` then joins the bead to whatever seat takes the id next. The berth is still the bead's seat only while `berth list` holds its id, labelled with the bead's id, in a state other than `gone`:
 
@@ -374,7 +375,8 @@ Starting workers is a **loop**, not a kickoff. Start one at each ready bead, and
   When that prints `false`, and whenever you close a berth yourself, clear the bead in the same step. A bead left `in_progress` is also released from its dead seat's claim, because a claimed bead with no seat reads as a live worker and refuses every other seat's claim and close:
 
   ```bash
-  bd update <bead> --unset-metadata agent_pane --unset-metadata working_topic
+  bd update <bead> --unset-metadata agent_pane --unset-metadata agent_session \
+                 --unset-metadata working_topic
   bd unclaim <bead> --if-assignee "<worker>"    # only a bead left in_progress
   ```
 
@@ -511,7 +513,7 @@ When the top bead has closed:
 1. Post a short wrap-up to the coordination topic.
 2. Make sure every effort bead reflects reality.
 3. Strike your line in `#<project>/boatyard` with `✓`.
-4. Clear your berth from the top bead with `bd update <top-bead> --unset-metadata agent_pane`, if it still names you. `unwatch` every bead that beady-eye's `watching` still lists.
+4. Clear your berth and session from the top bead with `bd update <top-bead> --unset-metadata agent_pane --unset-metadata agent_session`, if it still names you. `unwatch` every bead that beady-eye's `watching` still lists.
 5. Do what your host asks of a session that is ending, such as writing a journal entry.
 6. Close your berth with a bare `berth close`, as your last act. Closing it also closes every berth you opened: the bead viewer, and any worker still open. So close only when no worker is asleep on an answer. Between events, sleep with your berth open, just as a worker does.
 
