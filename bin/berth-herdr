@@ -339,13 +339,15 @@ list() {
     state=$(pane_state "$(jq -c --arg id "$id" '.[] | select(.pane_id == $id)' <<<"$berths")")
     states=$(jq -c --arg id "$id" --arg state "$state" '.[$id] = $state' <<<"$states")
   done
+  # herdr keeps an agent's session once the agent has left.
   jq --argjson states "$states" '
     [.[] | {
       id: .pane_id,
       label: (.label // null),
       relationship: .tokens.berth_relationship,
       parent: (.tokens.berth_parent // null),
-      state: $states[.pane_id]
+      state: $states[.pane_id],
+      agent_session: (if $states[.pane_id] == "gone" then null else .agent_session.value? // null end)
     }]' <<<"$berths"
 }
 

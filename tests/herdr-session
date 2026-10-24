@@ -1,0 +1,65 @@
+#!/usr/bin/env bash
+# The herdr adapter lists the agent session each berth holds. See
+# docs/design.md, "The herdr adapter".
+#
+# herdr treats a process named claude as an agent, so a copy of bash of that
+# name stands in for Claude Code, and reports the session that Claude Code's
+# start-up would.
+#
+# Run it under with-herdr-yard.
+#
+# Needs: bash, coreutils, herdr, jq, berth.
+set -uo pipefail
+
+work=$(mktemp -d)
+failures=0
+
+check() { # <what> <want> <got>
+  if [ "$2" = "$3" ]; then
+    echo "ok: $1"
+  else
+    echo "FAIL: $1: wanted '$2', got '$3'"
+    failures=$((failures + 1))
+  fi
+}
+
+# herdr takes a moment to see a new foreground process, so a state is
+# awaited rather than read once.
+settles() { # <what> <id> <want>
+  local got _
+  for _ in $(seq 1 100); do
+    got=$(berth state "$2")
+    [ "$got" = "$3" ] && break
+    sleep 0.1
+  done
+  check "$1 reads $3" "$3" "$got"
+}
+
+agent_session() { # <id>
+  berth list | jq -r --arg id "$1" '.[] | select(.id == $id) | .agent_session // "null"'
+}
+
+cp "$(command -v bash)" "$work/claude"
+agent=$(berth open --as independent --cwd "$work" -- "$work/claude" --norc --noprofile -c \
+  "printf '\e]0;✳ Claude\a\n────────\n❯ \n────────\n'; read -r")
+settles "an agent at its prompt" "$agent" at-rest
+herdr --session "$BERTH_YARD" pane report-agent-session "$agent" --source herdr:claude --agent claude \
+  --agent-session-id a-session >/dev/null
+check "an agent's berth is listed with its agent session" a-session "$(agent_session "$agent")"
+
+viewer=$(berth open --as independent --cwd "$work" -- sleep 600)
+check "a berth with no agent is listed with no agent session" null "$(agent_session "$viewer")"
+
+berth send-key "$agent" Enter
+settles "a berth whose agent has left" "$agent" gone
+check "a berth whose agent has left is listed with no agent session" null "$(agent_session "$agent")"
+
+berth close "$agent"
+berth close "$viewer"
+
+echo
+if [ "$failures" -gt 0 ]; then
+  echo "$failures failed."
+  exit 1
+fi
+echo "The herdr adapter lists the agent session each berth holds."

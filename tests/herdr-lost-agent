@@ -48,6 +48,8 @@ check "herdr has no agent in the pane" null \
 settles "a session whose process holds the foreground" "$lost" active
 check "it is listed as active" active \
   "$(berth list | jq -r --arg id "$lost" '.[] | select(.id == $id) | .state')"
+check "it is listed with its agent session" lost-session \
+  "$(berth list | jq -r --arg id "$lost" '.[] | select(.id == $id) | .agent_session')"
 
 herdr_yard pane send-keys "$lost" C-c >/dev/null
 settles "a session whose process has left" "$lost" gone
