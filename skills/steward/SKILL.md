@@ -159,7 +159,11 @@ You are now bound, reachable, and hold the whole state. Reconstruct from these r
 
 ## The push gate: never rest with unstaffed work
 
-The wake ritual tells you the state. The push gate is what you owe before you rest. Walk **every strand of work the top bead needs, in your project and in every other project the effort touches**, and confirm each is in exactly one of seven states:
+The wake ritual tells you the state. The push gate is what you owe before you rest.
+
+**First read the top bead's description against the graph.** Each piece of work it names, such as a switch, a deploy, a release, a check or a post, is a bead the top bead reaches through its dependencies, as the bar's rule for the top bead says. Work named only in prose is a strand the walk below never meets, so nobody staffs it. File each missing bead in the project that owns the work and wire it in, as *Track discovered work* says.
+
+Then walk **every strand of work the top bead needs, in your project and in every other project the effort touches**, and confirm each is in exactly one of seven states:
 
 1. **Done.** It has landed on the repo's default branch, which with pull requests means merged rather than opened, and its bead says so.
 2. **Staffed and live.** An accountable worker is on it and has reported recently, through a post, a commit or a bead update. Under a delivery formula the worker sits on a step of the bead's molecule, not on the bead. A worker that has gone dark is not this state, and neither is a bead handed to a channel nobody picked up.

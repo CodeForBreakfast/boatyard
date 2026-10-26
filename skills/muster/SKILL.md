@@ -92,9 +92,10 @@ Before you start the steward, confirm that the graph can be driven. All of these
   bdi --beads --brief <project>:<top-bead> | jq -r '.ready[] | "\(.project):\(.id) \(.labels | join(",")) \(.title)"'
   ```
 - Every bead, the graph and the top bead meet every rule in the bar.
+- Every piece of work the top bead's description names is a bead in the top bead's tree, as the bar's rule for the top bead says. Read the description against the tree bdi printed, and file and wire each bead that is missing.
 - Every foreign strand is confirmed in good shape by its home project, and wired into the graph as an edge on its home-project id.
 
-For a graph that is not trivial, give **one** throwaway subagent an adversarial review of it, and keep only its verdict. Its brief: read the bar at its full path, and hunt for every breach of it, missing blockers included, and for unwired foreign strands. Fix what it finds. This review is your own quality check, not a gate on the human. Where your seat may not start subagents, the review does not run, and the checks above remain the real bar.
+For a graph that is not trivial, give **one** throwaway subagent an adversarial review of it, and keep only its verdict. Its brief: read the bar at its full path, and hunt for every breach of it, missing blockers included, for unwired foreign strands, and for work the top bead names that no bead carries. Fix what it finds. This review is your own quality check, not a gate on the human. Where your seat may not start subagents, the review does not run, and the checks above remain the real bar.
 
 **When your seat will take the effort over itself, the review always runs, even on a trivial graph.** A fresh steward is what proves the graph can be driven cold, and a seat that has held the whole conversation is not fresh. So add one more line to the subagent's brief: rebuild the effort from the top bead alone, and report every fact the effort needs that the beads do not hold.
 
