@@ -8,7 +8,7 @@ argument-hint: <beads, a label or a query naming the work>
 
 You turn a body of work into an effort that one steward can drive cold and end to end, and then you hand it to that steward. The work is usually beads that already exist, and it may be spread across several projects.
 
-The steward consumes a wired, context-sized bead graph under one top bead and never builds one, and a worker never wires the graph, so building it is your job.
+The steward consumes a wired graph of outcome beads under one top bead and never builds one, and a worker never wires the graph, so building it is your job.
 
 Coordination runs over commy: see its `using-commy` skill for channels, topics and tone. The `steward` skill is what consumes your output, and the `worker` skill is the seat that does the work.
 
@@ -55,7 +55,7 @@ The top bead is the effort's cold-restart record, as the bar describes. It lives
 
 ## Audit local beads for size and briefability
 
-Hold each local bead to the bar for each bead. **Split** any bead too big for one worker's context, and say so as you split it so the human can interrupt, but don't wait for approval. Where a bead is thin on what a brief needs, flesh it out now.
+Hold each local bead to the bar for each bead. **Split** any bead that holds two outcomes, or that is too big for one worker's context, into beads that each hold one outcome. Say so as you split it so the human can interrupt, but don't wait for approval. Where a bead is thin on what a brief needs, flesh it out now.
 
 ## Shape other projects' slices over commy
 

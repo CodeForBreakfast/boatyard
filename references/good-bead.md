@@ -5,7 +5,7 @@ This is the bar every bead in an effort meets, together with the graph that wire
 ## Each bead
 
 - **A bead is an outcome that someone outside the change can observe, wired to the outcomes it needs.**
-- **One bead is one worker is one context.** A single worker could finish it without compacting.
+- **A bead is one outcome, however much or little work that is.** Its title names that outcome and never joins two with "and". A bead too big for one worker to finish without compacting is split, and each part is an outcome of its own. A bead is never bundled with another to fill a seat. How many beads one worker takes is the steward's staffing choice when it starts the seat.
 - **A bead is briefable.** It has a clear deliverable, a definition of done and stated edges, so the steward can write a complete brief from it when it starts the seat.
 - **A definition of done stated only as removals is incomplete.** Deleting the thing meets an all-negative outcome most completely, so a deletion that orphans behaviour passes every clause. On a cleanup or refactor bead, name what must still work after the removals: the behaviour that keeps running, and what still reaches it.
 
