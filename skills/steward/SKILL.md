@@ -199,13 +199,13 @@ You bloat, and force expensive compaction, by pulling detail of the work into yo
 
 ## One bead, one worker, one context
 
-Size the effort so a single worker can finish each bead without itself compacting. The bead graph is your plan for parallelism and for context: independent beads run in parallel, and a bead too big for one context is split before it is handed out. Wire dependencies with `bd dep add` so that bdi's `ready` tells you, and a restarted you, what can start now.
+Size the effort so a single worker can finish each bead without itself compacting. The bead graph is your plan for parallelism and for context: independent beads run in parallel, and a bead too big for one context is split, and each part held to the bar as *Track discovered work* says, before it is handed out. Wire dependencies with `bd dep add` so that bdi's `ready` tells you, and a restarted you, what can start now.
 
 A bead may be a parent whose small beads one worker finishes together, under one pull request. Brief the parent, and the worker takes its small beads with it.
 
 **No seat does work that has no bead.** New work goes into a bead before any seat does it, whether that seat is new or already running. Nothing is handed to a seat only in conversation.
 
-That holds when the human types an instruction in your berth that adds to or changes a worker's work. It is new work, not a message to forward. File a bead for it, or edit the existing bead's description, and wire it into the graph before you point the worker at that bead.
+That holds when the human types an instruction in your berth that adds to or changes a worker's work. It is new work, not a message to forward. File a bead for it, or edit the existing bead's description, and wire it into the graph and hold it to the bar, as *Track discovered work* says, before you point the worker at that bead.
 
 **Each bead gets a fresh seat by default.** A seat ends with its bead. You may give a quick follow-up on what a worker just did to that same seat, while its context still holds the work, once the follow-up has its own bead. To reuse a seat, post the follow-up's brief as the first message of the new bead's working topic, as for any start, then point the live seat at that topic in its current one. The seat claims the new bead as it claimed its first.
 
@@ -215,6 +215,7 @@ Work you discover mid-effort, such as a follow-up a worker raises or a dependenc
 
 1. **Open the bead in its home project**, the tracker that owns the work. Your own effort's sub-work is a bead in your project. Where that project has already filed the work, use its bead rather than file a second.
 2. **Wire it into your graph by its home-project id**, with `bd dep add <local-bead> <foreign-id>` on the local bead that waits for it, or on the top bead where the foreign work is itself part of the goal. The edge is stored in your tracker, so it is your write. No local bead stands in for the foreign one: a stand-in reads as ready whether or not the foreign work can start.
+3. **Hold it to the bar before any seat takes it.** Judge the bead and the edges you wired for it against `references/good-bead.md` under the plugin's root. Then give one throwaway subagent the bar's full path and the ids of the bead and of each bead at the other end of its edges. Its brief is to hunt for every breach of the bar in that bead and those edges, missing blockers included. Keep only its verdict, and fix what it finds. A bead you rewrite gets the same, whether you split it or edit its description.
 
 Then push the home-project bead onto a seat born in that project.
 
