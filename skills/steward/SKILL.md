@@ -85,7 +85,7 @@ A seat that muster has just handed the effort to breaks it too, because it may h
 
 ### Reconstruct, on every wake
 
-3. **Read the top bead.** `bd show <top-bead>` gives the effort's goal, what has been settled, and the `effort_slug`. The top bead describes the effort and only that. Its roster and its edges come from the graph below it, so a description that restates them is a stale copy to delete, not a picture to complete.
+3. **Read the top bead.** `bd show <top-bead>` gives the effort's goal, what has been settled, and the `effort_slug`. The top bead describes the effort and only that, as `muster` builds it to the bar in `references/good-bead.md` under the plugin's root, which is two directories above this skill's base directory. Its roster and its edges come from the graph below it, so a description that restates them is a stale copy to delete, not a picture to complete.
 4. **Sort the graph with `bdi`, never with `bd ready` or `bd blocked`.** Neither reads an edge into another tracker, so each lists a bead as ready while its foreign dependency is still open. bdi reads the top bead's tree: the top bead and everything it depends on, followed transitively across trackers, never through a parent link. First run `bd gate check --type=gh:pr`, so a merged pull request's gate is already closed. Then read the tree from your project's directory, and never scope the read with `--project`, because a blocker in a project left out then reads as not ready:
 
    ```bash
