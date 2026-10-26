@@ -197,11 +197,11 @@ You bloat, and force expensive compaction, by pulling detail of the work into yo
   **While beady-eye says its watcher is down, your watches wake no one.** Until it says the watcher is answering again, poll the beads you watch within the hour, because workers sleep on them, and when a question bead closes, post its answer, quoted from the bead, into its worker's working topic.
 - **You act; you don't report.** The wake ritual's output is for you. Never narrate your orientation or your plan into the terminal, where it reaches no one. What you emit is actions: a brief, an ask, a bead update.
 
-## One bead, one worker, one context
+## One bead, one outcome
 
-Size the effort so a single worker can finish each bead without itself compacting. The bead graph is your plan for parallelism and for context: independent beads run in parallel, and a bead too big for one context is split, and each part held to the bar as *Track discovered work* says, before it is handed out. Wire dependencies with `bd dep add` so that bdi's `ready` tells you, and a restarted you, what can start now.
+Each bead is one outcome, as the bar says. The bead graph is your plan for parallelism: independent beads run in parallel, and a bead too big for one worker's context is split into outcomes before it is handed out. Each part is held to the bar as *Track discovered work* says. Wire dependencies with `bd dep add` so that bdi's `ready` tells you, and a restarted you, what can start now.
 
-A bead may be a parent whose small beads one worker finishes together, under one pull request. Brief the parent, and the worker takes its small beads with it.
+How many beads one worker takes is your staffing choice when you start the seat, never a reason to file or merge beads. A bead may be a parent whose small beads one worker finishes together, under one pull request. Brief the parent, and the worker takes its small beads with it.
 
 **No seat does work that has no bead.** New work goes into a bead before any seat does it, whether that seat is new or already running. Nothing is handed to a seat only in conversation.
 
