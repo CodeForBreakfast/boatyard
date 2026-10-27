@@ -1,6 +1,6 @@
 ---
 name: muster
-description: Turns a body of work, usually beads that already exist and possibly spread across several projects, into one boatyard effort that a steward can drive cold, then hands it to a steward: a person's own seat takes the effort over, and a seat with a standing role starts one with sign-on. Builds and wires the bead graph, shapes other projects' slices over commy with whoever answers in each project's channel, and checks the graph can be driven before the launch. Use only when invoked by name, as `/boatyard:muster` or an explicit instruction to muster an effort.
+description: Turns a body of work, usually beads that already exist and possibly spread across several projects, into one boatyard effort that a steward can drive cold, then hands it to a steward: a person's own seat takes the effort over, a seat with a standing role that another seat asked hands the steward's start back to that seat, and a seat with a standing role acting for itself starts one with sign-on. Builds and wires the bead graph, shapes other projects' slices over commy with whoever answers in each project's channel, and checks the graph can be driven before the launch. Use only when invoked by name, as `/boatyard:muster` or an explicit instruction to muster an effort.
 argument-hint: <beads, a label or a query naming the work>
 ---
 
@@ -106,7 +106,8 @@ For a graph that is not trivial, give **one** throwaway subagent an adversarial 
 Who becomes the steward depends on the role your seat already holds. Decide it from that role, and don't ask the person.
 
 - **A seat a person works in takes the effort over itself,** in the berth where the person talked it through. No second steward starts.
-- **A seat with a standing role,** such as one that answers in its project's channel, keeps that role, so it starts a separate steward.
+- **A seat with a standing role hands the start back** when another seat asked it to muster, as *Hand the start back* says. A standing role is one such as answering in a project's channel. The asking seat starts the steward on its own host, so the work runs where it was asked for.
+- **A seat with a standing role acting on its own judgement starts a separate steward** where it runs. A person asking it directly counts as its own judgement.
 
 You create none of the effort's commy topics and no line in the project's `boatyard` index. The steward opens its topics and registers the effort in the index when it binds, and it names its own berth.
 
@@ -115,6 +116,17 @@ You create none of the effort's commy topics and no line in the project's `boaty
 Sign off first, as *Sign off* says, because the preparation ends here. Then load the steward skill in this seat with the Skill tool, naming `boatyard:steward` and passing the top bead as its argument. From then on this seat follows the steward skill, not this one.
 
 **Start the steward fresh, whatever `current_identity` says.** Your seat may have bound its commy identity while you prepared, and the steward's wake ritual would read that as a compaction and skip its reachable half. So do the reachable half of the wake ritual, then the reconstruct half.
+
+### Hand the start back
+
+Reply to the asking seat where it asked, with the top bead, the project it lives in, and the line that starts its steward:
+
+```bash
+sign-on --as independent --cwd <its checkout of this project> --label <effort> \
+  "/boatyard:steward <top-bead>"
+```
+
+The asking seat fills in its own checkout of the project, because a path holds on one host only. You start no steward yourself, and you do not wait for the asking seat to start it.
 
 ### Start a separate steward
 
@@ -129,14 +141,14 @@ The steward's berth is independent of yours, so closing your seat leaves the ste
 
 If `sign-on` fails, report its message. Where the message says your seat is in no multiplexer, because no backend is named or your seat is in no pane, give the human the line `/boatyard:steward <top-bead>` to start by hand, and say which project the top bead lives in. Where it opened a berth and then got stuck, its message names that berth, so pass the name on for the human to read and close.
 
-**You do not close your own seat.** A seat with a standing role that musters an effort has to outlive the preparation. Sign off, and whatever role you had before carries on.
+**You do not close your own seat.** A seat with a standing role that musters an effort, whether it started the steward or handed the start back, has to outlive the preparation. Sign off, and whatever role you had before carries on.
 
 ## Sign off
 
-Handing the effort to a steward ends the preparation. A seat that started a separate steward does not stay to watch it or to rework the graph, because the steward owns the effort from the moment it runs.
+Handing the effort to a steward ends the preparation. A seat that started a separate steward, or handed its start back, does not stay to watch it or to rework the graph, because the steward owns the effort from the moment it runs.
 
-1. **Record the preparation** as your host asks of finished work, such as a journal entry: the effort, the top bead, the beads including foreign ones, the splits and edges you made, and the steward's berth.
-2. **Say plainly that preparation is finished.** Name the top bead and the steward's berth. A seat that takes the effort over then loads the steward skill. Any other seat stops.
+1. **Record the preparation** as your host asks of finished work, such as a journal entry: the effort, the top bead, the beads including foreign ones, the splits and edges you made, and the steward's berth or the seat you handed its start to.
+2. **Say plainly that preparation is finished.** Name the top bead and the steward's berth, or the seat you handed the start to. A seat that takes the effort over then loads the steward skill. Any other seat stops.
 
 If you could not start the steward and handed the human its line instead, still record and sign off. The graph is the preparation's deliverable, and only the start is left to the human.
 
