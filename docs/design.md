@@ -101,6 +101,15 @@ A caller that is not itself a berth has none of the three: a service manager's u
 
 Where a verb needs the caller, such as a worker's opener or the opener a berth opens beside, the calling pane stands in for a caller that is not a berth. It stands in only within its own yard. A caller in no pane, or whose pane is in another yard than the one named, is refused with a message that says which.
 
+### Contract for outside consumers
+
+A product outside boatyard may depend on two things, and on nothing else of boatyard's:
+
+- **The three variables** above, inherited by every process a berth runs.
+- **`berth list`'s JSON:** an array with one object per berth, each holding exactly the fields `id`, `label`, `relationship`, `parent`, `state`, `agent_state` and `agent_session`, with the values the verbs table and *Berth and agent states* give them.
+
+Dropping, renaming or changing the meaning of a variable or a field breaks the contract, and so does a new value that a consumer could not have expected. Boatyard cuts no releases, so the pull request making such a change marks it breaking with a `!` in its title, and the commit it lands as carries the mark on `main`. The port contract suite fails when a field is added, dropped or renamed, so no change to the shape lands unnoticed.
+
 ### Errors
 
 - A berth that no longer exists reports state `gone`, and agent state `none`, and exits 0. That is an answer, not a failure.

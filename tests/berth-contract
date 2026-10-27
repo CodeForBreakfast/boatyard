@@ -77,6 +77,7 @@ check "a worker is listed as a worker" worker "$(field "$worker" relationship)"
 check "a worker's parent is its opener" "$independent" "$(field "$worker" parent)"
 check "a worker's command learns its own BERTH_ID" "$worker" "$(recorded "$work/worker" BERTH_ID)"
 check "a worker inherits BERTH_YARD" "$BERTH_YARD" "$(recorded "$work/worker" BERTH_YARD)"
+check "a worker inherits BERTH_BACKEND" "$BERTH_BACKEND" "$(recorded "$work/worker" BERTH_BACKEND)"
 
 second_worker=$(BERTH_ID=$independent berth open --as worker --cwd "$work" -- true)
 check "a second worker has the same parent" "$independent" "$(field "$second_worker" parent)"
