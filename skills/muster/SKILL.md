@@ -24,7 +24,7 @@ Muster work of **any size**: one small bead in this project, a handful of local 
 
 - **No coordination across projects.** When nothing is foreign, skip *Shape other projects' slices over commy*.
 - **A trivial graph.** The top bead may be the one bead, or an outcome bead that depends on a few, with few or no other dependency edges. That graph is complete, not deficient.
-- **A quick readiness gate.** `bd dep cycles` is empty and bdi lists the bead as ready, as *The readiness gate* says. Skip the adversarial review, because it has nothing to find, unless your seat will take the effort over itself.
+- **A quick readiness gate.** `bd dep cycles` is empty, bdi lists the bead as ready, and each piece of code work reaches its evidence, as *The readiness gate* says. Skip the adversarial review, because it has nothing to find, unless your seat will take the effort over itself.
 
 ## The one principle everything hangs off
 
@@ -93,9 +93,10 @@ Before you start the steward, confirm that the graph can be driven. All of these
   ```
 - Every bead, the graph and the top bead meet every rule in the bar.
 - Every piece of work the top bead's description names is a bead in the top bead's tree, as the bar's rule for the top bead says. Read the description against the tree bdi printed, and file and wire each bead that is missing.
+- Each piece of code work reaches its evidence, as the bar's rule on where the graph ends says. For each bead that merges code, follow the beads that depend on it up to the evidence. Either a release or deployment bead sits on that path, or the top bead's description says why the outcome can be seen at the merge. Where neither holds, file and wire the missing bead, or add the reason to the top bead.
 - Every foreign strand is confirmed in good shape by its home project, and wired into the graph as an edge on its home-project id.
 
-For a graph that is not trivial, give **one** throwaway subagent an adversarial review of it, and keep only its verdict. Its brief: read the bar at its full path, and hunt for every breach of it, missing blockers included, for unwired foreign strands, and for work the top bead names that no bead carries. Fix what it finds. This review is your own quality check, not a gate on the human. Where your seat may not start subagents, the review does not run, and the checks above remain the real bar.
+For a graph that is not trivial, give **one** throwaway subagent an adversarial review of it, and keep only its verdict. Its brief: read the bar at its full path, and hunt for every breach of it, missing blockers included, for unwired foreign strands, for work the top bead names that no bead carries, and for code work that reaches its evidence through no release or deployment while the top bead gives no reason. Fix what it finds. This review is your own quality check, not a gate on the human. Where your seat may not start subagents, the review does not run, and the checks above remain the real bar.
 
 **When your seat will take the effort over itself, the review always runs, even on a trivial graph.** A fresh steward is what proves the graph can be driven cold, and a seat that has held the whole conversation is not fresh. So add one more line to the subagent's brief: rebuild the effort from the top bead alone, and report every fact the effort needs that the beads do not hold.
 
