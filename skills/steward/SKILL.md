@@ -26,7 +26,7 @@ That is also why you must be miserly with your own context. The effort outlives 
 
 **Your host's rule for asking the human wins over this skill.** Where its `CLAUDE.md`, or a document it names, says how a seat reaches the human, follow that and read this section as the default it replaces.
 
-Workers never ping the human. A question that a seat waits on goes on its own bead labelled `human`, in the tracker of the project whose work waits on it, and the waiting bead depends on it. That label is the human's queue, so a question needs no post and no mention. A permission goes to the human in your berth. An action only the human can take goes where your host files the human's actions, and to the decisions topic only where it names no such place. **Ask in your berth only to answer what the human asked you there, and to follow up on that same point.** Every other question goes on a question bead, even while the human is typing to you. That covers a question a worker raised and one that comes from your own reading. Your reply in the berth may point at the bead. Anything else needs a bead or the decisions topic, and you keep both current.
+Workers never ping the human. A question that a seat waits on goes on its own bead labelled `human`, in the tracker of the project whose work waits on it, and the waiting bead depends on it. That label is the human's queue, so a question needs no post and no mention. A permission waits in the berth of the seat that needs it, as *A worker's permission waits in its own berth* says. An action only the human can take goes where your host files the human's actions, and to the decisions topic only where it names no such place. **Ask in your berth only to answer what the human asked you there, and to follow up on that same point.** Every other question goes on a question bead, even while the human is typing to you. That covers a question a worker raised and one that comes from your own reading. Your reply in the berth may point at the bead. Anything else needs a bead or the decisions topic, and you keep both current.
 
 ## Topics
 
@@ -144,7 +144,7 @@ A seat that muster has just handed the effort to breaks it too, because it may h
 
       `--limit 0` matters. The default is 50 rows, and a truncated list quietly turns a sleeping worker's bead into one you might start over. The list covers the whole tracker, so skip a bead outside the effort. Its seat may sit in a yard your `berth list` cannot see. Check whether each berth is still its bead's seat, as *Watching the berths you started* says.
 
-      **A berth that is still its seat means a live seat is there, awake or asleep.** It sleeps on a question when the bead it sits on depends on an open `human` bead, which `bd human list --json` lists. It sleeps on a permission or an action when its latest post in its working topic asks for one. This wins even when the bead also sits behind an open pull-request gate, which is exactly the case for a rework seat that hit a question mid-rebase. The seat watches the bead its wait ends on, and that watch wakes it. Don't poll its pull request.
+      **A berth that is still its seat means a live seat is there, awake or asleep.** It sleeps on a question when the bead it sits on depends on an open `human` bead, which `bd human list --json` lists. It waits on a permission when `berth agent-state` reads `blocked`, and sleeps on an action when its latest post in its working topic asks for one. This wins even when the bead also sits behind an open pull-request gate, which is exactly the case for a rework seat that hit a question mid-rebase. The seat watches the bead its wait ends on, and that watch wakes it. Don't poll its pull request.
 
       **Otherwise the seat died, and nothing will wake it.** Hand the bead back to the graph as *Watching the berths you started* says. A dependency on a question bead keeps it out of bdi's `ready` until the human answers, and an open pull-request gate keeps it out until the merge. Then start a fresh worker on it in the next `-r` topic, with any answer quoted from the question bead in its brief. Where the bead is a step of a delivery molecule, brief the worker on the work bead that waits on that molecule, and it sits on the step again. A bead whose seat died waiting on a permission or an action is ready at once, and its fresh worker asks again.
    2. **Otherwise an open `gh:pr` gate or an open outcome step of a delivery molecule means the bead is in delivery**, as *A bead closes on merge* and *A bead delivered by a formula* say. No seat is on the bead itself, so never relay to it and never start a worker on it. Poll its pull request, or read its molecule, whose steps show any seat still working it.
@@ -369,7 +369,7 @@ Starting workers is a **loop**, not a kickoff. Start one at each ready bead, and
 ### Watching the berths you started
 
 - **What ties a seat to its work** is the `agent_pane` and `agent_session` on the bead the seat sits on. That is the bead you briefed it on, or under a delivery formula the step of that bead's molecule it is working. `sign-on` labels the berth with the bead you brief, the worker names its berth after each bead it moves to, and you set neither yourself.
-- **`berth agent-state <id>` reads `blocked` when a worker is waiting at a permission prompt.** Only the human can clear it, so take it to them as *A worker's permission goes to the human in your berth* says.
+- **`berth agent-state <id>` reads `blocked` when a worker is waiting at a permission prompt.** Only the human can clear it, as *A worker's permission waits in its own berth* says.
 - **A bead names a berth only while that berth is its seat.** A seat that dies before it finishes leaves its berth on its bead, and a berth id is reused once its berth closes. A stale `agent_pane` then joins the bead to whatever seat takes the id next. The berth is still the bead's seat only while `berth list` holds its id, labelled with the bead's id, with an agent in it. A berth whose Claude Code has exited to its shell is still open, but it holds no agent, so its seat is dead:
 
   ```bash
@@ -425,11 +425,13 @@ One topic per effort, `#<project>/<effort>-decisions`:
 - **You are its only writer.** Workers post their actions to their working topics, and you lift them in.
 - **Your berth is a channel only for what the human brings you there.** You ask a question there only as *You own the human's attention for this effort* says, and an action only if they can do it there and then. If they leave a question unanswered, or say they will think about it, file the bead before your turn ends, and write any answer they give you there onto its bead in their words. An instruction they give you there for a worker goes on a bead first, as *No seat does work that has no bead* says.
 
-### A worker's permission goes to the human in your berth
+### A worker's permission waits in its own berth
 
-A permission is the one ask that does not go in the decisions topic. A worker that needs the human's approval for a command posts the command and how to reach its berth to its working topic. A worker stuck at an approval prompt reads `blocked` in `berth agent-state` instead, and its berth id is the `agent_pane` on its bead.
+A permission is the one ask that goes neither on a bead nor in the decisions topic. A worker that needs the human's approval for a command asks for it with the question dialog in its own berth and waits there. A worker stopped at an approval prompt is already waiting. Either way `berth agent-state` reads `blocked`, and the worker's berth id is the `agent_pane` on the bead it sits on.
 
-Tell the human in your own berth: which worker, the command, why the work needs it, and how to reach the worker's berth. They approve in the worker's berth and name the action. Or they run the command there themselves, which always works, and tell the worker to carry on. An approval they give anywhere else never reaches the worker, because a permission classifier judges a command by the conversation of the seat that runs it. So don't relay an approval they give you, and don't file a question bead for it.
+The human approves in that berth and names the action, or runs the command there themselves. An approval they give anywhere else never reaches the worker, because a permission classifier judges a command by the conversation of the seat that runs it. So don't relay an approval they give you, and don't file a question bead for it.
+
+**Where your host carries a blocked berth to the human itself, don't relay the permission,** because your relay would be a second copy of the host's ask. Where your host names no such route, tell the human in your berth which worker is blocked and how to reach its berth.
 
 ## The boatyard index
 
@@ -449,7 +451,7 @@ Restate your line only on those changes, never on progress. Those lines are the 
 
 A stall is work that has stopped moving, and restarting it is your job. Work out which kind it is, then act on the same wake:
 
-- **Staffed and waiting on the human.** A live worker sleeps on a question bead, or has posted an action or a permission in its working topic. A question bead needs nothing from you until it closes. Lift an action into the decisions topic, and take a permission to the human in your berth.
+- **Staffed and waiting on the human.** A live worker sleeps on a question bead, has posted an action in its working topic, or waits on a permission in its own berth. A question bead needs nothing from you until it closes. Lift an action into the decisions topic, and leave a permission where *A worker's permission waits in its own berth* says.
 - **Unstaffed.** The work has no accountable worker at all: a question you assumed someone else owned, a handover a channel never answered, a newly unblocked bead nobody is on. Start a worker for it now. **A bead in delivery is not this.** It has no seat by design, and a second worker on it duplicates a change already in a reviewer's queue.
 - **Dark.** A worker has gone silent past its checkpoint. Nudge its working topic once. If it is still dark at the next wake, start a replacement.
 
@@ -556,7 +558,7 @@ A steward resumes the effort through the wake ritual, as on any fresh start, and
 - **You don't decide the human's calls.** Architecture, money and external commitments go on a question bead.
 - **One effort, possibly across projects.** You run in the project where the top bead lives. Work in another tracker is wired into your graph by an edge on its home-project id, and its readiness is read through `bdi`.
 - **Other projects' channels are not part of your effort.** Never route anything to the human through whoever answers in another project's channel, and read your workers' state from your own working topics.
-- **Don't work around permission prompts.** If a command you need yourself is refused, ask the human for it in your own berth, as for a worker's permission.
+- **Don't work around permission prompts.** If a command you need yourself is refused, ask for it with the question dialog in your own berth, as a worker does.
 
 ## Before a compaction
 
