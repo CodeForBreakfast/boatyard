@@ -173,7 +173,14 @@ Then walk **every strand of work the top bead needs, in your project and in ever
 4. **In delivery.** The bead sits behind the open `gh:pr` gate of its own pull request, or behind the open outcome step of a delivery molecule where no seat sits on a step and the ready steps are not the worker's. It has no seat, correctly. What you owe it is the watch in *Watching your pull requests*, or the reading in *A bead delivered by a formula*, not a new worker.
 5. **Capped.** The strand could start, but its repo already holds this effort's limit of unmerged pull requests. Only a merge releases it.
 6. **Blocked by a dependency.** bdi lists the bead as waiting on a dependency other than its own pull request's gate or its molecule's outcome step, such as a gate on a pull request outside the effort, or a bead in another project that is not closed. A worker started here would build on code that is not on the default branch yet.
-7. **Deferred to a date.** The strand cannot start before a known date, and its bead records it with `bd defer <bead> --until <date>`. The date lives on the bead, so it survives your session.
+7. **Gated on a date.** The strand cannot start before a known date, such as a scheduled run's, and its bead waits on a timer gate that expires just after that date. Use a gate rather than `bd defer`, because a gate closing is a change in the tracker that a watch on the bead reports, and a date passing is not.
+
+   ```bash
+   bd gate create --type=timer --blocks <bead> --timeout=<duration> \
+     --title "<what the bead waits for, and when>"
+   ```
+
+   The duration runs from now, in hours and minutes such as `14h30m`, so run `date` first rather than trust the clock in your context. A gate sweep closes the gate at its deadline where your host runs one. Otherwise run `bd gate check --type=timer` at a wake to close it.
 
 States 4 to 7 are all waits, and in an effort that delivers through pull requests most strands sit in one of them at any moment.
 
@@ -192,7 +199,7 @@ You bloat, and force expensive compaction, by pulling detail of the work into yo
 - **Don't read large artefacts yourself**: source files, transcripts, long logs. When you need a conclusion from a pile of material, give the reading to a throwaway subagent and keep only its answer. Work that owns a bead goes to a worker in its own berth. A one-off read goes to your own subagent.
 - **Sleep between events, but only once the push gate is clean.** Use `ScheduleWakeup` only for a specific future event you care about: a worker's declared checkpoint, which is the watch for its death because a dead worker sends nothing. Otherwise commy and beady-eye deliver inbound messages reliably, so don't poll on a tight interval.
 
-  **A wait for a date goes on its bead, not only in a wake.** A `ScheduleWakeup` dies with your session, so defer the bead to the date as push-gate state 7 says. You may also schedule a wake for the date. If your session has gone by then, the bead shows as ready and tally shows the effort with no live steward, and a person starts one.
+  **A wait for a date goes on its bead, not only in a wake.** A `ScheduleWakeup` dies with your session, so put the bead behind a timer gate as push-gate state 7 says. You may also schedule a wake for the date. If your session has gone by then, the bead goes ready once its gate closes, and the effort waits for a steward as *Parking* says.
 
   **A bead you wait on wakes you through your watch on it.** A closed question bead or foreign dependency ends a wait, so `unwatch` it and run the wake ritual. A comment, or any change that leaves the bead open, is nothing to act on unless it is a question for you, or a gate sweep's report of a pull-request event.
 
@@ -532,7 +539,7 @@ When the top bead has closed:
 
 ## Parking
 
-**Parking stops an effort part-way, on purpose, so that a fresh steward can resume it cold.** The human parks before a reboot, so every seat on the machine may park at once, and the pause may last minutes or weeks. Leave the effort where the wake ritual can rebuild it from beads and commy alone, then go:
+**Parking stops an effort part-way, on purpose, so that a fresh steward can resume it cold.** The human parks before a reboot, so every seat on the machine may park at once, and the pause may last minutes or weeks. You also park to wait for a scheduled run, once nothing else in the effort can move until the run is due. Leave the effort where the wake ritual can rebuild it from beads and commy alone, then go:
 
 1. **Say so in the coordination topic**: "parking `<top-bead>`".
 2. **Stand down each worker that is working.** Post `stand down: parking. Push your work in progress to your branch and name the branch in your note.` to its working topic, mentioning it. It notes where it got to on its bead, hands back the bead it sits on, and closes its berth. Wait for each sign-off. A worker that has not signed off by the time you finish ends with your berth, and the resuming steward treats it as a seat that died.
@@ -542,13 +549,14 @@ When the top bead has closed:
    ```bash
    bd note <top-bead> "Parked: <what a resuming steward needs>"
    ```
-5. **Let go of the effort.** `unwatch` every bead that beady-eye's `watching` still lists, then release your claim on the top bead and clear your berth and session from it:
+5. **Hand on the watch for a scheduled run.** Where you park to wait for one, the bead that checks the run waits on a timer gate, as push-gate state 7 says. Your host's instructions name who watches a parked effort's check, and where to tell them. Send them one message, naming the check bead and the top bead, each written as `<project>:<id>`. Leave the human no reminder of the run, because the watcher starts a steward once the gate closes and the check goes ready. Where your host names no watcher, the check still goes ready, tally shows the effort with no live steward, and a person starts one.
+6. **Let go of the effort.** `unwatch` every bead that beady-eye's `watching` still lists, then release your claim on the top bead and clear your berth and session from it:
 
    ```bash
    bd update <top-bead> --unset-metadata agent_pane --unset-metadata agent_session
    bd unclaim <top-bead>
    ```
-6. **Do what your host asks of a session that is ending**, then close your berth with a bare `berth close`.
+7. **Do what your host asks of a session that is ending**, then close your berth with a bare `berth close`.
 
 A steward resumes the effort through the wake ritual, as on any fresh start, and reads your note in `bd show <top-bead>` at *Reconstruct* step 3.
 
