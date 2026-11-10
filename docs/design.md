@@ -11,6 +11,7 @@ In scope now:
 - The orchestration skills and the launcher.
 - Long-lived agents for a host that runs them under a service manager. `berth serve` runs a yard's backend under the service manager, and `sign-on` opens each agent from a caller that is not a berth.
 - Compaction at rest, by a mod in the plugin.
+- Waking a steward that a multiplexer resumed, by the same mod.
 
 Later: the integrations that serve interactive panes only, such as agent-state hooks, a statusline, review tabs and window-manager keybinds. Until the port serves them, they call their multiplexer directly.
 
@@ -21,6 +22,7 @@ Later: the integrations that serve interactive panes only, such as agent-state h
 | `berth` | The port: a backend-neutral command, plus one adapter per multiplexer | a multiplexer |
 | `sign-on` | Launches Claude Code in a berth and gets it past its startup gate, or gets a seat already starting in one past it | `berth` |
 | Compaction mod | Compacts a session at rest before it runs low on context | Claude Code |
+| Resume hook | Sends a resumed steward through its whole wake ritual | Claude Code |
 | Skills | `steward`, `worker`, `muster` and `tally` | `sign-on`, `berth` |
 
 The port knows only terminal mechanics. It knows nothing about Claude Code. The startup gate belongs to Claude Code, so it lives in `sign-on`. Compaction is useful without any orchestration, so it runs inside every session that loads the plugin, in a berth or not, and does not use the port.
@@ -177,6 +179,13 @@ A mod in the plugin compacts a session at the end of a turn once its free contex
 - **The opt-in survives a resume.** A multiplexer may resume a session in a new process without the environment it launched with. So the mod keeps a session's `BOATYARD_COMPACT_THRESHOLD` in the plugin's own store under the session's id, and a session without the variable takes the value kept for its id. A session that never had the variable has nothing kept, so a person's session stays out after a resume too. A session that draws nowhere keeps nothing.
 - **Plugin settings can opt in every session and set the threshold.** `compactAtRest` is off by default. The threshold is 70 by default.
 
+## A resumed steward
+
+A multiplexer that restores its session resumes each seat's conversation in a new process. The steward's wake ritual tells a fresh start from a compaction by whether commy is bound, and a resumed seat's commy comes back bound. So the plugin's mod tells a resumed steward to run the whole ritual.
+
+- **The mod marks a steward when the steward skill loads.** It keeps the mark in the plugin's own store under the session's id, which a resume keeps.
+- **On a resume of a marked session, the mod submits one message.** It tells the seat to run the wake ritual's reachable half, then its reconstruct half. A worker, a person's session, a fresh start and a compaction get nothing.
+
 ## Skills
 
 | Skill | Role | Invocation |
@@ -204,7 +213,7 @@ Pull requests are GitHub's. The skills read, wait on and merge them with `gh` an
 - **One flake exporting two packages:** `berth` and `sign-on`. The packages matter as much as the plugin. A service manager does not see the plugin's `bin/`, so a host that runs agents under one installs the packages.
 - **Host inputs.** The multiplexer package, the Claude Code command and flags, and the settings path are all package arguments or configuration. A host supplies its own.
 - **A host keeps its seats' claims alive.** A bd claim's lease lapses unless something renews it, and `tally` reads a steward as live only while its top bead's lease is. The host renews the claims of every running seat, including a seat that is asleep.
-- **A host allows the plugin's mod.** Where a host's managed settings limit mods to its organization's, the compaction mod does not load until the host allows it.
+- **A host allows the plugin's mod.** Where a host's managed settings limit mods to its organization's, the plugin's mod does not load until the host allows it.
 - **Runtime dependencies.** The scripts in `bin/` state their dependencies, such as `jq`, for readers who do not use nix.
 - **One revision per host.** Claude Code puts a plugin's `bin/` after the ambient path, so where a host installs the packages, the packages run and the plugin supplies only the skills. A host that installs both loads the plugin from the same revision as the packages, with `--plugin-dir` on its Claude Code command.
 
@@ -213,7 +222,7 @@ Pull requests are GitHub's. The skills read, wait on and merge them with `gh` an
 - **Port contract suite.** One suite states what every adapter must do: open in each relationship, list, name, send-text, send-key, wait-text, read, state, agent state across all three agent states and none, close, and the cascade when an independent berth closes. It runs against every adapter.
   - For herdr, it runs a throwaway server with `HOME` redirected and every `HERDR_*` variable unset. An inherited `HERDR_SOCKET_PATH` would otherwise drive the live session. The server runs inside the nix build sandbox, so the suite is a flake check.
   - herdr treats a process named `claude` as an agent and reads its state from the screen. The suite drives the states with a stand-in process of that name, not with Claude Code.
-- **Unit tests.** The compaction mod's rule has its own tests, run by `claude plugin test` against a stand-in engine. So does each adapter's mapping from backend states to the port's agent states, including the herdr parked-on-background-work and lost-agent corrections.
+- **Unit tests.** The mod's compaction rule and its rule for a resumed steward have their own tests, run by `claude plugin test` against a stand-in engine. So does each adapter's mapping from backend states to the port's agent states, including the herdr parked-on-background-work and lost-agent corrections.
 - **End to end.** One real effort runs on `steward` and `worker`.
 
 ## Open decisions
