@@ -19,7 +19,7 @@ Later: the integrations that serve interactive panes only, such as agent-state h
 | Component | Role | Depends on |
 |---|---|---|
 | `berth` | The port: a backend-neutral command, plus one adapter per multiplexer | a multiplexer |
-| `sign-on` | Launches Claude Code in a berth and gets it past its startup gate | `berth` |
+| `sign-on` | Launches Claude Code in a berth and gets it past its startup gate, or gets a seat already starting in one past it | `berth` |
 | Compaction mod | Compacts a session at rest before it runs low on context | Claude Code |
 | Skills | `steward`, `worker`, `muster` and `tally` | `sign-on`, `berth` |
 
@@ -157,6 +157,13 @@ Each launch states its own relationship, working directory, label and prompt. A 
 A seat is born in its repository's main checkout, never in a linked worktree. Claude Code reads its instructions, skills and trust state from the launch directory and cannot re-read them after a `cd`.
 
 A host that starts long-lived agents from a script calls `sign-on` there too, so the gate logic exists once.
+
+`sign-on --pass-gate [<berth>]` runs step 4 alone, on a seat that is already starting in a berth. It serves a seat that herdr resumed. herdr restores a seat by typing `claude --resume` into a fresh shell in the seat's pane, so `sign-on` never runs and the seat stops at its gate. A host's shell starts `sign-on --pass-gate` in the background from that pane, and it waits for the gate as a launch does, with the same gate text and limits.
+
+- With no berth named, it acts on the caller's own: `BERTH_ID`, or else the herdr pane in `HERDR_PANE_ID`. A resumed pane keeps only what herdr's server environment held, so where `BERTH_BACKEND` is unset and `HERDR_PANE_ID` is set, it takes herdr as the backend.
+- It exits 0 once the gate has cleared, 1 when it is stuck, and 2 on a usage error.
+- It prints nothing, because whatever it wrote would land on the seat's screen. Its failures go to the system log through `logger` with the tag `sign-on`. On Linux that is the journal, read with `journalctl -t sign-on`. On macOS it is the unified log, which `log show` reads. A failure names the berth and what it showed, and leaves the berth for a person to pass by hand.
+- A usage error goes to standard error, because it is a fault in the caller's script.
 
 ## Compaction
 

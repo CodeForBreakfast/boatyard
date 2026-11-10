@@ -15,7 +15,7 @@
 #   SIGN_ON_MIN_MEMORY     the memory the host must have available for a seat
 #                          to start, in GiB. 0 turns the check off.
 #
-# Needs: bash, coreutils, git, jq, berth.
+# Needs: bash, coreutils, git, jq, logger, berth.
 set -euo pipefail
 
 usage() {
@@ -24,6 +24,7 @@ usage: sign-on --as independent|worker|tender --cwd <dir> [--label <text>]
                [--beside | --tab] [--focus] [--model <model>] [--effort <level>]
                [--add-dir <dir>] [--env <name>=<value>]... [--settings <file>]
                [--threshold <free %>] [<prompt>]
+       sign-on --pass-gate [<berth>]
 
 An independent seat starts its own line of work, so it opens apart from its
 caller, where the backend keeps a line of work: in herdr, a workspace of its
@@ -38,6 +39,11 @@ With --focus, they land on the seat as soon as it opens, before sign-on gets
 it past its startup gate.
 
 With no prompt, the seat takes no turn and waits at its prompt for a person.
+
+--pass-gate gets a seat that is already starting in a berth past its startup
+gate, such as one the multiplexer resumed. With no berth named, it acts on the
+caller's own. It prints nothing, and its failures go to the system log under
+the tag sign-on.
 EOF
   exit 2
 }
@@ -46,6 +52,71 @@ die() {
   echo "sign-on: $1" >&2
   exit 1
 }
+
+claude=${SIGN_ON_CLAUDE:-claude}
+gate=${SIGN_ON_GATE:-}
+trust_prompt="Is this a project you created or one you trust?"
+start_timeout=${SIGN_ON_START_TIMEOUT:-180}
+min_memory=${SIGN_ON_MIN_MEMORY:-8}
+folder=""
+
+# Gets the agent starting in the berth $id past its startup gate. Whoever calls
+# it defines stuck, which takes what the berth shows and does not return.
+pass_gate() {
+  if [ -n "$gate" ]; then
+    berth wait-text "$id" "$gate" --timeout "$start_timeout" 2>/dev/null ||
+      stuck "did not show the gate '$gate' within ${start_timeout}s"
+    # wait-text goes on finding the gate in recent output after it has gone,
+    # so the screen is what says it cleared. An Enter goes only to a screen
+    # that shows the gate and nothing else sign-on knows. Claude Code's trust
+    # dialog is never answered, because a person decides what a folder may run.
+    local cleared="" sent=0 screen
+    while [ -z "$cleared" ]; do
+      screen=$(berth read "$id")
+      case "$screen" in
+        *"$trust_prompt"*) stuck "shows Claude Code's trust dialog${folder:+ for $folder}, which sign-on never answers" ;;
+        *"$gate"*)
+          [ "$sent" -lt 10 ] || stuck "still shows the gate '$gate' after ten Enters"
+          berth send-key "$id" Enter
+          sent=$((sent + 1))
+          sleep 1
+          ;;
+        *)
+          [ "$sent" -gt 0 ] || stuck "shows a screen sign-on does not recognise, not the gate '$gate'"
+          cleared=1
+          ;;
+      esac
+    done
+  else
+    # A backend may read a starting agent as active before it has read the
+    # screen, so the first agent state after none cannot tell a gate from a
+    # turn. Once the agent has shown, a gate nobody configured is the watching
+    # steward's to find, as a blocked agent.
+    local deadline=$((SECONDS + start_timeout))
+    until [ "$(berth agent-state "$id")" != none ]; do
+      [ "$SECONDS" -lt "$deadline" ] || stuck "still has no agent after ${start_timeout}s"
+      sleep 1
+    done
+  fi
+}
+
+if [ "${1:-}" = --pass-gate ]; then
+  [ $# -le 2 ] && [[ ${2:-} != -* ]] || usage
+  # A seat the multiplexer resumed runs this in the background from its own
+  # pane, where anything written to the terminal lands on the seat's screen.
+  exec 2> >(logger -t sign-on 2>/dev/null)
+  # A pane that herdr restored keeps only what its server's environment held,
+  # which need not name the backend.
+  if [ -z "${BERTH_BACKEND:-}" ] && [ -n "${HERDR_PANE_ID:-}" ]; then
+    export BERTH_BACKEND=herdr
+  fi
+  id=${2:-$(berth id)}
+  stuck() {
+    die "the berth $id $1, so a person has to get it past its startup gate."
+  }
+  pass_gate
+  exit 0
+fi
 
 as="" cwd="" label="" place="" focus="" threshold="" prompt=() flags=() env=()
 while [ $# -gt 0 ]; do
@@ -84,12 +155,6 @@ while [ $# -gt 0 ]; do
 done
 [ -n "$as" ] && [ -n "$cwd" ] || usage
 [ -z "$place" ] || [ "$as" = independent ] || usage
-
-claude=${SIGN_ON_CLAUDE:-claude}
-gate=${SIGN_ON_GATE:-}
-trust_prompt="Is this a project you created or one you trust?"
-start_timeout=${SIGN_ON_START_TIMEOUT:-180}
-min_memory=${SIGN_ON_MIN_MEMORY:-8}
 
 # Prints MemAvailable in KiB, or fails where the host has no /proc/meminfo.
 available_kib() {
@@ -156,40 +221,6 @@ stuck() {
   die "the berth $id $1. It is left open to read: berth read $id, then berth close $id."
 }
 
-if [ -n "$gate" ]; then
-  berth wait-text "$id" "$gate" --timeout "$start_timeout" 2>/dev/null ||
-    stuck "did not show the gate '$gate' within ${start_timeout}s"
-  # wait-text goes on finding the gate in recent output after it has gone,
-  # so the screen is what says it cleared. An Enter goes only to a screen that
-  # shows the gate and nothing else sign-on knows. Claude Code's trust dialog
-  # is never answered, because a person decides what a folder may run.
-  cleared="" sent=0
-  while [ -z "$cleared" ]; do
-    screen=$(berth read "$id")
-    case "$screen" in
-      *"$trust_prompt"*) stuck "shows Claude Code's trust dialog for $folder, which sign-on never answers" ;;
-      *"$gate"*)
-        [ "$sent" -lt 10 ] || stuck "still shows the gate '$gate' after ten Enters"
-        berth send-key "$id" Enter
-        sent=$((sent + 1))
-        sleep 1
-        ;;
-      *)
-        [ "$sent" -gt 0 ] || stuck "shows a screen sign-on does not recognise, not the gate '$gate'"
-        cleared=1
-        ;;
-    esac
-  done
-else
-  # A backend may read a starting agent as active before it has read the
-  # screen, so the first agent state after none cannot tell a gate from a
-  # turn. Once the agent has shown, a gate nobody configured is the watching
-  # steward's to find, as a blocked agent.
-  deadline=$((SECONDS + start_timeout))
-  until [ "$(berth agent-state "$id")" != none ]; do
-    [ "$SECONDS" -lt "$deadline" ] || stuck "still has no agent after ${start_timeout}s"
-    sleep 1
-  done
-fi
+pass_gate
 
 printf '%s\n' "$id"
