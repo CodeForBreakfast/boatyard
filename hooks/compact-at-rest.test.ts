@@ -1,5 +1,5 @@
 import type { On, RenderSurface, SessionUsage } from 'claude-code'
-import { expect, mock, test } from 'claude-code/testing'
+import { expect, test } from 'claude-code/testing'
 
 // Auto-compact runs at 160000 tokens, so 160000 is the space usable before it.
 const AUTO_COMPACT_AT = 160000
@@ -32,18 +32,28 @@ function usageAt(tokens: number | undefined): SessionUsage {
 }
 
 // The engine beneath the plugin: a session whose context holds `tokens`, and
-// a count of the compactions the plugin asks for.
+// a count of the compactions the plugin asks for. A test resumes the session
+// by changing `env` and `tokens`, as a new process under the same session id
+// would find them. The plugin's store outlives the process.
 function session(on: On, tokens: number | undefined, env: Record<string, string> = {}, surfaces: readonly RenderSurface[] = ['terminal']) {
-  const compactions = { count: 0 }
-  mock.env(on, env)
+  const store: Record<string, unknown> = {}
+  const world = { count: 0, tokens, env, store }
+  on('env.get', (_$, e) => ({ value: world.env[e.name] }))
+  on('store.get', (_$, e) => ({ value: store[e.key] }))
+  on('store.set', (_$, e) => {
+    store[e.key] = e.value
+    return { value: undefined }
+  })
+  on('session.id', () => ({ value: 'session-1' }))
+  on('session.start', (_$, e) => ({ cwd: e.cwd }))
   on('session.surfaces', () => ({ value: surfaces }))
-  on('session.usage', () => ({ value: usageAt(tokens) }))
+  on('session.usage', () => ({ value: usageAt(world.tokens) }))
   on('session.compact', () => {
-    compactions.count += 1
+    world.count += 1
     return { messages: [{ role: 'user', text: 'the summary', toolUses: [] }] }
   })
   on('turn.complete', () => ({ text: 'done' }))
-  return compactions
+  return world
 }
 
 const TURN = { answer: 'done', durationMs: 1000, isAborted: false, turnId: 'turn-1' } as const
@@ -143,4 +153,51 @@ test('leaves a headless session alone', async ($, on) => {
   const compactions = session(on, tokensAtFree(10), OPTED_IN, [])
   await $.turn.complete({ ...TURN, reason: 'answer' })
   expect(compactions.count).toBe(0)
+})
+
+test('a resumed session keeps the opt-in it launched with', async ($, on) => {
+  const seat = session(on, tokensAtFree(60), OPTED_IN)
+  await $.turn.complete({ ...TURN, reason: 'answer' })
+  expect(seat.count).toBe(1)
+
+  seat.env = {}
+  await $.turn.complete({ ...TURN, reason: 'answer' })
+  expect(seat.count).toBe(2)
+})
+
+test('a resumed session keeps the threshold it launched with', { options: { compactThreshold: 50 } }, async ($, on) => {
+  const seat = session(on, tokensAtFree(90), { BOATYARD_COMPACT_THRESHOLD: '80' })
+  await $.turn.complete({ ...TURN, reason: 'answer' })
+
+  seat.env = {}
+  seat.tokens = tokensAtFree(60)
+  await $.turn.complete({ ...TURN, reason: 'answer' })
+  expect(seat.count).toBe(1)
+})
+
+test('a session resumed before its first turn keeps its opt-in', async ($, on) => {
+  const seat = session(on, undefined, OPTED_IN)
+  await $.session.start({ cwd: '/work', surface: 'terminal', isInteractive: true })
+
+  seat.env = {}
+  seat.tokens = tokensAtFree(60)
+  await $.turn.complete({ ...TURN, reason: 'answer' })
+  expect(seat.count).toBe(1)
+})
+
+test('a session that never opted in stays out after a resume', async ($, on) => {
+  const person = session(on, tokensAtFree(10))
+  await $.turn.complete({ ...TURN, reason: 'answer' })
+
+  person.env = {}
+  await $.turn.complete({ ...TURN, reason: 'answer' })
+  expect(person.count).toBe(0)
+})
+
+test('a headless session keeps no opt-in for a resume', async ($, on) => {
+  const run = session(on, tokensAtFree(60), OPTED_IN, [])
+  await $.session.start({ cwd: '/work', surface: null, isInteractive: false })
+  await $.turn.complete({ ...TURN, reason: 'answer' })
+
+  expect(run.store).toEqual({})
 })
