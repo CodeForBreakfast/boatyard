@@ -113,6 +113,14 @@ sign-on --as independent --cwd ~/src/example-app --label "example-app" --focus
 
 To start an effort, type `/boatyard:muster` and describe the work. Once the work is ready to drive, the seat becomes the effort's steward.
 
+When herdr restores its session, it resumes each seat without `sign-on`, so a seat stops at the startup prompt. Have your shell run this in the background in a pane that herdr restores, before the seat starts:
+
+```sh
+(sign-on --pass-gate &)
+```
+
+It prints nothing. Its failures go to the system log with the tag `sign-on`.
+
 ## Developing
 
 `nix develop` gives you the toolchain, and `nix flake check` runs every test. [`CLAUDE.md`](CLAUDE.md) has the conventions for a change.
