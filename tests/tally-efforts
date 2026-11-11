@@ -104,6 +104,10 @@ effort() { # <top> <jq filter>
 check "one line per effort, folding the effort another depends on and the shared slug" \
   '["ch-2","ch-3","ex-1","ex-3","ex-7"]' "$(jq -sc 'map(.top) | sort' <<<"$output")"
 
+check "every line holds the fields outside products rely on" '[]' \
+  "$(jq -sc 'map(["project","top","slug","steward","ready","restart"] - keys | select(length > 0)) | unique' <<<"$output")"
+check "an effort names its project and slug" '["shipwright","mast-step"]' "$(effort ex-1 '[.project, .slug]')"
+
 check "an effort with no steward says so" 'null' "$(effort ex-1 .steward)"
 check "ready work counts across trackers" '2' "$(effort ex-1 .ready)"
 check "the restart line names the project's checkout" \

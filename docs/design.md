@@ -11,6 +11,7 @@ In scope now:
 - The orchestration skills and the launcher.
 - Long-lived agents for a host that runs them under a service manager. `berth serve` runs a yard's backend under the service manager, and `sign-on` opens each agent from a caller that is not a berth.
 - Compaction at rest, by a mod in the plugin.
+- Waking a steward that a multiplexer resumed, by the same mod.
 
 Later: the integrations that serve interactive panes only, such as agent-state hooks, a statusline, review tabs and window-manager keybinds. Until the port serves them, they call their multiplexer directly.
 
@@ -19,8 +20,9 @@ Later: the integrations that serve interactive panes only, such as agent-state h
 | Component | Role | Depends on |
 |---|---|---|
 | `berth` | The port: a backend-neutral command, plus one adapter per multiplexer | a multiplexer |
-| `sign-on` | Launches Claude Code in a berth and gets it past its startup gate | `berth` |
+| `sign-on` | Launches Claude Code in a berth and gets it past its startup gate, or gets a seat already starting in one past it | `berth` |
 | Compaction mod | Compacts a session at rest before it runs low on context | Claude Code |
+| Resume hook | Sends a resumed steward through its whole wake ritual | Claude Code |
 | Skills | `steward`, `worker`, `muster` and `tally` | `sign-on`, `berth` |
 
 The port knows only terminal mechanics. It knows nothing about Claude Code. The startup gate belongs to Claude Code, so it lives in `sign-on`. Compaction is useful without any orchestration, so it runs inside every session that loads the plugin, in a berth or not, and does not use the port.
@@ -103,12 +105,13 @@ Where a verb needs the caller, such as a worker's opener or the opener a berth o
 
 ### Contract for outside consumers
 
-A product outside boatyard may depend on two things, and on nothing else of boatyard's:
+A product outside boatyard may depend on three things, and on nothing else of boatyard's:
 
 - **The three variables** above, inherited by every process a berth runs.
 - **`berth list`'s JSON:** an array with one object per berth, each holding exactly the fields `id`, `label`, `relationship`, `parent`, `state`, `agent_state` and `agent_session`, with the values the verbs table and *Berth and agent states* give them.
+- **The efforts output:** the JSON lines that `skills/tally/efforts` prints, one per open effort, each holding at least the fields `project`, `top`, `slug`, `steward`, `ready` and `restart`, with the meanings the tally skill gives them. Its other fields, `also`, `status`, `gates` and `asks`, are not part of the contract.
 
-Dropping, renaming or changing the meaning of a variable or a field breaks the contract, and so does a new value that a consumer could not have expected. Boatyard cuts no releases, so the pull request making such a change marks it breaking with a `!` in its title, and the commit it lands as carries the mark on `main`. The port contract suite fails when a field is added, dropped or renamed, so no change to the shape lands unnoticed.
+Dropping, renaming or changing the meaning of a variable or a field breaks the contract, and so does a new value that a consumer could not have expected. Boatyard cuts no releases, so the pull request making such a change marks it breaking with a `!` in its title, and the commit it lands as carries the mark on `main`. The port contract suite fails when a field is added, dropped or renamed, so no change to the shape lands unnoticed. The tally efforts check fails when one of the six efforts fields is dropped or renamed.
 
 ### Errors
 
@@ -124,6 +127,7 @@ It is written first. Its obligations beyond straight mapping:
 - **The parked-on-background-work correction** described under Berth and agent states.
 - **The lost-agent correction.** Where a wrapper renames Claude Code's process, as Nix's does, herdr names it from its argv, and skips reading argv while the process waits on the disk, as under swap. Enough misses clear the agent, and herdr may not look again for minutes. The session reported at Claude Code's start-up survives, so a pane with no agent, a session, and a foreground process other than its shell has the agent state `active`, not none.
 - **The agent session.** A berth's agent session is the id that herdr reports as the pane's `agent_session`. herdr keeps that id after the agent leaves, so the adapter lists none for a berth with no agent state.
+- **Restore.** When herdr restores a session, each pane keeps its id, cwd and label but loses its metadata tokens, which hold a berth's relationship, place and parent. So the adapter also saves each berth's tokens in a file per pane, under `berth/herdr/<yard>/` in `$XDG_STATE_HOME`, or `~/.local/state` without it. The next `open`, `name`, `list` or `close` puts the saved tokens back on any pane that has lost them, and forgets the panes that have gone. A restored pane comes back as a bare shell, so the adapter marks each pane whose tokens it puts back. When `open` adopts a marked tender whose shell sits alone in the foreground, it types the berth's command in again and clears the mark. A tender that herdr did not restore is adopted without running anything, even where its command has exited.
 - **The cascade.** herdr keeps a workspace's other panes when its first pane closes, so the adapter closes them itself. It closes a whole workspace only for the independent berth that opened it, and only while no other independent berth lives there. Any other berth closes its own pane.
 - **Waiting for the shell.** herdr starts every pane with a shell, so the adapter types the berth's command into it. It types only once the shell has settled alone in the foreground, because a child of the shell's start-up, such as a dev shell's hook, can read the terminal and swallow typed input.
 - **Screen source.** `wait-text` matches herdr's recent output, not only the visible frame. A pane shorter than the text it waits for never shows all of it at once.
@@ -157,6 +161,13 @@ A seat is born in its repository's main checkout, never in a linked worktree. Cl
 
 A host that starts long-lived agents from a script calls `sign-on` there too, so the gate logic exists once.
 
+`sign-on --pass-gate [<berth>]` runs step 4 alone, on a seat that is already starting in a berth. It serves a seat that herdr resumed. herdr restores a seat by typing `claude --resume` into a fresh shell in the seat's pane, so `sign-on` never runs and the seat stops at its gate. A host's shell starts `sign-on --pass-gate` in the background from that pane, and it waits for the gate as a launch does, with the same gate text and limits.
+
+- With no berth named, it acts on the caller's own: `BERTH_ID`, or else the herdr pane in `HERDR_PANE_ID`. A resumed pane keeps only what herdr's server environment held, so where `BERTH_BACKEND` is unset and `HERDR_PANE_ID` is set, it takes herdr as the backend.
+- It exits 0 once the gate has cleared, 1 when it is stuck, and 2 on a usage error.
+- It prints nothing, because whatever it wrote would land on the seat's screen. Its failures go to the system log through `logger` with the tag `sign-on`. On Linux that is the journal, read with `journalctl -t sign-on`. On macOS it is the unified log, which `log show` reads. A failure names the berth and what it showed, and leaves the berth for a person to pass by hand.
+- A usage error goes to standard error, because it is a fault in the caller's script.
+
 ## Compaction
 
 A mod in the plugin compacts a session at the end of a turn once its free context falls below a threshold. The next message then lands on a lean context, rather than the session drifting into Claude Code's own auto-compact mid-turn.
@@ -165,7 +176,16 @@ A mod in the plugin compacts a session at the end of a turn once its free contex
 - **The figure is free context before auto-compact,** as a whole percentage of the space usable before auto-compact. A session with auto-compact off measures against its whole window.
 - **A turn with no figure is left alone.** The engine has none until a session's first response, and none straight after a compact, so the mod never compacts twice running. It does not compact after an interrupted turn, which the person is about to follow up, or at the end of a subagent's turn.
 - **A session is left alone unless it has opted in,** so a person's interactive session is never compacted by surprise. Setting `BOATYARD_COMPACT_THRESHOLD` in a session's environment opts that session in. A whole number gives the session its own threshold, which wins over the plugin setting, and an empty value keeps the setting's threshold. `sign-on` sets it for every seat it launches, to the launch's compaction threshold or else empty. Any other value is logged and ignored, and the session stays opted in at the setting's threshold.
+- **The opt-in survives a resume.** A multiplexer may resume a session in a new process without the environment it launched with. So the mod keeps a session's `BOATYARD_COMPACT_THRESHOLD` in the plugin's own store under the session's id, and a session without the variable takes the value kept for its id. A session that never had the variable has nothing kept, so a person's session stays out after a resume too. A session that draws nowhere keeps nothing.
 - **Plugin settings can opt in every session and set the threshold.** `compactAtRest` is off by default. The threshold is 70 by default.
+
+## A resumed steward
+
+A multiplexer that restores its session resumes each seat's conversation in a new process. The steward's wake ritual tells a fresh start from a compaction by whether commy is bound, and a resumed seat's commy comes back bound. So the plugin's mod tells a resumed steward to run the whole ritual.
+
+- **The mod marks a steward when the steward skill loads.** It keeps the mark in the plugin's own store under the session's id, which a resume keeps.
+- **On a resume of a marked session, the mod submits one message.** It tells the seat to run the wake ritual's reachable half, then its reconstruct half. A worker, a person's session, a fresh start and a compaction get nothing.
+- **The message waits until the session's interface has mounted.** Claude Code runs its start hooks before that, and refuses a prompt until it has. A resumed session with no interface, such as a `-p` run, gets nothing.
 
 ## Skills
 
@@ -194,7 +214,7 @@ Pull requests are GitHub's. The skills read, wait on and merge them with `gh` an
 - **One flake exporting two packages:** `berth` and `sign-on`. The packages matter as much as the plugin. A service manager does not see the plugin's `bin/`, so a host that runs agents under one installs the packages.
 - **Host inputs.** The multiplexer package, the Claude Code command and flags, and the settings path are all package arguments or configuration. A host supplies its own.
 - **A host keeps its seats' claims alive.** A bd claim's lease lapses unless something renews it, and `tally` reads a steward as live only while its top bead's lease is. The host renews the claims of every running seat, including a seat that is asleep.
-- **A host allows the plugin's mod.** Where a host's managed settings limit mods to its organization's, the compaction mod does not load until the host allows it.
+- **A host allows the plugin's mod.** Where a host's managed settings limit mods to its organization's, the plugin's mod does not load until the host allows it.
 - **Runtime dependencies.** The scripts in `bin/` state their dependencies, such as `jq`, for readers who do not use nix.
 - **One revision per host.** Claude Code puts a plugin's `bin/` after the ambient path, so where a host installs the packages, the packages run and the plugin supplies only the skills. A host that installs both loads the plugin from the same revision as the packages, with `--plugin-dir` on its Claude Code command.
 
@@ -203,7 +223,7 @@ Pull requests are GitHub's. The skills read, wait on and merge them with `gh` an
 - **Port contract suite.** One suite states what every adapter must do: open in each relationship, list, name, send-text, send-key, wait-text, read, state, agent state across all three agent states and none, close, and the cascade when an independent berth closes. It runs against every adapter.
   - For herdr, it runs a throwaway server with `HOME` redirected and every `HERDR_*` variable unset. An inherited `HERDR_SOCKET_PATH` would otherwise drive the live session. The server runs inside the nix build sandbox, so the suite is a flake check.
   - herdr treats a process named `claude` as an agent and reads its state from the screen. The suite drives the states with a stand-in process of that name, not with Claude Code.
-- **Unit tests.** The compaction mod's rule has its own tests, run by `claude plugin test` against a stand-in engine. So does each adapter's mapping from backend states to the port's agent states, including the herdr parked-on-background-work and lost-agent corrections.
+- **Unit tests.** The mod's compaction rule and its rule for a resumed steward have their own tests, run by `claude plugin test` against a stand-in engine. So does each adapter's mapping from backend states to the port's agent states, including the herdr parked-on-background-work and lost-agent corrections.
 - **End to end.** One real effort runs on `steward` and `worker`.
 
 ## Open decisions

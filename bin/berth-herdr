@@ -4,7 +4,8 @@
 #
 # A berth is a herdr pane, and its id is herdr's pane id. A yard is a herdr
 # session. The relationship and the opener live on the pane as metadata
-# tokens, so herdr itself is the only record.
+# tokens. herdr drops those when it restores a session, so the adapter keeps
+# a copy of each berth's tokens to put back.
 #
 # Needs: bash, coreutils, herdr, jq.
 set -euo pipefail
@@ -93,6 +94,42 @@ pane_get() {
 
 existing_pane() { # <id> <what the verb could not do>
   on_berth "$1" "$2" pane_get "$1"
+}
+
+saved_tokens=${XDG_STATE_HOME:-$HOME/.local/state}/berth/herdr
+
+# Reports a berth's tokens to herdr, and saves all of its tokens.
+report_tokens() { # <id> <report-metadata options>...
+  local id=$1 dir=$saved_tokens/$yard
+  shift
+  herdr_result pane report-metadata "$id" --source berth "$@" >/dev/null
+  mkdir -p "$dir"
+  pane_get "$id" | jq -c '.tokens | with_entries(select(.key | startswith("berth_")))' >"$dir/.$id.$$"
+  mv "$dir/.$id.$$" "$dir/$id"
+}
+
+# Puts back the saved tokens of each pane that herdr restored without them,
+# and forgets the berths that have gone. A berth opened after the pane list
+# was taken is missing from it, so its tokens are kept. herdr restores a pane
+# with a bare shell, and berth_restored says so until a tender's adoption
+# starts its command again.
+restore_berths() {
+  local dir=$saved_tokens/$yard listed panes file id tokens
+  [ -d "$dir" ] || return 0
+  listed=$(mktemp)
+  panes=$(herdr_result pane list)
+  for file in "$dir"/*; do
+    [ -f "$file" ] || continue
+    id=${file##*/}
+    case $(jq -r --arg id "$id" '.panes[] | select(.pane_id == $id) | .tokens.berth_relationship // "lost"' <<<"$panes") in
+      lost)
+        mapfile -t tokens < <(jq -r 'to_entries[] | "--token", "\(.key)=\(.value)"' "$file")
+        report_tokens "$id" "${tokens[@]}" --token berth_restored=true
+        ;;
+      "") [ "$file" -nt "$listed" ] || rm -f "$file" ;;
+    esac
+  done
+  rm -f "$listed"
 }
 
 # The given berth, or the calling pane. A pane id is unique only within its
@@ -196,9 +233,20 @@ await_shell() { # <id>
   echo "berth (herdr): the shell in berth $id was still starting after ${shell_wait_seconds}s, so its command is typed anyway and may be lost." >&2
 }
 
+# herdr gives a pane its id only once it exists, so BERTH_ID reaches the
+# command rather than the pane's shell.
+run_in() { # <id> <command>...
+  local id=$1 command
+  shift
+  printf -v command '%q ' "$@"
+  await_shell "$id"
+  herdr_result pane run "$id" "env BERTH_ID=$(printf '%q' "$id") $command" >/dev/null
+}
+
 open() {
-  local as=$1 place=$2 focus=$3 cwd=$4 label=$5 opener=$6 id opener_pane workspace panes tab target
+  local as=$1 place=$2 focus=$3 cwd=$4 label=$5 opener=$6 id tender opener_pane workspace panes tab target
   shift 6
+  restore_berths
 
   if [ "$as" = independent ]; then
     case $place in
@@ -226,11 +274,14 @@ open() {
     workspace=$(jq -r .workspace_id <<<"$opener_pane")
 
     if [ "$as" = tender ] && [ -n "$label" ]; then
-      id=$(herdr_result pane list --workspace "$workspace" | jq -r --arg label "$label" '
-        first(.panes[] | select(.tokens.berth_relationship == "tender" and .label == $label))
-        | .pane_id')
-      if [ -n "$id" ]; then
-        herdr_result pane report-metadata "$id" --source berth --token "berth_parent=$opener" >/dev/null
+      tender=$(herdr_result pane list --workspace "$workspace" | jq -c --arg label "$label" '
+        first(.panes[] | select(.tokens.berth_relationship == "tender" and .label == $label))')
+      if [ -n "$tender" ]; then
+        id=$(jq -r .pane_id <<<"$tender")
+        report_tokens "$id" --token "berth_parent=$opener" --clear-token berth_restored
+        if jq -e '.tokens.berth_restored' <<<"$tender" >/dev/null && shell_alone "$id"; then
+          run_in "$id" "$@"
+        fi
         printf '%s\n' "$id"
         return
       fi
@@ -258,22 +309,16 @@ open() {
   fi
 
   [ -z "$label" ] || herdr_result pane rename "$id" "$label" >/dev/null
-  herdr_result pane report-metadata "$id" --source berth --token "berth_relationship=$as" \
-    --token "berth_place=$place" ${opener:+--token "berth_parent=$opener"} >/dev/null
-
-  # herdr gives a pane its id only once it exists, so BERTH_ID reaches the
-  # command rather than the pane's shell.
-  local command
-  printf -v command '%q ' "$@"
-  await_shell "$id"
-  herdr_result pane run "$id" "env BERTH_ID=$(printf '%q' "$id") $command" >/dev/null
-
+  report_tokens "$id" --token "berth_relationship=$as" --token "berth_place=$place" \
+    ${opener:+--token "berth_parent=$opener"}
+  run_in "$id" "$@"
   printf '%s\n' "$id"
 }
 
 name() {
   local id pane
   id=$(berth_id "$1")
+  restore_berths
   pane=$(existing_pane "$id" "it cannot be named")
   herdr_result pane rename "$id" "$2" >/dev/null
   [ "$(jq -r '.tokens.berth_relationship // empty' <<<"$pane")" = independent ] || return 0
@@ -333,6 +378,7 @@ read_screen() {
 list() {
   local panes berths id states='{}' state
   yard=${1:-$yard}
+  restore_berths
   panes=$(herdr_result pane list)
   berths=$(jq -c '[.panes[] | select(.tokens.berth_relationship)]' <<<"$panes")
   for id in $(jq -r '.[].pane_id' <<<"$berths"); do
@@ -391,6 +437,7 @@ owns_workspace() { # <pane>
 close() {
   local id pane panes child status=0
   id=$(berth_id "$1")
+  restore_berths
   pane=$(pane_get "$id") || status=$?
   case $status in
     0) ;;
@@ -408,6 +455,7 @@ close() {
   else
     herdr_result pane close "$id" >/dev/null
   fi
+  rm -f "$saved_tokens/$yard/$id"
 }
 
 verb=$1

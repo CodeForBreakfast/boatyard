@@ -312,6 +312,73 @@ check "the berth opens in the yard berth resolves" true \
   "$(berth list | jq -r --arg id "$id" 'any(.[]; .id == $id)')"
 check "the command learns that BERTH_YARD" "$BERTH_YARD" "$(recorded plain BERTH_YARD)"
 
+echo "# a seat already starting in a berth"
+
+# --pass-gate sends its failures to the system log, so a stand-in logger
+# records what it is given.
+mkdir -p "$work/log"
+cat >"$work/log/logger" <<EOF
+#!$BASH
+printf '%s\n' "\$*" >>"$work/logger.args"
+cat >>"$work/logger.out"
+EOF
+chmod +x "$work/log/logger"
+
+id=$(berth open --as independent --cwd "$work/project" -- "$(seat running rest 2)")
+out=$(PATH=$work/log:$PATH SIGN_ON_GATE=$gate sign-on --pass-gate "$id" 2>&1)
+check "--pass-gate takes a named berth past its gate" 0 "$?"
+check "and prints nothing" "" "$out"
+check "the gate took two Enters and is gone from the screen" false \
+  "$(contains "$(berth read "$id")" "$gate")"
+check "and nothing went to the system log" false "$(test -s "$work/logger.out" && echo true || echo false)"
+
+echo "# a seat that herdr resumed"
+
+# herdr restores a seat by typing its claude --resume into a fresh shell in
+# the seat's pane, whose environment holds HERDR_PANE_ID and HERDR_SESSION and
+# nothing that sign-on or berth set. The caller starts --pass-gate in the
+# background from there, before Claude Code has drawn its gate. HERDR_SESSION
+# is set only in a pane of a named session, so this runs in one.
+resumed=resumed
+env -u BERTH_YARD -u BERTH_ID berth serve "$resumed" >"$work/serve.log" 2>&1 &
+serving=$!
+trap 'kill "$serving" 2>/dev/null' EXIT
+eventually berth list "$resumed" >/dev/null 2>&1
+
+resume() { # <name> <SIGN_ON_START_TIMEOUT> <enters the gate takes>
+  local pane
+  pane=$(herdr --session "$resumed" workspace create --cwd "$work/project" --no-focus |
+    jq -r .result.root_pane.pane_id)
+  herdr --session "$resumed" pane run "$pane" "(env -u BERTH_BACKEND -u BERTH_YARD -u BERTH_ID \
+PATH='$work/log:$PATH' SIGN_ON_GATE='$gate' SIGN_ON_START_TIMEOUT=$2 \
+sign-on --pass-gate; echo \$? >'$work/$1.status') & $(seat "$1" rest "$3")" >/dev/null
+  printf '%s\n' "$pane"
+}
+
+finished() { # <name>
+  eventually test -s "$work/$1.status"
+  cat "$work/$1.status"
+}
+
+in_resumed() { env -u BERTH_ID BERTH_YARD=$resumed berth "$@"; }
+
+pane=$(resume woken 30 2)
+check "--pass-gate from a resumed seat's own pane succeeds" 0 "$(finished woken)"
+check "the pane is in a named session" "$resumed" "$(recorded woken HERDR_SESSION)"
+check "the gate took two Enters" 2 "$(keys woken)"
+check "and is gone from the pane's screen" false "$(contains "$(in_resumed read "$pane")" "$gate")"
+
+pane=$(resume ungated 3 0)
+check "--pass-gate on a resumed seat that shows no gate fails" 1 "$(finished ungated)"
+eventually grep -q "did not show the gate" "$work/logger.out"
+check "and says why in the system log" true "$(contains "$(cat "$work/logger.out")" "did not show the gate")"
+check "under the tag sign-on" true "$(grep -qx -- "-t sign-on" "$work/logger.args" && echo true || echo false)"
+check "and names the seat's berth" true "$(contains "$(cat "$work/logger.out")" "the berth $pane ")"
+check "and does not advise closing it" false "$(contains "$(cat "$work/logger.out")" "close")"
+check "and writes nothing on the seat's screen" false "$(contains "$(in_resumed read "$pane")" "sign-on")"
+
+kill "$serving"
+
 echo "# failures"
 
 fails() { # <what> <word the reason has> <sign-on's environment and arguments>...
@@ -357,6 +424,8 @@ fails "an --env that is not an assignment" usage \
   sign-on --as independent --cwd "$work/project" --env SEAT_ROLE "$prompt"
 fails "a threshold that is not a whole number" usage \
   sign-on --as independent --cwd "$work/project" --threshold 70% "$prompt"
+fails "--pass-gate with two berths" usage sign-on --pass-gate one two
+fails "--pass-gate with a launch's flags" usage sign-on --pass-gate --as independent
 
 echo
 if [ "$failures" -gt 0 ]; then

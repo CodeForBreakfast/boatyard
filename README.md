@@ -10,7 +10,7 @@ boatyard is one developer's daily setup, published as it is. It supports one mul
 
 - **`berth`** is a small command for opening, naming, reading and closing terminal panes, for asking whether one is still open, and for asking whether the agent in one is busy, at rest or waiting on a person. The skills only ever talk to the multiplexer through it, and herdr is its first backend.
 - **`sign-on`** launches Claude Code in a new berth and gets it past Claude Code's startup prompt.
-- **The Claude Code plugin** carries four skills and the compaction mod:
+- **The Claude Code plugin** carries four skills and a mod that compacts sessions at rest and wakes a resumed steward:
   - `muster` turns a body of work into an effort a steward can drive.
   - `steward` drives one effort.
   - `worker` does one bead's worth of work inside an effort.
@@ -51,7 +51,7 @@ git clone https://github.com/CodeForBreakfast/boatyard ~/src/boatyard
 claude --plugin-dir ~/src/boatyard
 ```
 
-If your managed settings allow only your own organization's plugin mods, allow this one too, or the compaction mod does not load.
+If your managed settings allow only your own organization's plugin mods, allow this one too, or the plugin's mod does not load.
 
 ### Configuration
 
@@ -112,6 +112,14 @@ sign-on --as independent --cwd ~/src/example-app --label "example-app" --focus
 ```
 
 To start an effort, type `/boatyard:muster` and describe the work. Once the work is ready to drive, the seat becomes the effort's steward.
+
+When herdr restores its session, it resumes each seat without `sign-on`, so a seat stops at the startup prompt. Have your shell run this in the background in a pane that herdr restores, before the seat starts:
+
+```sh
+(sign-on --pass-gate &)
+```
+
+It prints nothing. Its failures go to the system log with the tag `sign-on`.
 
 ## Developing
 

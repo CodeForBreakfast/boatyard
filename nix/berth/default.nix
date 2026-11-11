@@ -22,6 +22,7 @@ in
     berth-herdr-caller = herdrSuite "herdr-caller";
     berth-herdr-shell-start = herdrSuite "herdr-shell-start";
     berth-herdr-binary = herdrSuite "herdr-binary";
+    berth-herdr-restore = herdrSuite "herdr-restore";
 
     berth-herdr-state = pkgs.runCommand "berth-herdr-state"
       { nativeBuildInputs = [ berth pkgs.bash pkgs.jq ]; } ''
@@ -40,7 +41,7 @@ in
       shellcheck ${../../bin/berth} ${../../bin/berth-herdr} ${../../bin/berth-herdr-state} \
         ${../../tests/with-herdr-yard} ${../../tests/berth-contract} ${../../tests/herdr-layout} \
         ${../../tests/herdr-state} ${../../tests/herdr-lost-agent} ${../../tests/herdr-caller} \
-        ${../../tests/herdr-shell-start} ${../../tests/herdr-binary} ${../../tests/herdr-session} \
+        ${../../tests/herdr-shell-start} ${../../tests/herdr-binary} ${../../tests/herdr-session} ${../../tests/herdr-restore} \
         ${../../tests/berth-usage}
       touch $out
     '';
