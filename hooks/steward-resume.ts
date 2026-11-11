@@ -21,8 +21,18 @@ export const register: Register = (on) => {
     return next(e)
   })
 
+  // A new process runs SessionStart before its REPL mounts, and the engine
+  // refuses a prompt until then. An interactive session.start follows the mount.
+  let resumedSteward = false
+
   on('classic.SessionStart', async ($, e, next) => {
-    if (e.source === 'resume' && (await $.store.get(stewardKey(e.session_id))) === true) {
+    resumedSteward = e.source === 'resume' && (await $.store.get(stewardKey(e.session_id))) === true
+    return next(e)
+  })
+
+  on('session.start', { isInteractive: true }, async ($, e, next) => {
+    if (resumedSteward) {
+      resumedSteward = false
       void $.prompt.submit({ text: WAKE_RITUAL })
     }
     return next(e)
