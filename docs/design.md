@@ -185,6 +185,7 @@ A multiplexer that restores its session resumes each seat's conversation in a ne
 
 - **The mod marks a steward when the steward skill loads.** It keeps the mark in the plugin's own store under the session's id, which a resume keeps.
 - **On a resume of a marked session, the mod submits one message.** It tells the seat to run the wake ritual's reachable half, then its reconstruct half. A worker, a person's session, a fresh start and a compaction get nothing.
+- **The message waits until the session's interface has mounted.** Claude Code runs its start hooks before that, and refuses a prompt until it has. A resumed session with no interface, such as a `-p` run, gets nothing.
 
 ## Skills
 
