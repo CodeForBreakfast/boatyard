@@ -170,12 +170,13 @@ stop() {
 
 # Each session's core keeps a state folder of its own.
 yards() {
-  local dir
+  local dir up=()
   for dir in "${XDG_STATE_HOME:-$HOME/.local/state}"/herdr-core/*/; do
     [ -d "$dir" ] || continue
     dir=${dir%/}
-    ! yard_running "${dir##*/}" || echo "${dir##*/}"
+    ! yard_running "${dir##*/}" || up+=("${dir##*/}")
   done
+  [ ${#up[@]} = 0 ] || printf '%s\n' "${up[@]}"
 }
 
 # hc can only type text and press Enter in one go, so text sent without a key
