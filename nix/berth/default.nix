@@ -3,10 +3,15 @@
 let
   berth = pkgs.callPackage ./package.nix { };
 
+  openByHand = pkgs.writeShellScript "herdr-open-by-hand" ''
+    exec bash ${../../tests/herdr-open-by-hand} "$@"
+  '';
+
   # Each suite runs against a herdr server of its own inside the build
   # sandbox.
   herdrSuite = suite: pkgs.runCommand "berth-${suite}"
     { nativeBuildInputs = [ berth pkgs.bash pkgs.coreutils pkgs.herdr pkgs.jq ]; } ''
+    export BERTH_OPEN_BY_HAND=${openByHand}
     bash ${../../tests/with-herdr-yard} bash ${../../tests + "/${suite}"}
     touch $out
   '';
@@ -42,7 +47,7 @@ in
         ${../../tests/with-herdr-yard} ${../../tests/berth-contract} ${../../tests/herdr-layout} \
         ${../../tests/herdr-state} ${../../tests/herdr-lost-agent} ${../../tests/herdr-caller} \
         ${../../tests/herdr-shell-start} ${../../tests/herdr-binary} ${../../tests/herdr-session} ${../../tests/herdr-restore} \
-        ${../../tests/berth-usage}
+        ${../../tests/berth-usage} ${../../tests/herdr-open-by-hand}
       touch $out
     '';
   };

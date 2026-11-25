@@ -375,27 +375,38 @@ read_screen() {
   on_berth "$id" "it cannot be read" herdr_call pane read "$id" --source visible --format text
 }
 
-list() {
-  local panes berths id states='{}' state
+yards() {
+  local out
+  out=$(env -u HERDR_SOCKET_PATH "$herdr" session list --json 2>&1) ||
+    die "herdr session list failed: $out"
+  jq -r '.sessions[] | select(.running) | .name' <<<"$out"
+}
+
+# With all, a pane that berth did not open is listed while it runs an agent.
+list() { # <yard> <berths|all>
+  local panes listed id states='{}' state
   yard=${1:-$yard}
   restore_berths
   panes=$(herdr_result pane list)
-  berths=$(jq -c '[.panes[] | select(.tokens.berth_relationship)]' <<<"$panes")
-  for id in $(jq -r '.[].pane_id' <<<"$berths"); do
-    state=$(pane_agent_state "$(jq -c --arg id "$id" '.[] | select(.pane_id == $id)' <<<"$berths")")
+  listed=$(jq -c --arg scope "$2" \
+    '[.panes[] | select($scope == "all" or .tokens.berth_relationship)]' <<<"$panes")
+  for id in $(jq -r '.[].pane_id' <<<"$listed"); do
+    state=$(pane_agent_state "$(jq -c --arg id "$id" '.[] | select(.pane_id == $id)' <<<"$listed")")
     states=$(jq -c --arg id "$id" --arg state "$state" '.[$id] = $state' <<<"$states")
   done
   # herdr keeps an agent's session once the agent has left.
   jq --argjson states "$states" '
-    [.[] | ($states[.pane_id] | if . == "none" then null else . end) as $agent | {
+    [.[] | ($states[.pane_id] | if . == "none" then null else . end) as $agent
+      | (.tokens.berth_relationship // null) as $relationship
+      | select($relationship != null or $agent != null) | {
       id: .pane_id,
       label: (.label // null),
-      relationship: .tokens.berth_relationship,
+      relationship: $relationship,
       parent: (.tokens.berth_parent // null),
       state: "open",
       agent_state: $agent,
       agent_session: (if $agent == null then null else .agent_session.value? // null end)
-    }]' <<<"$berths"
+    }]' <<<"$listed"
 }
 
 state() {
@@ -461,7 +472,7 @@ close() {
 verb=$1
 shift
 case "$verb" in
-  serve | stop | open | name | list | state | close) "$verb" "$@" ;;
+  serve | stop | open | name | list | state | close | yards) "$verb" "$@" ;;
   yard) echo "$yard" ;;
   id) berth_id "$1" ;;
   send-text) send_text "$@" ;;
