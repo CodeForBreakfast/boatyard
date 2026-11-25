@@ -125,13 +125,14 @@ new_place_id() { # <sp|tb>
 # stands in for the size floors that herdr's adapter measures.
 workers_per_tab=4
 
-# The tab in the opener's space where its next worker goes.
+# The tab in the opener's space where its next worker goes: the oldest of its
+# workers' tabs that has room.
 worker_tab() { # <opener> <space>
   local tab
   tab=$(terminals | jq -r --arg opener "$1" --arg space "$2" --argjson most "$workers_per_tab" '
     [.[] | select(.labels["berth.parent"] == $opener and .labels["berth.relationship"] == "worker"
-      and .labels["herdr.space"] == $space) | .labels["herdr.tab"]]
-    | group_by(.) | first(.[] | select(length < $most) | .[0]) // empty')
+      and .labels["herdr.space"] == $space)] | sort_by(.created_ms) | map(.labels["herdr.tab"]) as $tabs
+    | first($tabs[] as $tab | select([$tabs[] | select(. == $tab)] | length < $most) | $tab) // empty')
   [ -n "$tab" ] || tab=$(new_place_id tb)
   printf '%s\n' "$tab"
 }
