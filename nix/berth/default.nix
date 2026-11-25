@@ -2,6 +2,7 @@
 
 let
   berth = pkgs.callPackage ./package.nix { };
+  sign-on = pkgs.callPackage ../sign-on/package.nix { };
 
   openByHand = pkgs.writeShellScript "herdr-open-by-hand" ''
     exec bash ${../../tests/herdr-open-by-hand} "$@"
@@ -24,7 +25,7 @@ let
   # hc cannot type text without pressing Enter, so text that berth holds for
   # the next Enter does not show on screen until then.
   herdrAppSuite = suite: pkgs.runCommand "berth-${suite}-herdr-app"
-    { nativeBuildInputs = [ berth pkgs.bash pkgs.coreutils pkgs.flock pkgs.herdr-core pkgs.jq ]; } ''
+    { nativeBuildInputs = [ berth sign-on pkgs.bash pkgs.coreutils pkgs.flock pkgs.herdr-core pkgs.jq ]; } ''
     export BERTH_OPEN_BY_HAND=${openByHandInApp}
     export BERTH_CONTRACT_GAPS=unsent-text-shows
     bash ${../../tests/with-herdr-app-yard} bash ${../../tests + "/${suite}"}
@@ -39,6 +40,7 @@ in
     berth-contract-herdr-app = herdrAppSuite "berth-contract";
     berth-herdr-app-caller = herdrAppSuite "herdr-app-caller";
     berth-herdr-app-layout = herdrAppSuite "herdr-app-layout";
+    berth-herdr-app-restore = herdrAppSuite "herdr-app-restore";
     berth-herdr-layout = herdrSuite "herdr-layout";
     berth-herdr-lost-agent = herdrSuite "herdr-lost-agent";
     berth-herdr-session = herdrSuite "herdr-session";
@@ -67,7 +69,7 @@ in
         ${../../tests/herdr-shell-start} ${../../tests/herdr-binary} ${../../tests/herdr-session} ${../../tests/herdr-restore} \
         ${../../tests/berth-usage} ${../../tests/herdr-open-by-hand} \
         ${../../bin/berth-herdr-app} ${../../tests/with-herdr-app-yard} ${../../tests/herdr-app-open-by-hand} \
-        ${../../tests/herdr-app-caller} ${../../tests/herdr-app-layout}
+        ${../../tests/herdr-app-caller} ${../../tests/herdr-app-layout} ${../../tests/herdr-app-restore}
       touch $out
     '';
   };

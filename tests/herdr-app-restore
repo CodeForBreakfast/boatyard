@@ -1,0 +1,155 @@
+#!/usr/bin/env bash
+# The herdr app adapter brings its seats back as agents after herdr-core
+# restarts. See docs/design.md, "The herdr app adapter".
+#
+# The yard's core is stopped and served again, which is when herdr-core gives
+# each kept terminal a bare shell. The core this suite serves is stopped by the
+# pid it was started with, and by nothing else.
+#
+# Run it under with-herdr-app-yard.
+#
+# Needs: bash, coreutils, flock, herdr-core, jq, berth, sign-on.
+set -uo pipefail
+
+: "${BERTH_BACKEND:?}"
+work=$(mktemp -d)
+failures=0
+
+check() { # <what> <want> <got>
+  if [ "$2" = "$3" ]; then
+    echo "ok: $1"
+  else
+    echo "FAIL: $1: wanted '$2', got '$3'"
+    failures=$((failures + 1))
+  fi
+}
+
+eventually() { # <command>...
+  local _
+  for _ in $(seq 1 300); do
+    "$@" && return 0
+    sleep 0.1
+  done
+  return 1
+}
+
+# A stand-in for Claude Code shows a startup gate, then records the session
+# id on its terminal as the plugin's mod does, and reports itself at rest. Each
+# start logs what it was started with.
+export SIGN_ON_GATE="Press Enter to go on"
+echo "#!$(command -v bash)" >"$work/claude"
+cat >>"$work/claude" <<'EOF'
+log=$1
+shift
+echo "args=$* id=$BERTH_ID yard=$BERTH_YARD backend=$BERTH_BACKEND seat=${SEAT:-none}" >>"$log"
+echo "$SIGN_ON_GATE"
+read -r reply
+echo "passed${reply:+ $reply}" >>"$log"
+hc label "$HC_TERMINAL_ID" claude.session=s-1 >/dev/null
+printf '\e]7501;:state=idle:app=claude-code\e\\'
+exec sleep 600
+EOF
+chmod +x "$work/claude"
+
+starts() { # <log>
+  grep -c '^args=' "$1" 2>/dev/null || echo 0
+}
+
+passed() { # <log>
+  grep -c '^passed' "$1" 2>/dev/null || echo 0
+}
+
+session_of() { # <id>
+  berth list 2>>"$work/list.err" | jq -r --arg id "$1" '.[] | select(.id == $id) | .agent_session // "none"'
+}
+
+has_session() { # <id>
+  [ "$(session_of "$1")" = s-1 ]
+}
+
+# sign-on puts the seat's environment before the command, and its prompt last
+# after --.
+seat=$(berth open --as independent --cwd "$work" --label seat -- \
+  env SEAT=one "$work/claude" "$work/seat.log" --model m -- "the first prompt")
+eventually test "$(starts "$work/seat.log")" = 1
+berth send-key "$seat" Enter
+eventually has_session "$seat"
+
+# A command whose -- is not just before its last word is not one the adapter
+# knows how to resume.
+odd=$(berth open --as independent --cwd "$work" --label odd -- \
+  "$work/claude" "$work/odd.log" -- "a prompt" --model m)
+eventually test "$(starts "$work/odd.log")" = 1
+berth send-key "$odd" Enter
+eventually has_session "$odd"
+
+viewer() { # <opener>
+  BERTH_ID=$1 berth open --as tender --cwd "$work" --label viewer -- \
+    bash -c "echo run >>$(printf '%q' "$work/viewer-runs"); exec sleep 600"
+}
+view=$(viewer "$seat")
+eventually test "$(wc -l <"$work/viewer-runs" 2>/dev/null)" = 1
+
+echo "# herdr-core restarts"
+
+yard_down() {
+  ! berth yards | grep -qx "$BERTH_YARD"
+}
+yard_up() {
+  ! yard_down
+}
+# Serving straight after a stop now and then finds the yard briefly held by
+# a core the suite did not start, so the suite serves until its own core
+# holds the yard.
+serving=""
+trap 'kill "$serving" 2>/dev/null; wait "$serving" 2>/dev/null' EXIT
+serve_again() {
+  eventually yard_down || return 1
+  berth serve "$BERTH_YARD" >"$work/serve.log" 2>&1 &
+  serving=$!
+  eventually yard_up && sleep 0.5 && kill -0 "$serving" 2>/dev/null
+}
+berth stop "$BERTH_YARD"
+for _ in 1 2 3 4 5; do
+  ! serve_again || break
+done
+kill -0 "$serving" 2>/dev/null || { echo "the core did not come back."; cat "$work/serve.log"; exit 1; }
+
+# The first calls after the restart race each other to resume the seats.
+berth list >/dev/null 2>>"$work/list.err" &
+first=$!
+berth list >/dev/null 2>>"$work/list.err" &
+wait "$first" $!
+
+eventually has_session "$seat"
+check "a seat comes back under the same berth with its agent session" s-1 "$(session_of "$seat")"
+check "the seat starts once more" 2 "$(starts "$work/seat.log")"
+check "it resumes its session in place of its prompt, under its own environment" \
+  "args=--model m --resume s-1 id=$seat yard=$BERTH_YARD backend=herdr-app seat=one" \
+  "$(tail -n 2 "$work/seat.log" | head -n 1)"
+eventually test "$(passed "$work/seat.log")" = 2
+check "sign-on gets it past its startup gate" 2 "$(passed "$work/seat.log")"
+check "and nothing else is typed into it" passed "$(grep '^passed' "$work/seat.log" | tail -n 1)"
+
+berth list >/dev/null 2>&1
+sleep 1
+check "a later call does not resume it again" 2 "$(starts "$work/seat.log")"
+
+check "a seat whose command the adapter does not know is left at its shell" 1 "$(starts "$work/odd.log")"
+check "and berth says why" true \
+  "$(grep -q "berth $odd .*not resumed" "$work/list.err" && echo true || echo false)"
+
+check "a restored viewer is adopted by its label" "$view" "$(viewer "$seat")"
+eventually test "$(wc -l <"$work/viewer-runs")" = 2
+check "and runs its command again" 2 "$(wc -l <"$work/viewer-runs")"
+
+for id in "$view" "$odd" "$seat"; do
+  berth close "$id"
+done
+
+echo
+if [ "$failures" -gt 0 ]; then
+  echo "$failures failed."
+  exit 1
+fi
+echo "The herdr app adapter brings its seats back as agents after a restart."
