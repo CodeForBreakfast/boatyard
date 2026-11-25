@@ -37,6 +37,7 @@ in
   checks = {
     berth-contract-herdr = herdrSuite "berth-contract";
     berth-contract-herdr-app = herdrAppSuite "berth-contract";
+    berth-herdr-app-caller = herdrAppSuite "herdr-app-caller";
     berth-herdr-layout = herdrSuite "herdr-layout";
     berth-herdr-lost-agent = herdrSuite "herdr-lost-agent";
     berth-herdr-session = herdrSuite "herdr-session";
@@ -64,7 +65,8 @@ in
         ${../../tests/herdr-state} ${../../tests/herdr-lost-agent} ${../../tests/herdr-caller} \
         ${../../tests/herdr-shell-start} ${../../tests/herdr-binary} ${../../tests/herdr-session} ${../../tests/herdr-restore} \
         ${../../tests/berth-usage} ${../../tests/herdr-open-by-hand} \
-        ${../../bin/berth-herdr-app} ${../../tests/with-herdr-app-yard} ${../../tests/herdr-app-open-by-hand}
+        ${../../bin/berth-herdr-app} ${../../tests/with-herdr-app-yard} ${../../tests/herdr-app-open-by-hand} \
+        ${../../tests/herdr-app-caller}
       touch $out
     '';
   };

@@ -4,15 +4,16 @@
 #
 # HOME and every XDG folder hc uses are redirected, and every HC_* and
 # HERDR_* variable unset, because an inherited HC_TERMINAL_SOCKET would
-# otherwise drive the live core. The core is stopped by the pid it was
-# started with, and by nothing else.
+# otherwise drive the live core. The caller's own berth variables are unset
+# too, because the core hands its environment to each terminal. The core is
+# stopped by the pid it was started with, and by nothing else.
 #
 # Needs: bash, coreutils, flock, herdr-core.
 set -euo pipefail
 
 [ $# -gt 0 ] || { echo "usage: with-herdr-app-yard <command>..." >&2; exit 2; }
 
-unset "${!HC_@}" "${!HERDR_@}"
+unset "${!HC_@}" "${!HERDR_@}" BERTH_BACKEND BERTH_YARD BERTH_ID
 
 # A unix socket path has to fit in about a hundred bytes, so HOME stays short.
 HOME=$(mktemp -d "${TMPDIR:-/tmp}/yard.XXXXXX")

@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Boatyard runs coding agents in terminal multiplexer panes and coordinates them. It hides the multiplexer behind a port, so that moving to another multiplexer means writing an adapter rather than editing skills. herdr is the first backend. tuios, Orca and tmux are candidates.
+Boatyard runs coding agents in terminal multiplexer panes and coordinates them. It hides the multiplexer behind a port, so that moving to another multiplexer means writing an adapter rather than editing skills. herdr is the first backend, and the herdr desktop app is the second. tuios, Orca and tmux are candidates.
 
 ## Scope
 
@@ -39,7 +39,7 @@ The port knows only terminal mechanics. It knows nothing about Claude Code. The 
 
 ### Concepts
 
-- **Yard.** One backend session that holds berths, such as a herdr server session.
+- **Yard.** One backend session that holds berths, such as a herdr server session or a herdr-core session.
 - **Berth.** One terminal in which a process runs, usually an agent. A berth id is opaque to consumers. An adapter may use its backend's native id, and the herdr adapter does, returning herdr's pane id verbatim.
 - **Relationship.** Every berth is opened in a relationship to its opener:
   - **independent**: it starts its own line of work, as a steward or a long-lived agent does.
@@ -102,7 +102,9 @@ Every berth carries three variables:
 
 A berth opened from inside another inherits `BERTH_BACKEND` and `BERTH_YARD`. An adapter may set variables of its own, but consumers read only these three.
 
-A caller that is not itself a berth has none of the three: a service manager's unit, or a pane a person opened by hand. The host's environment then names the backend, and the adapter resolves the yard and the calling pane from its backend's own variables. With no backend named, `berth` exits non-zero.
+A caller that is not itself a berth has none of the three: a service manager's unit, or a pane a person opened by hand. The host's environment then names the backend, and the adapter resolves the yard and the calling pane from its backend's own variables.
+
+`BERTH_BACKEND` wins wherever it is set, and every berth sets it. Without it, `berth` takes the backend from the calling pane, so a pane a person opened by hand works on a host that runs herdr and the herdr app side by side. herdr-core's terminal variable `HC_TERMINAL_ID` selects the herdr app, and herdr's pane variable `HERDR_PANE_ID` selects herdr. A caller that has both is refused. This happens where herdr runs inside an app terminal, because herdr's panes inherit the app terminal's variables. A caller that has neither is refused too. Each refusal says which case it is.
 
 Where a verb needs the caller, such as a worker's opener or the opener a berth opens beside, the calling pane stands in for a caller that is not a berth. It stands in only within its own yard. A caller in no pane, or whose pane is in another yard than the one named, is refused with a message that says which.
 
@@ -137,6 +139,17 @@ It is written first. Its obligations beyond straight mapping:
 - **Screen source.** `wait-text` matches herdr's recent output, not only the visible frame. A pane shorter than the text it waits for never shows all of it at once.
 - **Package parameter.** herdr's package is a parameter, so a host can supply a platform-specific build.
 - **The host's herdr.** A host can name the herdr binary the adapter runs, with `BERTH_HERDR` set to its path. Without it, the adapter runs the packaged herdr. A macOS host that re-signs herdr needs this, because macOS ties its Local-Network grant to the binary's path. The adapter takes the binary from a variable and not from the caller's `PATH`, because a herdr host usually has some herdr on its `PATH`, and the packaged one would quietly give way to it.
+
+### The herdr app adapter
+
+The herdr desktop app runs its terminals in its own backend, herdr-core, and never attaches to a herdr server. The adapter drives herdr-core through its command, `hc`. A yard is an hc session, named by `HC_SESSION` and `default` without it. A berth is an hc terminal, and its id is herdr-core's terminal id, verbatim. The relationship, parent, label and line of work live on the terminal as hc labels under `berth.`. Its obligations beyond straight mapping:
+
+- **A yard that is down stays down.** Every hc command starts its session's core when none is running. So the adapter checks for a running core before it asks hc anything. It looks for the lock that a running core holds on `core.lock` in the session's folder under `herdr-core/` in `$XDG_STATE_HOME`. `berth serve` runs `herdr-core serve` in the foreground.
+- **Agent state.** herdr-core takes a terminal's agent state only from what its program reports over OSC 7501. `working` is `active`, `blocked` is `blocked`, and `idle`, `done` and `error` are `at-rest`. A terminal with no report has no agent state. A berth's agent session is the terminal's `claude.session` label, which the plugin's mod sets, as *Agent state under the herdr app* says. The adapter lists none for a berth with no agent state.
+- **The shell after the command.** hc runs a berth's command as the terminal's program, and the terminal finishes when the command exits. So the adapter runs the command under a shell, which becomes the shell that `SHELL` names in herdr-core's environment once the command exits. An agent that leaves for its shell then leaves its berth open, and herdr-core clears its agent state once the shell is back in the foreground. The command takes its `BERTH_ID` from herdr-core's own `HC_TERMINAL_ID`, because hc gives a terminal its id only once it exists.
+- **Text waits for Enter.** hc can paste text and press Enter in one call, but it cannot type text without submitting it. So `send-text` holds the text in the adapter's state, under `berth/herdr-app/<yard>/` in `$XDG_STATE_HOME`, and the next `send-key Enter` submits it with one paste. Text held this way does not show on screen until then. A key other than Enter is refused while text is held, because hc could not type the text in front of it. A later hc that types without submitting closes the gap.
+- **Lines of work.** The app window places no berth yet, so every berth stays hidden from the window. A line of work is a label: an independent berth that opens apart starts one, and every other berth joins its opener's. `open` looks within it for a labelled tender, and closing a berth closes what it opened.
+- **Package parameter.** herdr-core's package is a parameter, as herdr's is for its adapter.
 
 ## `sign-on`
 
@@ -234,15 +247,17 @@ Pull requests are GitHub's. The skills read, wait on and merge them with `gh` an
 
 ## Testing
 
-- **Port contract suite.** One suite states what every adapter must do: open in each relationship, list, list with `--all`, yards, name, send-text, send-key, wait-text, read, state, agent state across all three agent states and none, close, and the cascade when an independent berth closes. It runs against every adapter. Each adapter's run supplies a command that opens a pane as a person would, outside berth, for the `--all` cases.
+- **Port contract suite.** One suite states what every adapter must do: open in each relationship, list, list with `--all`, yards, name, send-text, send-key, wait-text, read, state, agent state across all three agent states and none, close, and the cascade when an independent berth closes. It runs against every adapter. Each adapter's run supplies a command that opens a pane as a person would, outside berth, for the `--all` cases. A run may also name the cases that its backend cannot meet yet. The suite reports such a case rather than failing it, and fails it once it holds, so the gap is dropped as soon as the backend closes it. The herdr app's run names the case where text sent without a key shows on screen.
   - For herdr, it runs a throwaway server with `HOME` redirected and every `HERDR_*` variable unset. An inherited `HERDR_SOCKET_PATH` would otherwise drive the live session. The server runs inside the nix build sandbox, so the suite is a flake check.
-  - herdr treats a process named `claude` as an agent and reads its state from the screen. The suite drives the states with a stand-in process of that name, not with Claude Code.
+  - For the herdr app, it runs a throwaway herdr-core in the same way, with `HOME` and the XDG folders redirected and every `HC_*` and `HERDR_*` variable unset.
+  - herdr treats a process named `claude` as an agent and reads its state from the screen. herdr-core takes the state Claude Code reports over OSC 7501. The suite drives the states with a stand-in process of that name, not with Claude Code, and the stand-in both draws Claude's screens and makes its reports.
+- **Choosing a backend.** The front end's usage test covers a host that runs both backends. A caller in an app terminal reaches the app's adapter, one in a herdr pane reaches herdr's, and one in both or in neither is refused.
 - **Unit tests.** The mod's compaction rule, its rule for a resumed steward and its reports to the herdr app have their own tests, run by `claude plugin test` against a stand-in engine. So does each adapter's mapping from backend states to the port's agent states, including the herdr parked-on-background-work and lost-agent corrections.
 - **End to end.** One real effort runs on `steward` and `worker`.
 
 ## Open decisions
 
-- **The second adapter.** tmux would bring `berth` to the most users. tuios fits the port model most closely. Orca was the original request for a second backend.
+- **The next adapter.** tmux would bring `berth` to the most users. tuios fits the port model most closely. Orca was the original request for a second backend.
 
 ## Rejected alternatives
 
