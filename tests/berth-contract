@@ -234,6 +234,7 @@ by_list() { # [<list arguments>...]
 check "list --all lists each berth as list does" "$(by_list)" "$(by_list --all)"
 
 by_hand=$("$BERTH_OPEN_BY_HAND" "$work/claude" --norc --noprofile "$work/stand-in")
+check "BERTH_OPEN_BY_HAND prints the id of a pane that is open" open "$(berth state "$by_hand")"
 for _ in $(seq 1 200); do
   [ "$(field "$by_hand" agent_state --all)" = at-rest ] && break
   sleep 0.1
@@ -250,6 +251,7 @@ berth name "$by_hand" "my own seat"
 check "a pane opened by hand takes a label" "my own seat" "$(field "$by_hand" label --all)"
 
 shell_by_hand=$("$BERTH_OPEN_BY_HAND" sleep 600)
+check "BERTH_OPEN_BY_HAND opens a second pane" open "$(berth state "$shell_by_hand")"
 check "list --all leaves out a pane opened by hand that runs no agent" false "$(listed "$shell_by_hand" --all)"
 
 shows "$by_hand" leave
