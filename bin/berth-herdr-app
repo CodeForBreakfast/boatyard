@@ -8,7 +8,7 @@
 # yard is an hc session. The relationship, the opener, the line of work and
 # the label live on the terminal as hc labels.
 #
-# Needs: bash, coreutils, flock, herdr-core, jq.
+# Needs: bash, coreutils, flock, grep, herdr-core, jq.
 set -euo pipefail
 
 yard=${BERTH_YARD:-${HC_SESSION:-default}}
