@@ -115,19 +115,90 @@ terminal_agent_state() { # <terminal>
 berth_command=("$BASH" -c 'export BERTH_BACKEND=herdr-app BERTH_YARD=$1 BERTH_ID=$HC_TERMINAL_ID
   shift; "$@"; exec "${SHELL:-sh}"' berth "$yard")
 
+# The window shows a terminal labelled with herdr.space and herdr.tab in that
+# space and tab, and makes a new one for an id it does not know.
+new_place_id() { # <sp|tb>
+  printf '%s%s\n' "$1" "$(od -An -N16 -tx1 /dev/urandom | tr -d ' \n')"
+}
+
+# Nothing can measure the window's panes while it may be closed, so a count
+# stands in for the size floors that herdr's adapter measures.
+workers_per_tab=4
+
+# The tab in the opener's space where its next worker goes: the oldest of its
+# workers' tabs that has room.
+worker_tab() { # <opener> <space>
+  local tab
+  tab=$(terminals | jq -r --arg opener "$1" --arg space "$2" --argjson most "$workers_per_tab" '
+    [.[] | select(.labels["berth.parent"] == $opener and .labels["berth.relationship"] == "worker"
+      and .labels["herdr.space"] == $space)] | sort_by(.created_ms) | map(.labels["herdr.tab"]) as $tabs
+    | first($tabs[] as $tab | select([$tabs[] | select(. == $tab)] | length < $most) | $tab) // empty')
+  [ -n "$tab" ] || tab=$(new_place_id tb)
+  printf '%s\n' "$tab"
+}
+
+# Names and focus belong to the window, so they wait on no window. A closed
+# one leaves Herdr's own names. The window may not have seen a new terminal's
+# labels yet, so a refusal is tried again for a while.
+window_wait_seconds=5
+
+window() { # <command> <arguments>...
+  local out deadline=$((SECONDS + window_wait_seconds))
+  command -v herdr-app >/dev/null && herdr-app status >/dev/null 2>&1 || return 0
+  until out=$(herdr-app "do" "$@" 2>&1); do
+    if [ "$SECONDS" -ge "$deadline" ]; then
+      echo "berth (herdr-app): the window refused $1: $out" >&2
+      return 0
+    fi
+    sleep 0.2
+  done
+}
+
+# Names whatever an independent berth's place gives it: the space and its
+# first tab for one opened apart, and the tab for one opened in a tab. The
+# window takes a command with no id to mean what it shows, so a berth that
+# the window does not show names nothing.
+name_place() { # <terminal> <label>
+  local space tab
+  jq -e '.labels["berth.relationship"] == "independent"' <<<"$1" >/dev/null || return 0
+  space=$(jq -r '.labels["herdr.space"] // empty' <<<"$1")
+  tab=$(jq -r '.labels["herdr.tab"] // empty' <<<"$1")
+  [ -n "$space" ] && [ -n "$tab" ] || return 0
+  case $(jq -r '.labels["berth.place"]' <<<"$1") in
+    apart) window space.rename --id "$space" --name "$2" ;&
+    tab) window tab.rename --id "$tab" --name "$2" ;;
+  esac
+}
+
 open() {
-  local as=$1 place=$2 cwd=$4 label=$5 opener=$6 id line="" labels=()
+  local as=$1 place=$2 focus=$3 cwd=$4 label=$5 opener=$6 id line="" opener_terminal space="" tab=""
+  local workers_tab="" labels=()
   shift 6
-  # Focus belongs to the window, which places no berth yet.
 
   if [ "$as" = independent ] && [ "$place" = apart ]; then
     opener=""
+    space=$(new_place_id sp)
+    tab=$(new_place_id tb)
   else
     opener=$(berth_id "$opener" "there is nothing to open a berth beside")
-    line=$(existing_terminal "$opener" "there is nothing to open a berth beside" |
-      jq -r --arg id "$opener" '.labels["berth.line"] // $id')
+    opener_terminal=$(existing_terminal "$opener" "there is nothing to open a berth beside")
+    line=$(jq -r --arg id "$opener" '.labels["berth.line"] // $id' <<<"$opener_terminal")
     labels+=(--label "berth.line=$line")
+    # A berth beside a terminal that the window does not show stays hidden too.
+    space=$(jq -r '.labels["herdr.space"] // empty' <<<"$opener_terminal")
+    if [ -n "$space" ]; then
+      case $as/$place in
+        independent/tab) tab=$(new_place_id tb) ;;
+        worker/*)
+          tab=$(worker_tab "$opener" "$space")
+          terminals | jq -e --arg tab "$tab" 'any(.[]; .labels["herdr.tab"] == $tab)' >/dev/null ||
+            workers_tab=$tab
+          ;;
+        *) tab=$(jq -r '.labels["herdr.tab"] // empty' <<<"$opener_terminal") ;;
+      esac
+    fi
   fi
+  labels+=(${space:+--label "herdr.space=$space"} ${tab:+--label "herdr.tab=$tab"})
 
   if [ "$as" = tender ] && [ -n "$label" ]; then
     id=$(terminals | jq -r --arg line "$line" --arg label "$label" '
@@ -148,14 +219,20 @@ open() {
     ${label:+--label "berth.label=$label"} "${labels[@]}" \
     -- "${berth_command[@]}" "$@" | jq -r .address)
   [ -n "$line" ] || hc_call label "$id" "berth.line=$id" >/dev/null
+  if [ -n "$space" ]; then
+    [ -z "$label" ] || name_place "$(hc_call get "$id")" "$label"
+    [ -z "$workers_tab" ] || window tab.rename --id "$workers_tab" --name workers
+    [ "$focus" != focus ] || window pane.focus --terminal "$id"
+  fi
   printf '%s\n' "$id"
 }
 
 name() {
-  local id
+  local id terminal
   id=$(berth_id "$1")
-  existing_terminal "$id" "it cannot be named" >/dev/null
+  terminal=$(existing_terminal "$id" "it cannot be named")
   hc_call label "$id" "berth.label=$2" >/dev/null
+  [ -z "$(jq -r '.labels["herdr.space"] // empty' <<<"$terminal")" ] || name_place "$terminal" "$2"
 }
 
 serve() {

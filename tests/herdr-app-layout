@@ -1,0 +1,128 @@
+#!/usr/bin/env bash
+# The herdr app adapter's layout rules, which the port contract leaves to each
+# adapter. A berth's place in the app window is the herdr.space and herdr.tab
+# labels on its terminal, so these checks read the labels. They need no window.
+# See docs/design.md, "The herdr app adapter".
+#
+# Run it under with-herdr-app-yard.
+#
+# Needs: bash, coreutils, herdr-core, jq, berth.
+set -uo pipefail
+
+work=$(mktemp -d)
+failures=0
+
+check() { # <what> <want> <got>
+  if [ "$2" = "$3" ]; then
+    echo "ok: $1"
+  else
+    echo "FAIL: $1: wanted '$2', got '$3'"
+    failures=$((failures + 1))
+  fi
+}
+
+differ() { # <a> <b>
+  [ "$1" != "$2" ] && echo true || echo false
+}
+
+hand() {
+  env -u HC_TERMINAL_SOCKET -u HC_TERMINAL_ID HC_SESSION="$BERTH_YARD" hc "$1" --json "${@:2}"
+}
+
+place() { # <terminal> <space|tab>
+  hand get "$1" | jq -r --arg key "herdr.$2" '.labels[$key] // "none"'
+}
+
+exists() { # <terminal>
+  [ "$(berth state "$1")" = open ] && echo true || echo false
+}
+
+echo "# an independent berth opened apart gets a space of its own"
+
+first=$(berth open --as independent --cwd "$work" --label "first line" -- true)
+second=$(berth open --as independent --cwd "$work" -- true)
+space=$(place "$first" space)
+check "it is in a space" true "$(differ none "$space")"
+check "it is in a tab" true "$(differ none "$(place "$first" tab)")"
+check "each independent berth has its own space" true "$(differ "$space" "$(place "$second" space)")"
+
+echo "# workers share a tab in their opener's space"
+
+workers=()
+for _ in 1 2; do
+  workers+=("$(BERTH_ID=$first berth open --as worker --cwd "$work" -- true)")
+done
+tab=$(place "${workers[0]}" tab)
+check "a worker opens in its opener's space" "$space" "$(place "${workers[0]}" space)"
+check "a worker opens outside its opener's tab" true "$(differ "$(place "$first" tab)" "$tab")"
+check "the second worker shares the first worker's tab" "$tab" "$(place "${workers[1]}" tab)"
+
+echo "# workers fill a tab, then open another"
+
+for _ in 1 2 3; do
+  workers+=("$(BERTH_ID=$first berth open --as worker --cwd "$work" -- true)")
+done
+check "the fourth worker shares the first worker's tab" "$tab" "$(place "${workers[3]}" tab)"
+check "the fifth worker opens another tab" true "$(differ "$tab" "$(place "${workers[4]}" tab)")"
+check "the fifth worker stays in its opener's space" "$space" "$(place "${workers[4]}" space)"
+check "the fifth worker opens outside its opener's tab" true \
+  "$(differ "$(place "$first" tab)" "$(place "${workers[4]}" tab)")"
+berth close "${workers[0]}"
+refill=$(BERTH_ID=$first berth open --as worker --cwd "$work" -- true)
+check "a worker fills the room a closed worker left" "$tab" "$(place "$refill" tab)"
+
+echo "# a tender opens in its opener's tab"
+
+tender=$(BERTH_ID=$first berth open --as tender --cwd "$work" -- true)
+check "it opens in its opener's space" "$space" "$(place "$tender" space)"
+check "it opens in its opener's tab" "$(place "$first" tab)" "$(place "$tender" tab)"
+
+echo "# a berth opened beside its opener shares its tab"
+
+beside=$(BERTH_ID=$first berth open --as independent --beside --cwd "$work" -- true)
+check "it opens in its opener's tab" "$(place "$first" tab)" "$(place "$beside" tab)"
+check "it opens in its opener's space" "$space" "$(place "$beside" space)"
+
+echo "# a berth opened in a tab gets a tab of its own in its opener's space"
+
+tabbed=$(BERTH_ID=$first berth open --as independent --tab --cwd "$work" --label effort -- true)
+check "it opens in its opener's space" "$space" "$(place "$tabbed" space)"
+check "it opens outside its opener's tab" true "$(differ "$(place "$first" tab)" "$(place "$tabbed" tab)")"
+check "it opens outside the workers' tab" true "$(differ "$tab" "$(place "$tabbed" tab)")"
+
+echo "# a seat a person opened in the window starts an effort beside itself"
+
+# The app labels the terminals it starts with their space and tab.
+seat=$(hand run --bg --no-parent --no-notify --cwd "$work" \
+  --label herdr.space=sp-a-persons-space --label herdr.tab=tb-a-persons-tab | jq -r .address)
+steward=$(env -u BERTH_ID HC_TERMINAL_ID="$seat" HC_SESSION="$BERTH_YARD" \
+  berth open --as independent --beside --cwd "$work" -- true)
+check "it opens in the seat's space" sp-a-persons-space "$(place "$steward" space)"
+check "it opens in the seat's tab" tb-a-persons-tab "$(place "$steward" tab)"
+steward_worker=$(BERTH_ID=$steward berth open --as worker --cwd "$work" -- true)
+check "its workers open in the seat's space" sp-a-persons-space "$(place "$steward_worker" space)"
+check "its workers open outside the seat's tab" true "$(differ tb-a-persons-tab "$(place "$steward_worker" tab)")"
+
+echo "# a berth opened beside a terminal the window does not show stays hidden too"
+
+hidden=$(hand run --bg --no-parent --no-notify --cwd "$work" | jq -r .address)
+for as in worker tender; do
+  joined=$(env -u BERTH_ID HC_TERMINAL_ID="$hidden" HC_SESSION="$BERTH_YARD" \
+    berth open --as "$as" --cwd "$work" -- true)
+  check "a $as of a hidden opener has no space" none "$(place "$joined" space)"
+  check "a $as of a hidden opener has no tab" none "$(place "$joined" tab)"
+done
+
+echo "# closing a berth closes what it opened"
+
+berth close "$first"
+check "its workers are gone" false "$(exists "${workers[1]}")"
+check "its tender is gone" false "$(exists "$tender")"
+check "the other independent berth stays" true "$(exists "$second")"
+
+echo
+if [ "$failures" -gt 0 ]; then
+  echo "$failures failed."
+  exit 1
+fi
+echo "The herdr app layout rules hold."
