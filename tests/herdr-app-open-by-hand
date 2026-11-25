@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# Opens a terminal in the herdr-core session BERTH_YARD names, as a person
+# would and outside berth: a shell, with the command typed into it. It prints
+# the terminal's id. The port contract suite takes it as BERTH_OPEN_BY_HAND.
+#
+# Needs: bash, coreutils, herdr-core, jq.
+set -euo pipefail
+
+: "${BERTH_YARD:?}"
+[ $# -gt 0 ] || { echo "usage: herdr-app-open-by-hand <command>..." >&2; exit 2; }
+
+hand() {
+  env -u HC_TERMINAL_SOCKET -u HC_TERMINAL_ID HC_SESSION="$BERTH_YARD" hc "$1" --json "${@:2}"
+}
+
+terminal=$(hand run --bg --no-parent --no-notify --cwd "$PWD" | jq -r .address)
+hand send -- "$terminal" "$(printf '%q ' "$@")" >/dev/null
+echo "$terminal"

@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+# Runs a command against a throwaway herdr app yard, a herdr-core session of
+# its own, with BERTH_BACKEND and BERTH_YARD naming it.
+#
+# HOME and every XDG folder hc uses are redirected, and every HC_* and
+# HERDR_* variable unset, because an inherited HC_TERMINAL_SOCKET would
+# otherwise drive the live core. The core is stopped by the pid it was
+# started with, and by nothing else.
+#
+# Needs: bash, coreutils, flock, herdr-core.
+set -euo pipefail
+
+[ $# -gt 0 ] || { echo "usage: with-herdr-app-yard <command>..." >&2; exit 2; }
+
+unset "${!HC_@}" "${!HERDR_@}"
+
+# A unix socket path has to fit in about a hundred bytes, so HOME stays short.
+HOME=$(mktemp -d "${TMPDIR:-/tmp}/yard.XXXXXX")
+export HOME XDG_RUNTIME_DIR=$HOME/run XDG_STATE_HOME=$HOME/state XDG_CONFIG_HOME=$HOME/config
+export XDG_DATA_HOME=$HOME/data
+mkdir -m 700 "$XDG_RUNTIME_DIR"
+export SHELL=${BASH:-bash}
+
+lock=$XDG_STATE_HOME/herdr-core/default/core.lock
+up() { [ -f "$lock" ] && ! flock -n "$lock" true; }
+
+herdr-core serve >"$HOME/core.log" 2>&1 &
+core=$!
+stop_core() {
+  kill "$core" 2>/dev/null || true
+  wait "$core" 2>/dev/null || true
+}
+trap stop_core EXIT
+
+until up; do
+  if ! kill -0 "$core" 2>/dev/null || [ "$SECONDS" -gt 30 ]; then
+    echo "with-herdr-app-yard: herdr-core did not come up." >&2
+    cat "$HOME/core.log" >&2
+    exit 1
+  fi
+  sleep 0.1
+done
+
+export BERTH_BACKEND=herdr-app BERTH_YARD=default
+"$@"
