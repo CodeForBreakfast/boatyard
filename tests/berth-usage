@@ -90,5 +90,33 @@ refuses "name refuses a dashed label for a named berth" "${berth[@]}" name some-
 "${berth[@]}" name some-berth "a plain label"
 check "name still sets a plain label" "name some-berth a plain label" "$(cat "$calls")"
 
+# A host such as one running herdr and the herdr app side by side names no
+# backend, and the calling pane's variables choose it.
+for backend in herdr herdr-app; do
+  {
+    echo "#!$BASH"
+    echo "echo \"$backend \$*\" >>'$calls'"
+  } >"$work/berth-$backend"
+  chmod +x "$work/berth-$backend"
+done
+unset BERTH_BACKEND HC_TERMINAL_ID HERDR_PANE_ID
+
+passes "BERTH_BACKEND wins over the calling pane" "yard" \
+  env BERTH_BACKEND=recorder HC_TERMINAL_ID=t1 HERDR_PANE_ID=p1 "${berth[@]}" yard
+passes "a caller in a herdr app terminal reaches the app's adapter" "herdr-app yard" \
+  env HC_TERMINAL_ID=t1 "${berth[@]}" yard
+passes "a caller in a herdr pane reaches herdr's adapter" "herdr yard" \
+  env HERDR_PANE_ID=p1 "${berth[@]}" yard
+refuses "a caller in both a herdr pane and an app terminal is refused" \
+  env HC_TERMINAL_ID=t1 HERDR_PANE_ID=p1 "${berth[@]}" yard
+refuses "a caller in neither is refused" "${berth[@]}" yard
+
+err=$(env HC_TERMINAL_ID=t1 HERDR_PANE_ID=p1 "${berth[@]}" yard 2>&1)
+check "the refusal of a caller in both says so" true \
+  "$(case $err in *both*) echo true ;; *) echo false ;; esac)"
+err=$("${berth[@]}" yard 2>&1)
+check "the refusal of a caller in neither says so" true \
+  "$(case $err in *" no herdr pane or herdr app terminal"*) echo true ;; *) echo false ;; esac)"
+
 rm -rf "$work"
 exit $((failures > 0))

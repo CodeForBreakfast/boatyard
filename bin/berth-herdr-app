@@ -1,0 +1,310 @@
+#!/usr/bin/env bash
+# berth-herdr-app: berth's adapter for the herdr desktop app, which `berth`
+# runs with the verbs already parsed. See docs/design.md, "The herdr app
+# adapter".
+#
+# The app runs its terminals in herdr-core, and the adapter drives herdr-core
+# through hc. A berth is an hc terminal, and its id is the terminal's id. A
+# yard is an hc session. The relationship, the opener, the line of work and
+# the label live on the terminal as hc labels.
+#
+# Needs: bash, coreutils, flock, herdr-core, jq.
+set -euo pipefail
+
+yard=${BERTH_YARD:-${HC_SESSION:-default}}
+
+die() {
+  echo "berth (herdr-app): $1" >&2
+  exit 1
+}
+
+# Every hc command starts its session's core when none is running, so the
+# adapter looks for a running core itself before it asks hc anything. A
+# running core holds a lock on core.lock in its session's state folder.
+core_lock() { # <yard>
+  echo "${XDG_STATE_HOME:-$HOME/.local/state}/herdr-core/$1/core.lock"
+}
+
+yard_running() { # <yard>
+  local lock
+  lock=$(core_lock "$1")
+  [ -f "$lock" ] && ! flock -n "$lock" true
+}
+
+# Inside a terminal, hc reaches the terminal's own core and takes the terminal
+# as its caller, so neither may override the yard.
+hc_env() {
+  env -u HC_TERMINAL_SOCKET -u HC_SOCKET -u HC_TERMINAL_ID HC_SESSION="$yard" "$@"
+}
+
+# Prints what hc prints. Returns 3 for a terminal hc does not have, so a caller
+# can answer gone. Anything else that fails ends berth.
+hc_call() {
+  local out status=0 message
+  yard_running "$yard" || die "the yard $yard is not up."
+  out=$(hc_env hc "$1" --json "${@:2}" 2>&1) || status=$?
+  [ "$status" = 0 ] && { printf '%s\n' "$out"; return; }
+  [ "$status" = 3 ] && return 3
+  message=$(jq -r '.error.message? // empty' <<<"$out" 2>/dev/null) || message=""
+  die "hc $1 failed in yard $yard: ${message:-$out}"
+}
+
+# Runs a call on a berth that has to exist for the verb to go on.
+on_berth() { # <id> <what the verb could not do> <call>...
+  local id=$1 what=$2 status=0
+  shift 2
+  "$@" || status=$?
+  case $status in
+    0) ;;
+    3) die "the berth $id is gone, so $what." ;;
+    *) exit "$status" ;;
+  esac
+}
+
+# A finished terminal is gone, as one that hc has removed is.
+terminal_get() { # <id>
+  local terminal
+  terminal=$(hc_call get "$1") || return
+  jq -e '.state == "live"' <<<"$terminal" >/dev/null || return 3
+  printf '%s\n' "$terminal"
+}
+
+existing_terminal() { # <id> <what the verb could not do>
+  on_berth "$1" "$2" terminal_get "$1"
+}
+
+# Every live terminal of the yard, in one call.
+terminals() {
+  local out
+  yard_running "$yard" || die "the yard $yard is not up."
+  out=$(hc_env hc connect <<<'{"jsonrpc":"2.0","id":1,"method":"terminal.list","params":{}}' 2>&1) ||
+    die "hc connect failed in yard $yard: $out"
+  jq -ce '.result.terminals' <<<"$out" 2>/dev/null ||
+    die "hc's terminal list failed in yard $yard: $out"
+}
+
+# The given berth, or the calling terminal. A terminal id is unique only within
+# its session, so the calling terminal stands for the caller only in its own
+# yard.
+berth_id() { # <id> [<what the verb could not do>]
+  local id=$1 what=${2:-there is no berth to act on} own
+  if [ -z "$id" ]; then
+    [ -n "${HC_TERMINAL_ID:-}" ] || die "the caller is neither a berth nor in a herdr app terminal, so $what."
+    own=${HC_SESSION:-default}
+    [ "$own" = "$yard" ] || die "the caller's herdr app terminal is in the yard $own, not in $yard, so $what."
+    id=$HC_TERMINAL_ID
+  fi
+  printf '%s\n' "$id"
+}
+
+# herdr-core takes a terminal's status only from what its program reports
+# over OSC 7501.
+agent_state_of='def agent_state: {working: "active", blocked: "blocked", idle: "at-rest",
+  done: "at-rest", error: "at-rest"}[.status.state? // "none"];'
+
+terminal_agent_state() { # <terminal>
+  jq -r "$agent_state_of"' agent_state // "none"' <<<"$1"
+}
+
+# The command runs under the shell, so a berth whose command has exited, such
+# as an agent that left, stays open at a prompt. hc gives a terminal its id
+# only once it exists, so the command reads its BERTH_ID from the terminal.
+# The terminal runs in herdr-core's environment, not the caller's, so the
+# shell is named by its path.
+# shellcheck disable=SC2016 # the berth's own shell expands it
+berth_command=("$BASH" -c 'export BERTH_BACKEND=herdr-app BERTH_YARD=$1 BERTH_ID=$HC_TERMINAL_ID
+  shift; "$@"; exec "${SHELL:-sh}"' berth "$yard")
+
+open() {
+  local as=$1 place=$2 cwd=$4 label=$5 opener=$6 id line="" labels=()
+  shift 6
+  # Focus belongs to the window, which places no berth yet.
+
+  if [ "$as" = independent ] && [ "$place" = apart ]; then
+    opener=""
+  else
+    opener=$(berth_id "$opener" "there is nothing to open a berth beside")
+    line=$(existing_terminal "$opener" "there is nothing to open a berth beside" |
+      jq -r --arg id "$opener" '.labels["berth.line"] // $id')
+    labels+=(--label "berth.line=$line")
+  fi
+
+  if [ "$as" = tender ] && [ -n "$label" ]; then
+    id=$(terminals | jq -r --arg line "$line" --arg label "$label" '
+      first(.[] | select(.labels["berth.relationship"] == "tender" and .labels["berth.line"] == $line
+        and .labels["berth.label"] == $label) | .address) // empty')
+    if [ -n "$id" ]; then
+      hc_call label "$id" "berth.parent=$opener" >/dev/null
+      printf '%s\n' "$id"
+      return
+    fi
+  fi
+
+  # Closing its opener leaves an independent berth, so its opener is not its
+  # parent.
+  [ "$as" = independent ] || labels+=(--label "berth.parent=$opener")
+  id=$(hc_call run --bg --no-parent --no-notify --cwd "$cwd" \
+    --label "berth.relationship=$as" --label "berth.place=$place" \
+    ${label:+--label "berth.label=$label"} "${labels[@]}" \
+    -- "${berth_command[@]}" "$@" | jq -r .address)
+  [ -n "$line" ] || hc_call label "$id" "berth.line=$id" >/dev/null
+  printf '%s\n' "$id"
+}
+
+name() {
+  local id
+  id=$(berth_id "$1")
+  existing_terminal "$id" "it cannot be named" >/dev/null
+  hc_call label "$id" "berth.label=$2" >/dev/null
+}
+
+serve() {
+  yard=$1
+  ! yard_running "$yard" || die "the yard $yard is already being served."
+  exec env -u HC_TERMINAL_SOCKET -u HC_SOCKET -u HC_TERMINAL_ID HC_SESSION="$yard" herdr-core serve
+}
+
+stop() {
+  yard=$1
+  yard_running "$yard" || return 0
+  hc_call server stop >/dev/null
+}
+
+# Each session's core keeps a state folder of its own.
+yards() {
+  local dir up=()
+  for dir in "${XDG_STATE_HOME:-$HOME/.local/state}"/herdr-core/*/; do
+    [ -d "$dir" ] || continue
+    dir=${dir%/}
+    ! yard_running "${dir##*/}" || up+=("${dir##*/}")
+  done
+  [ ${#up[@]} = 0 ] || printf '%s\n' "${up[@]}"
+}
+
+# hc can only type text and press Enter in one go, so text sent without a key
+# waits in the adapter's state until Enter submits it.
+held_text() { # <id>
+  echo "${XDG_STATE_HOME:-$HOME/.local/state}/berth/herdr-app/$yard/$1.text"
+}
+
+send_text() {
+  local id held
+  id=$(berth_id "$1")
+  existing_terminal "$id" "it cannot take text" >/dev/null
+  held=$(held_text "$id")
+  mkdir -p "${held%/*}"
+  printf '%s' "$2" >>"$held"
+}
+
+# berth names keys as herdr does, and hc names them in lower case.
+send_key() {
+  local id key held
+  id=$(berth_id "$1")
+  key=$(tr '[:upper:]' '[:lower:]' <<<"$2")
+  [ "$key" != escape ] || key=esc
+  existing_terminal "$id" "it cannot take a key" >/dev/null
+  held=$(held_text "$id")
+  if [ -f "$held" ]; then
+    [ "$key" = enter ] ||
+      die "berth $id holds text that only Enter can submit, because hc cannot type text without pressing Enter."
+    on_berth "$id" "it cannot take text" hc_call send --force -- "$id" "$(cat "$held")" >/dev/null
+    rm -f "$held"
+  else
+    on_berth "$id" "it cannot take a key" hc_call keys "$id" "$key" >/dev/null
+  fi
+}
+
+# hc reads lines whole, however wide the terminal, so a line taller than the
+# terminal still matches.
+recent_lines=1000
+
+wait_text() {
+  local id deadline text
+  id=$(berth_id "$1")
+  deadline=$(($(date +%s%N) + $3 * 1000000000))
+  while :; do
+    text=$(on_berth "$id" "there is nothing to wait on" hc_call read "$id" --lines "$recent_lines" | jq -r .text)
+    ! grep -qF -- "$2" <<<"$text" || return 0
+    [ "$(date +%s%N)" -lt "$deadline" ] || return 1
+    sleep 0.2
+  done
+}
+
+read_screen() {
+  local id
+  id=$(berth_id "$1")
+  on_berth "$id" "it cannot be read" hc_call read "$id" --lines 0 | jq -r .text
+}
+
+# With all, a terminal that berth did not open is listed while it runs an
+# agent. Like herdr, the app keeps a terminal's session once its agent has
+# left, so a berth with no agent state lists none.
+list() { # <yard> <berths|all>
+  yard=${1:-$yard}
+  terminals | jq --arg scope "$2" "$agent_state_of"'
+    [.[] | agent_state as $agent
+      | (.labels["berth.relationship"] // null) as $relationship
+      | select($relationship != null or ($scope == "all" and $agent != null)) | {
+      id: .address,
+      label: (.labels["berth.label"] // null),
+      relationship: $relationship,
+      parent: (.labels["berth.parent"] // null),
+      state: "open",
+      agent_state: $agent,
+      agent_session: (if $agent == null then null else .labels["claude.session"] // null end)
+    }]'
+}
+
+state() {
+  local id status=0
+  id=$(berth_id "$1")
+  terminal_get "$id" >/dev/null || status=$?
+  case $status in
+    0) echo open ;;
+    3) echo gone ;;
+    *) exit "$status" ;;
+  esac
+}
+
+agent_state() {
+  local id terminal status=0
+  id=$(berth_id "$1")
+  terminal=$(terminal_get "$id") || status=$?
+  case $status in
+    0) terminal_agent_state "$terminal" ;;
+    3) echo none ;;
+    *) exit "$status" ;;
+  esac
+}
+
+# Closing a berth closes the berths it opened first.
+close() {
+  local id child status=0
+  id=$(berth_id "$1")
+  terminal_get "$id" >/dev/null || status=$?
+  case $status in
+    0) ;;
+    3) return 0 ;;
+    *) exit "$status" ;;
+  esac
+  for child in $(terminals | jq -r --arg id "$id" '.[] | select(.labels["berth.parent"] == $id) | .address'); do
+    close "$child"
+  done
+  hc_call kill "$id" >/dev/null || [ $? = 3 ]
+  hc_call rm "$id" >/dev/null || [ $? = 3 ]
+  rm -f "$(held_text "$id")"
+}
+
+verb=$1
+shift
+case "$verb" in
+  serve | stop | open | name | list | state | close | yards) "$verb" "$@" ;;
+  yard) echo "$yard" ;;
+  id) berth_id "$1" ;;
+  send-text) send_text "$@" ;;
+  send-key) send_key "$@" ;;
+  wait-text) wait_text "$@" ;;
+  read) read_screen "$@" ;;
+  agent-state) agent_state "$@" ;;
+  *) die "berth passed an unknown verb, $verb." ;;
+esac

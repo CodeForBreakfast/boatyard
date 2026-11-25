@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # berth: the backend-neutral port. See docs/design.md, "The port: berth".
 #
-# This front end reads the arguments and hands each verb to the adapter that
-# BERTH_BACKEND names, `berth-<backend>` beside this script. An adapter takes
+# This front end reads the arguments and hands each verb to the adapter for
+# the backend, `berth-<backend>` beside this script. An adapter takes
 # the verbs already parsed:
 #
 #   serve <yard>
@@ -74,10 +74,20 @@ verb=$1
 shift
 case "${1:-}" in -h | --help) print_usage; exit 0 ;; esac
 
-[ -n "${BERTH_BACKEND:-}" ] ||
-  die "no backend named. Set BERTH_BACKEND, for example to herdr."
-adapter="$(dirname "$(readlink -f "$0")")/berth-$BERTH_BACKEND"
-[ -x "$adapter" ] || die "there is no adapter for the backend '$BERTH_BACKEND'."
+# Without BERTH_BACKEND, the calling pane's own variables name the backend.
+# herdr's panes inherit an app terminal's variables when herdr runs inside
+# one, so a caller that has both cannot be told apart.
+backend=${BERTH_BACKEND:-}
+if [ -z "$backend" ]; then
+  case "${HC_TERMINAL_ID:+app}${HERDR_PANE_ID:+herdr}" in
+    app) backend=herdr-app ;;
+    herdr) backend=herdr ;;
+    appherdr) die "no backend named, and the caller is in both a herdr pane and a herdr app terminal. Set BERTH_BACKEND." ;;
+    *) die "no backend named, and the caller is in no herdr pane or herdr app terminal. Set BERTH_BACKEND, for example to herdr." ;;
+  esac
+fi
+adapter="$(dirname "$(readlink -f "$0")")/berth-$backend"
+[ -x "$adapter" ] || die "there is no adapter for the backend '$backend'."
 
 case "$verb" in
   serve | stop)

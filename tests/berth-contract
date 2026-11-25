@@ -7,7 +7,8 @@
 # that opens a pane in that yard as a person would, outside berth, runs the
 # rest of its arguments there, and prints the pane's id. The suite reads
 # nothing of any backend, so a second adapter runs it unchanged, given a
-# BERTH_OPEN_BY_HAND of its own.
+# BERTH_OPEN_BY_HAND of its own. BERTH_CONTRACT_GAPS may name the cases its
+# backend cannot meet yet, as known_gap says.
 #
 # Needs: bash, coreutils, jq, berth.
 set -uo pipefail
@@ -25,6 +26,23 @@ check() { # <what> <want> <got>
     echo "FAIL: $1: wanted '$2', got '$3'"
     failures=$((failures + 1))
   fi
+}
+
+# A case that BERTH_CONTRACT_GAPS names is one the adapter's backend cannot
+# meet yet. It is reported rather than failed, and fails once it holds, so the
+# gap is dropped as soon as the backend closes it.
+known_gap() { # <gap> <what> <want> <got>
+  case " ${BERTH_CONTRACT_GAPS:-} " in
+    *" $1 "*)
+      if [ "$3" = "$4" ]; then
+        echo "FAIL: $2: it holds, so drop $1 from BERTH_CONTRACT_GAPS"
+        failures=$((failures + 1))
+      else
+        echo "known gap: $2"
+      fi
+      ;;
+    *) check "$2" "$3" "$4" ;;
+  esac
 }
 
 refused() { # <what> <command>...
@@ -131,6 +149,8 @@ berth wait-text "$typist" "heard HELLO" --timeout 1 2>/dev/null
 check "text sent without a key is not submitted, so wait-text fails at its timeout" 1 "$?"
 check "wait-text waits out its timeout before it fails" true \
   "$([ $(($(date +%s%N) - started)) -ge 1000000000 ] && echo true || echo false)"
+known_gap unsent-text-shows "text sent without a key shows on screen" true \
+  "$(berth read "$typist" | grep -q hello && echo true || echo false)"
 
 berth send-key "$typist" Enter
 BERTH_ID=$typist berth wait-text "heard HELLO" --timeout 10
@@ -163,19 +183,21 @@ berth close "$tall"
 echo "# state"
 
 # A backend knows Claude Code by its process name and reads its state from
-# the screen, so a copy of bash named claude stands in for it and draws
-# Claude's screens on cue.
+# the screen, or takes the state Claude Code reports over OSC 7501. So a copy
+# of bash named claude stands in for it, and draws Claude's screens and makes
+# Claude's reports on cue.
 cp "$(command -v bash)" "$work/claude"
 cat >"$work/stand-in" <<'EOF'
 prompt_box() { printf '\n────────\n❯ \n────────\n'; }
+reports() { printf '\e]7501;:state=%s:app=claude-code\e\\' "$1"; }
 screen=rest
 while :; do
   printf '\e[H\e[2J\e[3J'
   case $screen in
-    rest) printf '\e]0;✳ Claude\a'; prompt_box ;;
-    turn) printf '\e]0;⠂ Claude\a✻ Thinking… (esc to interrupt)\n' ;;
-    parked) printf '\e]0;⠂ Claude\a✻ Waiting for 2 background agents to finish\n'; prompt_box ;;
-    permission) printf '\e]0;✳ Claude\aDo you want to proceed?\n❯ 1. Yes\n  2. No\n\nEsc to cancel\n' ;;
+    rest) reports idle; printf '\e]0;✳ Claude\a'; prompt_box ;;
+    turn) reports working; printf '\e]0;⠂ Claude\a✻ Thinking… (esc to interrupt)\n' ;;
+    parked) reports done; printf '\e]0;⠂ Claude\a✻ Waiting for 2 background agents to finish\n'; prompt_box ;;
+    permission) reports 'blocked:kind=permission'; printf '\e]0;✳ Claude\aDo you want to proceed?\n❯ 1. Yes\n  2. No\n\nEsc to cancel\n' ;;
     leave) exit ;;
   esac
   read -r screen
