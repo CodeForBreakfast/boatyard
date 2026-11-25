@@ -43,12 +43,16 @@ trust_prompt="Is this a project you created or one you trust?"
 
 # A backend knows Claude Code by its process name, so a copy of bash named
 # claude stands in for it. It shows the gate until it has had the given
-# number of Enters, then draws the given screen, as the berth contract's
-# stand-in does.
+# number of Enters, then draws the given screen and reports its state over
+# OSC 7501, as the berth contract's stand-in does.
 cp "$(command -v bash)" "$work/claude"
 cat >"$work/stand-in" <<EOF
 prompt_box() { printf '\n────────\n❯ \n────────\n'; }
-screen=\$1 enters=\$2
+# It leaves a screen by scrolling it away rather than clearing it, so the
+# gate stays in the recent output that wait-text searches.
+scroll_away() { for _ in \$(seq 1 200); do echo; done; }
+reports() { printf '\e]7501;:state=%s:app=claude-code\e\\\\' "\$1"; }
+screen=\$1 enters=\$2 session=\$3
 # Like Claude Code, it asks first whether to trust a folder its config does
 # not trust, nor any folder above it, with the answer that quits focused.
 trusted=\$PWD
@@ -61,11 +65,19 @@ until jq -e --arg d "\$trusted" '.projects[\$d].hasTrustDialogAccepted == true' 
   fi
   trusted=\$(dirname "\$trusted")
 done
+# It records its session where its backend lists it, as Claude Code does in a
+# herdr pane and the plugin's mod does in a herdr app terminal.
+if [ -n "\${HERDR_PANE_ID:-}" ]; then
+  herdr pane report-agent-session "\$HERDR_PANE_ID" --source herdr:claude --agent claude \\
+    --agent-session-id "\$session" >/dev/null 2>&1
+elif [ -n "\${HC_TERMINAL_ID:-}" ]; then
+  hc label "\$HC_TERMINAL_ID" "claude.session=\$session" >/dev/null 2>&1
+fi
 # A screen that buries the gate under something else, so that wait-text
 # still finds the gate in recent output while the screen shows another.
 if [ "\$screen" = mystery ]; then
   printf 'Loading development channels\n❯ 1. $gate\n  2. Exit\n'
-  for _ in \$(seq 1 200); do echo; done
+  scroll_away
 fi
 if [ "\$enters" -gt 0 ]; then
   printf 'Loading development channels\n❯ 1. $gate\n  2. Exit\n'
@@ -74,15 +86,12 @@ if [ "\$enters" -gt 0 ]; then
     echo x >>"\$KEYS"
     enters=\$((enters - 1))
   done
-  # Scrolled away rather than cleared, so the gate stays in the recent
-  # output that wait-text searches.
-  for _ in \$(seq 1 200); do echo; done
 fi
 while :; do
-  printf '\e[H\e[2J'
+  scroll_away
   case \$screen in
-    rest) printf '\e]0;✳ Claude\a'; prompt_box ;;
-    turn) printf '\e]0;⠂ Claude\a✻ Thinking… (esc to interrupt)\n' ;;
+    rest) reports idle; printf '\e]0;✳ Claude\a'; prompt_box ;;
+    turn) reports working; printf '\e]0;⠂ Claude\a✻ Thinking… (esc to interrupt)\n' ;;
     trust) printf '$trust_prompt\n❯ No, exit\n  Yes, I trust this folder\n' ;;
     mystery) printf 'Select a theme\n❯ 1. Dark\n  2. Light\n' ;;
   esac
@@ -101,7 +110,7 @@ printf '%s\n' "\$@" >"$work/$1/args"
 env >"$work/$1/env"
 pwd >"$work/$1/pwd"
 export KEYS="$work/$1/keys"
-exec "$work/claude" --norc --noprofile "$work/stand-in" $2 $3
+exec "$work/claude" --norc --noprofile "$work/stand-in" $2 $3 session-$1
 EOF
   chmod +x "$work/$1/seat"
   printf '%s\n' "$work/$1/seat"
@@ -157,6 +166,12 @@ check "the command takes the launch's threshold for the compaction mod" 70 \
 check "the seat does not carry the mark" false \
   "$(grep -qx "$mark" "$work/gated/env" && echo true || echo false)"
 check "sign-on leaves no process of its own running" "" "$(marked)"
+session_of() { # <id>
+  berth list | jq -r --arg id "$1" '.[] | select(.id == $id) | .agent_session'
+}
+has_session() { [ "$(session_of "$1")" = "$2" ]; }
+eventually has_session "$id" session-gated
+check "the seat is listed with its agent session" session-gated "$(session_of "$id")"
 opener=$id
 
 echo "# no gate configured"
@@ -332,52 +347,57 @@ check "the gate took two Enters and is gone from the screen" false \
   "$(contains "$(berth read "$id")" "$gate")"
 check "and nothing went to the system log" false "$(test -s "$work/logger.out" && echo true || echo false)"
 
-echo "# a seat that herdr resumed"
+if [ "$BERTH_BACKEND" = herdr ]; then
+  echo "# a seat that herdr resumed"
 
-# herdr restores a seat by typing its claude --resume into a fresh shell in
-# the seat's pane, whose environment holds HERDR_PANE_ID and HERDR_SESSION and
-# nothing that sign-on or berth set. The caller starts --pass-gate in the
-# background from there, before Claude Code has drawn its gate. HERDR_SESSION
-# is set only in a pane of a named session, so this runs in one.
-resumed=resumed
-env -u BERTH_YARD -u BERTH_ID berth serve "$resumed" >"$work/serve.log" 2>&1 &
-serving=$!
-trap 'kill "$serving" 2>/dev/null' EXIT
-eventually berth list "$resumed" >/dev/null 2>&1
+  # herdr restores a seat by typing its claude --resume into a fresh shell in
+  # the seat's pane, whose environment holds HERDR_PANE_ID and HERDR_SESSION and
+  # nothing that sign-on or berth set. The caller starts --pass-gate in the
+  # background from there, before Claude Code has drawn its gate. HERDR_SESSION
+  # is set only in a pane of a named session, so this runs in one.
+  resumed=resumed
+  env -u BERTH_YARD -u BERTH_ID berth serve "$resumed" >"$work/serve.log" 2>&1 &
+  serving=$!
+  trap 'kill "$serving" 2>/dev/null' EXIT
+  eventually berth list "$resumed" >/dev/null 2>&1
 
-resume() { # <name> <SIGN_ON_START_TIMEOUT> <enters the gate takes>
-  local pane
-  pane=$(herdr --session "$resumed" workspace create --cwd "$work/project" --no-focus |
-    jq -r .result.root_pane.pane_id)
-  herdr --session "$resumed" pane run "$pane" "(env -u BERTH_BACKEND -u BERTH_YARD -u BERTH_ID \
-PATH='$work/log:$PATH' SIGN_ON_GATE='$gate' SIGN_ON_START_TIMEOUT=$2 \
+  # The pane echoes the command typed into it, so the gate's text comes from a
+  # file rather than the command, or wait-text would find it there.
+  printf '%s' "$gate" >"$work/gate"
+  resume() { # <name> <SIGN_ON_START_TIMEOUT> <enters the gate takes>
+    local pane
+    pane=$(herdr --session "$resumed" workspace create --cwd "$work/project" --no-focus |
+      jq -r .result.root_pane.pane_id)
+    herdr --session "$resumed" pane run "$pane" "(env -u BERTH_BACKEND -u BERTH_YARD -u BERTH_ID \
+PATH='$work/log:$PATH' SIGN_ON_GATE=\"\$(cat '$work/gate')\" SIGN_ON_START_TIMEOUT=$2 \
 sign-on --pass-gate; echo \$? >'$work/$1.status') & $(seat "$1" rest "$3")" >/dev/null
-  printf '%s\n' "$pane"
-}
+    printf '%s\n' "$pane"
+  }
 
-finished() { # <name>
-  eventually test -s "$work/$1.status"
-  cat "$work/$1.status"
-}
+  finished() { # <name>
+    eventually test -s "$work/$1.status"
+    cat "$work/$1.status"
+  }
 
-in_resumed() { env -u BERTH_ID BERTH_YARD=$resumed berth "$@"; }
+  in_resumed() { env -u BERTH_ID BERTH_YARD=$resumed berth "$@"; }
 
-pane=$(resume woken 30 2)
-check "--pass-gate from a resumed seat's own pane succeeds" 0 "$(finished woken)"
-check "the pane is in a named session" "$resumed" "$(recorded woken HERDR_SESSION)"
-check "the gate took two Enters" 2 "$(keys woken)"
-check "and is gone from the pane's screen" false "$(contains "$(in_resumed read "$pane")" "$gate")"
+  pane=$(resume woken 30 2)
+  check "--pass-gate from a resumed seat's own pane succeeds" 0 "$(finished woken)"
+  check "the pane is in a named session" "$resumed" "$(recorded woken HERDR_SESSION)"
+  check "the gate took two Enters" 2 "$(keys woken)"
+  check "and is gone from the pane's screen" false "$(contains "$(in_resumed read "$pane")" "$gate")"
 
-pane=$(resume ungated 3 0)
-check "--pass-gate on a resumed seat that shows no gate fails" 1 "$(finished ungated)"
-eventually grep -q "did not show the gate" "$work/logger.out"
-check "and says why in the system log" true "$(contains "$(cat "$work/logger.out")" "did not show the gate")"
-check "under the tag sign-on" true "$(grep -qx -- "-t sign-on" "$work/logger.args" && echo true || echo false)"
-check "and names the seat's berth" true "$(contains "$(cat "$work/logger.out")" "the berth $pane ")"
-check "and does not advise closing it" false "$(contains "$(cat "$work/logger.out")" "close")"
-check "and writes nothing on the seat's screen" false "$(contains "$(in_resumed read "$pane")" "sign-on")"
+  pane=$(resume ungated 3 0)
+  check "--pass-gate on a resumed seat that shows no gate fails" 1 "$(finished ungated)"
+  eventually grep -q "did not show the gate" "$work/logger.out"
+  check "and says why in the system log" true "$(contains "$(cat "$work/logger.out")" "did not show the gate")"
+  check "under the tag sign-on" true "$(grep -qx -- "-t sign-on" "$work/logger.args" && echo true || echo false)"
+  check "and names the seat's berth" true "$(contains "$(cat "$work/logger.out")" "the berth $pane ")"
+  check "and does not advise closing it" false "$(contains "$(cat "$work/logger.out")" "close")"
+  check "and writes nothing on the seat's screen" false "$(contains "$(in_resumed read "$pane")" "sign-on")"
 
-kill "$serving"
+  kill "$serving"
+fi
 
 echo "# failures"
 
@@ -398,7 +418,7 @@ fails "a gate that does not clear" "$gate" \
   SIGN_ON_CLAUDE="$(seat stuck rest 100)" SIGN_ON_GATE="$gate" \
   sign-on --as independent --cwd "$work/project" "$prompt"
 
-fails "a seat beside a caller in no pane" pane \
+fails "a seat beside a caller in no pane" "neither a berth" \
   SIGN_ON_CLAUDE="$(seat nowhere rest 0)" sign-on --as independent --beside --cwd "$work/project" "$prompt"
 check "and no berth opens for it" false "$(test -f "$work/nowhere/args" && echo true || echo false)"
 
