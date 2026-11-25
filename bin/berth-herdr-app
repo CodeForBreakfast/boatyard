@@ -109,9 +109,11 @@ terminal_agent_state() { # <terminal>
 # The command runs under the shell, so a berth whose command has exited, such
 # as an agent that left, stays open at a prompt. hc gives a terminal its id
 # only once it exists, so the command reads its BERTH_ID from the terminal.
+# The terminal runs in herdr-core's environment, not the caller's, so the
+# shell is named by its path.
 # shellcheck disable=SC2016 # the berth's own shell expands it
-berth_command=(env BERTH_BACKEND=herdr-app "BERTH_YARD=$yard"
-  bash -c 'export BERTH_ID=$HC_TERMINAL_ID; "$@"; exec "${SHELL:-sh}"' berth)
+berth_command=("$BASH" -c 'export BERTH_BACKEND=herdr-app BERTH_YARD=$1 BERTH_ID=$HC_TERMINAL_ID
+  shift; "$@"; exec "${SHELL:-sh}"' berth "$yard")
 
 open() {
   local as=$1 place=$2 cwd=$4 label=$5 opener=$6 id line="" labels=()
@@ -138,8 +140,8 @@ open() {
     fi
   fi
 
-  # An independent berth starts its own line of work, so its opener is not
-  # its parent.
+  # Closing its opener leaves an independent berth, so its opener is not its
+  # parent.
   [ "$as" = independent ] || labels+=(--label "berth.parent=$opener")
   id=$(hc_call run --bg --no-parent --no-notify --cwd "$cwd" \
     --label "berth.relationship=$as" --label "berth.place=$place" \
@@ -217,12 +219,12 @@ send_key() {
 recent_lines=1000
 
 wait_text() {
-  local id deadline
+  local id deadline text
   id=$(berth_id "$1")
   deadline=$(($(date +%s%N) + $3 * 1000000000))
   while :; do
-    on_berth "$id" "there is nothing to wait on" hc_call read "$id" --lines "$recent_lines" |
-      jq -r .text | grep -qF -- "$2" && return 0
+    text=$(on_berth "$id" "there is nothing to wait on" hc_call read "$id" --lines "$recent_lines" | jq -r .text)
+    ! grep -qF -- "$2" <<<"$text" || return 0
     [ "$(date +%s%N)" -lt "$deadline" ] || return 1
     sleep 0.2
   done
