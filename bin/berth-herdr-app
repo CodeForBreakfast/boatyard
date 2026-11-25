@@ -115,10 +115,95 @@ terminal_agent_state() { # <terminal>
 berth_command=("$BASH" -c 'export BERTH_BACKEND=herdr-app BERTH_YARD=$1 BERTH_ID=$HC_TERMINAL_ID
   shift; "$@"; exec "${SHELL:-sh}"' berth "$yard")
 
+state_dir() {
+  echo "${XDG_STATE_HOME:-$HOME/.local/state}/berth/herdr-app/$yard"
+}
+
+# A berth's command is kept where only its user can read it, because sign-on
+# passes a seat's environment, secrets included, on its command line.
+kept_command() { # <id>
+  echo "$(state_dir)/$1.command"
+}
+
+keep_command() { # <id> <command>...
+  local file
+  file=$(kept_command "$1")
+  shift
+  (umask 077 && mkdir -p "${file%/*}" && printf '%s\0' "$@" >"$file")
+}
+
+# herdr-core restarts a kept terminal with the shell alone as its program. The
+# berth.restore label names the shell the adapter has already acted on.
+restored='(.argv | length) == 1 and ((.labels["berth.restore"] // "") | split(" ")[0]) != (.pid | tostring)'
+
+# The shell is alone in the foreground for a moment before its start-up runs
+# anything, such as a dev shell's hook that would swallow typed text, so it
+# has to stay alone for several polls in a row.
+shell_settle_polls=4
+shell_poll_seconds=0.25
+
+shell_settled() { # <id>
+  local _
+  for _ in $(seq 1 "$shell_settle_polls"); do
+    terminal_get "$1" | jq -e '.foreground.pid == .pid' >/dev/null || return 1
+    sleep "$shell_poll_seconds"
+  done
+}
+
+# Types a command into a restored berth's shell, under the berth's own
+# variables, and says on the terminal what was done with its shell.
+type_command() { # <terminal> <outcome> <command>...
+  local id pid line
+  id=$(jq -r .address <<<"$1")
+  pid=$(jq -r .pid <<<"$1")
+  printf -v line '%q ' env BERTH_BACKEND=herdr-app "BERTH_YARD=$yard" "BERTH_ID=$id" "${@:3}"
+  hc_call send --force -- "$id" "$line" >/dev/null
+  hc_call label "$id" "berth.restore=$pid $2" >/dev/null
+}
+
+not_resumed() { # <terminal> <why>
+  local id pid
+  id=$(jq -r .address <<<"$1")
+  pid=$(jq -r .pid <<<"$1")
+  echo "berth (herdr-app): the berth $id is not resumed, because $2. Its shell is left bare." >&2
+  hc_call label "$id" "berth.restore=$pid not resumed: $2" >/dev/null
+}
+
+# Resumes each seat that herdr-core restored, from the session id the plugin's
+# mod left on its terminal. sign-on launches a seat with its prompt last, after
+# --, so the resume takes the prompt's place. sign-on then gets the seat past
+# its startup gate.
+resume_seats() {
+  local seats terminal id file command at
+  mapfile -t seats < <(terminals | jq -c ".[] | select(.labels[\"berth.relationship\"] and .labels[\"claude.session\"] and $restored)")
+  for terminal in "${seats[@]}"; do
+    id=$(jq -r .address <<<"$terminal")
+    shell_settled "$id" || continue
+    file=$(kept_command "$id")
+    [ -f "$file" ] || { not_resumed "$terminal" "its command was not kept"; continue; }
+    mapfile -d '' -t command <"$file"
+    for ((at = 0; at < ${#command[@]}; at++)); do
+      [ "${command[at]}" != -- ] || break
+    done
+    case $((${#command[@]} - at)) in
+      0) ;;
+      2) command=("${command[@]:0:at}") ;;
+      *) not_resumed "$terminal" "its command has more after -- than a prompt"; continue ;;
+    esac
+    type_command "$terminal" resumed "${command[@]}" --resume "$(jq -r '.labels["claude.session"]' <<<"$terminal")"
+    if command -v sign-on >/dev/null; then
+      BERTH_BACKEND=herdr-app BERTH_YARD=$yard sign-on --pass-gate "$id" </dev/null >/dev/null 2>&1 &
+    else
+      echo "berth (herdr-app): sign-on is not on the path, so the berth $id waits at its startup gate." >&2
+    fi
+  done
+}
+
 open() {
-  local as=$1 place=$2 cwd=$4 label=$5 opener=$6 id line="" labels=()
+  local as=$1 place=$2 cwd=$4 label=$5 opener=$6 id line="" labels=() tender
   shift 6
   # Focus belongs to the window, which places no berth yet.
+  resume_seats
 
   if [ "$as" = independent ] && [ "$place" = apart ]; then
     opener=""
@@ -129,24 +214,33 @@ open() {
     labels+=(--label "berth.line=$line")
   fi
 
+  # A tender that herdr-core restored is adopted with its command started
+  # again.
   if [ "$as" = tender ] && [ -n "$label" ]; then
-    id=$(terminals | jq -r --arg line "$line" --arg label "$label" '
+    tender=$(terminals | jq -c --arg line "$line" --arg label "$label" '
       first(.[] | select(.labels["berth.relationship"] == "tender" and .labels["berth.line"] == $line
-        and .labels["berth.label"] == $label) | .address) // empty')
-    if [ -n "$id" ]; then
+        and .labels["berth.label"] == $label)) // empty')
+    if [ -n "$tender" ]; then
+      id=$(jq -r .address <<<"$tender")
       hc_call label "$id" "berth.parent=$opener" >/dev/null
+      if jq -e "$restored" <<<"$tender" >/dev/null && shell_settled "$id"; then
+        type_command "$tender" "ran again" "$@"
+        keep_command "$id" "$@"
+      fi
       printf '%s\n' "$id"
       return
     fi
   fi
 
   # Closing its opener leaves an independent berth, so its opener is not its
-  # parent.
+  # parent. A kept terminal comes back as a bare shell when herdr-core
+  # restarts, where a terminal not kept would come back finished.
   [ "$as" = independent ] || labels+=(--label "berth.parent=$opener")
-  id=$(hc_call run --bg --no-parent --no-notify --cwd "$cwd" \
+  id=$(hc_call run --bg --keep --no-parent --no-notify --cwd "$cwd" \
     --label "berth.relationship=$as" --label "berth.place=$place" \
     ${label:+--label "berth.label=$label"} "${labels[@]}" \
     -- "${berth_command[@]}" "$@" | jq -r .address)
+  keep_command "$id" "$@"
   [ -n "$line" ] || hc_call label "$id" "berth.line=$id" >/dev/null
   printf '%s\n' "$id"
 }
@@ -154,6 +248,7 @@ open() {
 name() {
   local id
   id=$(berth_id "$1")
+  resume_seats
   existing_terminal "$id" "it cannot be named" >/dev/null
   hc_call label "$id" "berth.label=$2" >/dev/null
 }
@@ -184,7 +279,7 @@ yards() {
 # hc can only type text and press Enter in one go, so text sent without a key
 # waits in the adapter's state until Enter submits it.
 held_text() { # <id>
-  echo "${XDG_STATE_HOME:-$HOME/.local/state}/berth/herdr-app/$yard/$1.text"
+  echo "$(state_dir)/$1.text"
 }
 
 send_text() {
@@ -241,6 +336,7 @@ read_screen() {
 # left, so a berth with no agent state lists none.
 list() { # <yard> <berths|all>
   yard=${1:-$yard}
+  resume_seats
   terminals | jq --arg scope "$2" "$agent_state_of"'
     [.[] | agent_state as $agent
       | (.labels["berth.relationship"] // null) as $relationship
@@ -281,6 +377,7 @@ agent_state() {
 close() {
   local id child status=0
   id=$(berth_id "$1")
+  resume_seats
   terminal_get "$id" >/dev/null || status=$?
   case $status in
     0) ;;
@@ -292,7 +389,7 @@ close() {
   done
   hc_call kill "$id" >/dev/null || [ $? = 3 ]
   hc_call rm "$id" >/dev/null || [ $? = 3 ]
-  rm -f "$(held_text "$id")"
+  rm -f "$(held_text "$id")" "$(kept_command "$id")"
 }
 
 verb=$1
