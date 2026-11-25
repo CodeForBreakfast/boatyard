@@ -120,14 +120,16 @@ state_dir() {
 }
 
 # A berth's command is kept where only its user can read it, because sign-on
-# passes a seat's environment, secrets included, on its command line.
-kept_command() { # <id>
-  echo "$(state_dir)/$1.command"
+# passes a seat's environment, secrets included, on its command line. The file
+# is named for the terminal's creation as well as its id, so a command never
+# reaches a terminal it was not opened in.
+kept_command() { # <terminal>
+  jq -r --arg dir "$(state_dir)" '"\($dir)/\(.address).\(.created_ms).command"' <<<"$1"
 }
 
 keep_command() { # <id> <command>...
   local file
-  file=$(kept_command "$1")
+  file=$(kept_command "$(existing_terminal "$1" "its command cannot be kept")")
   shift
   (umask 077 && mkdir -p "${file%/*}" && printf '%s\0' "$@" >"$file")
 }
@@ -136,28 +138,42 @@ keep_command() { # <id> <command>...
 # berth.restore label names the shell the adapter has already acted on.
 restored='(.argv | length) == 1 and ((.labels["berth.restore"] // "") | split(" ")[0]) != (.pid | tostring)'
 
+# Two berth calls at once would each type into the same restored shell, and
+# the second line would land in the agent the first one started. So one call
+# at a time restores a yard, and it reads the terminals once it holds the lock.
+restore_lock() {
+  mkdir -p "$(state_dir)"
+  exec {restoring}>"$(state_dir)/restore.lock"
+  flock "$restoring"
+}
+
+restore_unlock() {
+  exec {restoring}>&-
+}
+
 # The shell is alone in the foreground for a moment before its start-up runs
 # anything, such as a dev shell's hook that would swallow typed text, so it
-# has to stay alone for several polls in a row.
+# has to stay alone for several polls in a row, the last just before typing.
 shell_settle_polls=4
 shell_poll_seconds=0.25
 
 shell_settled() { # <id>
   local _
   for _ in $(seq 1 "$shell_settle_polls"); do
-    terminal_get "$1" | jq -e '.foreground.pid == .pid' >/dev/null || return 1
     sleep "$shell_poll_seconds"
+    terminal_get "$1" | jq -e '.foreground.pid == .pid' >/dev/null || return 1
   done
 }
 
 # Types a command into a restored berth's shell, under the berth's own
-# variables, and says on the terminal what was done with its shell.
+# variables, and says on the terminal what was done with its shell. hc types
+# nothing into a program that reports itself blocked.
 type_command() { # <terminal> <outcome> <command>...
   local id pid line
   id=$(jq -r .address <<<"$1")
   pid=$(jq -r .pid <<<"$1")
   printf -v line '%q ' env BERTH_BACKEND=herdr-app "BERTH_YARD=$yard" "BERTH_ID=$id" "${@:3}"
-  hc_call send --force -- "$id" "$line" >/dev/null
+  hc_call send -- "$id" "$line" >/dev/null
   hc_call label "$id" "berth.restore=$pid $2" >/dev/null
 }
 
@@ -174,12 +190,13 @@ not_resumed() { # <terminal> <why>
 # --, so the resume takes the prompt's place. sign-on then gets the seat past
 # its startup gate.
 resume_seats() {
-  local seats terminal id file command at
+  local seats terminal id file command at restoring
+  restore_lock
   mapfile -t seats < <(terminals | jq -c ".[] | select(.labels[\"berth.relationship\"] and .labels[\"claude.session\"] and $restored)")
   for terminal in "${seats[@]}"; do
     id=$(jq -r .address <<<"$terminal")
     shell_settled "$id" || continue
-    file=$(kept_command "$id")
+    file=$(kept_command "$terminal")
     [ -f "$file" ] || { not_resumed "$terminal" "its command was not kept"; continue; }
     mapfile -d '' -t command <"$file"
     for ((at = 0; at < ${#command[@]}; at++)); do
@@ -192,15 +209,16 @@ resume_seats() {
     esac
     type_command "$terminal" resumed "${command[@]}" --resume "$(jq -r '.labels["claude.session"]' <<<"$terminal")"
     if command -v sign-on >/dev/null; then
-      BERTH_BACKEND=herdr-app BERTH_YARD=$yard sign-on --pass-gate "$id" </dev/null >/dev/null 2>&1 &
+      BERTH_BACKEND=herdr-app BERTH_YARD=$yard sign-on --pass-gate "$id" </dev/null >/dev/null 2>&1 {restoring}>&- &
     else
       echo "berth (herdr-app): sign-on is not on the path, so the berth $id waits at its startup gate." >&2
     fi
   done
+  restore_unlock
 }
 
 open() {
-  local as=$1 place=$2 cwd=$4 label=$5 opener=$6 id line="" labels=() tender
+  local as=$1 place=$2 cwd=$4 label=$5 opener=$6 id line="" labels=() tender restoring
   shift 6
   # Focus belongs to the window, which places no berth yet.
   resume_seats
@@ -217,6 +235,7 @@ open() {
   # A tender that herdr-core restored is adopted with its command started
   # again.
   if [ "$as" = tender ] && [ -n "$label" ]; then
+    restore_lock
     tender=$(terminals | jq -c --arg line "$line" --arg label "$label" '
       first(.[] | select(.labels["berth.relationship"] == "tender" and .labels["berth.line"] == $line
         and .labels["berth.label"] == $label)) // empty')
@@ -227,9 +246,11 @@ open() {
         type_command "$tender" "ran again" "$@"
         keep_command "$id" "$@"
       fi
+      restore_unlock
       printf '%s\n' "$id"
       return
     fi
+    restore_unlock
   fi
 
   # Closing its opener leaves an independent berth, so its opener is not its
@@ -389,7 +410,7 @@ close() {
   done
   hc_call kill "$id" >/dev/null || [ $? = 3 ]
   hc_call rm "$id" >/dev/null || [ $? = 3 ]
-  rm -f "$(held_text "$id")" "$(kept_command "$id")"
+  rm -f "$(held_text "$id")" "$(state_dir)/$id".*.command
 }
 
 verb=$1

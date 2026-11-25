@@ -43,8 +43,8 @@ log=$1
 shift
 echo "args=$* id=$BERTH_ID yard=$BERTH_YARD backend=$BERTH_BACKEND seat=${SEAT:-none}" >>"$log"
 echo "$SIGN_ON_GATE"
-read -r
-echo passed >>"$log"
+read -r reply
+echo "passed${reply:+ $reply}" >>"$log"
 hc label "$HC_TERMINAL_ID" claude.session=s-1 >/dev/null
 printf '\e]7501;:state=idle:app=claude-code\e\\'
 exec sleep 600
@@ -56,7 +56,7 @@ starts() { # <log>
 }
 
 passed() { # <log>
-  grep -c '^passed$' "$1" 2>/dev/null || echo 0
+  grep -c '^passed' "$1" 2>/dev/null || echo 0
 }
 
 session_of() { # <id>
@@ -95,12 +95,31 @@ echo "# herdr-core restarts"
 yard_down() {
   ! berth yards | grep -qx "$BERTH_YARD"
 }
-berth stop "$BERTH_YARD"
-eventually yard_down
-berth serve "$BERTH_YARD" >"$work/serve.log" 2>&1 &
-serving=$!
+yard_up() {
+  ! yard_down
+}
+# Serving straight after a stop now and then finds the yard briefly held by
+# a core the suite did not start, so the suite serves until its own core
+# holds the yard.
+serving=""
 trap 'kill "$serving" 2>/dev/null; wait "$serving" 2>/dev/null' EXIT
-eventually berth list >/dev/null 2>&1 || { echo "the core did not come back."; cat "$work/serve.log"; exit 1; }
+serve_again() {
+  eventually yard_down || return 1
+  berth serve "$BERTH_YARD" >"$work/serve.log" 2>&1 &
+  serving=$!
+  eventually yard_up && sleep 0.5 && kill -0 "$serving" 2>/dev/null
+}
+berth stop "$BERTH_YARD"
+for _ in 1 2 3 4 5; do
+  ! serve_again || break
+done
+kill -0 "$serving" 2>/dev/null || { echo "the core did not come back."; cat "$work/serve.log"; exit 1; }
+
+# The first calls after the restart race each other to resume the seats.
+berth list >/dev/null 2>>"$work/list.err" &
+first=$!
+berth list >/dev/null 2>>"$work/list.err" &
+wait "$first" $!
 
 eventually has_session "$seat"
 check "a seat comes back under the same berth with its agent session" s-1 "$(session_of "$seat")"
@@ -110,6 +129,7 @@ check "it resumes its session in place of its prompt, under its own environment"
   "$(tail -n 2 "$work/seat.log" | head -n 1)"
 eventually test "$(passed "$work/seat.log")" = 2
 check "sign-on gets it past its startup gate" 2 "$(passed "$work/seat.log")"
+check "and nothing else is typed into it" passed "$(grep '^passed' "$work/seat.log" | tail -n 1)"
 
 berth list >/dev/null 2>&1
 sleep 1
