@@ -8,10 +8,11 @@
 #   serve <yard>
 #   stop <yard>
 #   yard
+#   yards
 #   id <id>
 #   open <independent|worker|tender> <apart|beside|tab> <focus|no-focus> <cwd> <label> <opener> <command>...
 #   name <id> <label>
-#   list <yard>
+#   list <yard> <berths|all>
 #   send-text <id> <text>
 #   send-key <id> <key>
 #   wait-text <id> <text> <seconds>
@@ -22,7 +23,9 @@
 #
 # serve execs the backend, so that a service manager supervises the real
 # process. wait-text matches its text as a literal within one line of recent
-# output, and read prints the visible screen as plain text.
+# output, and read prints the visible screen as plain text. yards prints
+# each running yard on a line of its own. list with all also lists each pane
+# berth did not open that runs an agent.
 #
 # <opener> is BERTH_ID, and so is <id> when the caller gave none. Either is
 # empty when BERTH_ID is unset too, and the adapter then resolves the calling
@@ -39,11 +42,12 @@ print_usage() {
 usage: berth serve <yard>
        berth stop <yard>
        berth yard
+       berth yards
        berth id
        berth open --as independent|worker|tender --cwd <dir> [--label <text>] [--focus]
                   [--beside | --tab] -- <command>...
        berth name [<id>] <label>
-       berth list [<yard>]
+       berth list [<yard>] [--all]
        berth send-text [<id>] <text>
        berth send-key [<id>] <key>
        berth wait-text [<id>] <text> --timeout <seconds>
@@ -126,17 +130,27 @@ case "$verb" in
       *) usage ;;
     esac
     ;;
-  yard)
+  yard | yards)
     [ $# = 0 ] || usage
-    exec "$adapter" yard
+    exec "$adapter" "$verb"
     ;;
   id)
     [ $# = 0 ] || usage
     exec "$adapter" id "${BERTH_ID:-}"
     ;;
   list)
-    [ $# -le 1 ] || usage
-    exec "$adapter" list "${1:-}"
+    yard="" scope=berths
+    for arg in "$@"; do
+      case "$arg" in
+        --all) scope=all ;;
+        -*) usage ;;
+        *)
+          [ -z "$yard" ] || usage
+          yard=$arg
+          ;;
+      esac
+    done
+    exec "$adapter" list "$yard" "$scope"
     ;;
   read | state | agent-state | close)
     case $# in

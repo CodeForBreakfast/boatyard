@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# Opens a pane in the herdr session BERTH_YARD names, as a person would and
+# outside berth, runs the command in its shell, and prints the pane's id. The
+# port contract suite takes it as BERTH_OPEN_BY_HAND.
+#
+# Needs: bash, coreutils, herdr, jq.
+set -euo pipefail
+
+: "${BERTH_YARD:?}"
+[ $# -gt 0 ] || { echo "usage: herdr-open-by-hand <command>..." >&2; exit 2; }
+
+hand() {
+  env -u HERDR_SOCKET_PATH herdr --session "$BERTH_YARD" "$@"
+}
+
+pane=$(hand workspace create --cwd "$PWD" --no-focus | jq -r .result.root_pane.pane_id)
+hand pane run "$pane" "$(printf '%q ' "$@")" >/dev/null
+echo "$pane"

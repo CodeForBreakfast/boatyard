@@ -61,11 +61,27 @@ berth=(bash "$work/berth")
 
 prints_usage "berth --help" "${berth[@]}" --help
 prints_usage "berth -h" "${berth[@]}" -h
-for verb in serve stop yard id open name list send-text send-key wait-text read state agent-state close; do
+for verb in serve stop yard yards id open name list send-text send-key wait-text read state agent-state close; do
   prints_usage "berth $verb --help" "${berth[@]}" "$verb" --help
   prints_usage "berth $verb -h" "${berth[@]}" "$verb" -h
 done
 prints_usage "berth name --help with no backend named" env -u BERTH_BACKEND "${berth[@]}" name --help
+
+refuses "yards takes no argument" "${berth[@]}" yards some-yard
+refuses "list refuses an option it does not know" "${berth[@]}" list --every
+
+passes() { # <what> <want> <command>...
+  local what=$1 want=$2
+  shift 2
+  : >"$calls"
+  "$@"
+  check "$what" "$want" "$(cat "$calls")"
+}
+
+passes "list passes the caller's yard and berths only" "list  berths" "${berth[@]}" list
+passes "list --all before a yard passes both" "list some-yard all" "${berth[@]}" list --all some-yard
+passes "list --all after a yard passes both" "list some-yard all" "${berth[@]}" list some-yard --all
+passes "yards reaches the adapter" "yards" "${berth[@]}" yards
 
 refuses "name refuses a label that starts with a dash" "${berth[@]}" name --verbose
 refuses "name refuses a dashed label for a named berth" "${berth[@]}" name some-berth -x

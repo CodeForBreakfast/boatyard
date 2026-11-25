@@ -71,10 +71,11 @@ Each adapter maps its backend's agent states onto these three and corrects its b
 | `berth serve <yard>` | Runs the backend for a yard in the foreground, so a service manager can supervise the real process. |
 | `berth stop <yard>` | Stops a yard. |
 | `berth yard` | Prints the yard the caller acts in, resolved as the adapter resolves it for every other verb. |
+| `berth yards` | Prints each yard that is up, one per line. |
 | `berth id` | Prints the calling berth's id. A caller that is not a berth gets the id of the pane it runs in, which stands in for it as it does for every other verb. |
 | `berth open --as independent\|worker\|tender --cwd <dir> [--label <text>] [--beside \| --tab] [--focus] -- <command>` | Opens a berth and prints its id. With `--beside`, an independent berth opens beside its opener rather than apart. With `--tab`, it opens in a tab near its opener. With `--focus`, the person watching the yard lands on the new berth. Without it, their focus stays where it was. A labelled tender opens once in a line of work: where its opener's line of work already holds a tender with that label, `open` makes the opener its parent and prints its id, and runs no command. |
 | `berth name [<id>] <label>` | Labels a berth. On an independent berth that opened apart or in a tab, the label also names whatever the adapter groups under it. |
-| `berth list [<yard>]` | Prints the berths as JSON: id, label, relationship, parent, state, agent state and agent session. A berth's agent session is the id its agent goes by, such as a Claude Code session id. The agent state and the agent session are both null for a berth with no agent in it, such as one running a bead viewer. |
+| `berth list [<yard>] [--all]` | Prints the berths as JSON: id, label, relationship, parent, state, agent state and agent session. A berth's agent session is the id its agent goes by, such as a Claude Code session id. The agent state and the agent session are both null for a berth with no agent in it, such as one running a bead viewer. With `--all`, it also lists each pane that berth did not open while an agent runs in it, such as a seat a person started by hand. Such a pane has a null relationship and parent. |
 | `berth send-text [<id>] <text>` | Types text into a berth. |
 | `berth send-key [<id>] <key>` | Sends one key, such as `Enter`. |
 | `berth wait-text [<id>] <text> --timeout <s>` | Blocks until the text appears within one line on screen, or fails at the timeout. The text is literal, because each backend has its own regular expression dialect. |
@@ -108,7 +109,7 @@ Where a verb needs the caller, such as a worker's opener or the opener a berth o
 A product outside boatyard may depend on three things, and on nothing else of boatyard's:
 
 - **The three variables** above, inherited by every process a berth runs.
-- **`berth list`'s JSON:** an array with one object per berth, each holding exactly the fields `id`, `label`, `relationship`, `parent`, `state`, `agent_state` and `agent_session`, with the values the verbs table and *Berth and agent states* give them.
+- **`berth list`'s JSON:** an array with one object per berth, each holding exactly the fields `id`, `label`, `relationship`, `parent`, `state`, `agent_state` and `agent_session`, with the values the verbs table and *Berth and agent states* give them. Only `--all` lists a null relationship.
 - **The efforts output:** the JSON lines that `skills/tally/efforts` prints, one per open effort, each holding at least the fields `project`, `top`, `slug`, `steward`, `ready` and `restart`, with the meanings the tally skill gives them. Its other fields, `also`, `status`, `gates` and `asks`, are not part of the contract.
 
 Dropping, renaming or changing the meaning of a variable or a field breaks the contract, and so does a new value that a consumer could not have expected. Boatyard cuts no releases, so the pull request making such a change marks it breaking with a `!` in its title, and the commit it lands as carries the mark on `main`. The port contract suite fails when a field is added, dropped or renamed, so no change to the shape lands unnoticed. The tally efforts check fails when one of the six efforts fields is dropped or renamed.
@@ -220,7 +221,7 @@ Pull requests are GitHub's. The skills read, wait on and merge them with `gh` an
 
 ## Testing
 
-- **Port contract suite.** One suite states what every adapter must do: open in each relationship, list, name, send-text, send-key, wait-text, read, state, agent state across all three agent states and none, close, and the cascade when an independent berth closes. It runs against every adapter.
+- **Port contract suite.** One suite states what every adapter must do: open in each relationship, list, list with `--all`, yards, name, send-text, send-key, wait-text, read, state, agent state across all three agent states and none, close, and the cascade when an independent berth closes. It runs against every adapter. Each adapter's run supplies a command that opens a pane as a person would, outside berth, for the `--all` cases.
   - For herdr, it runs a throwaway server with `HOME` redirected and every `HERDR_*` variable unset. An inherited `HERDR_SOCKET_PATH` would otherwise drive the live session. The server runs inside the nix build sandbox, so the suite is a flake check.
   - herdr treats a process named `claude` as an agent and reads its state from the screen. The suite drives the states with a stand-in process of that name, not with Claude Code.
 - **Unit tests.** The mod's compaction rule and its rule for a resumed steward have their own tests, run by `claude plugin test` against a stand-in engine. So does each adapter's mapping from backend states to the port's agent states, including the herdr parked-on-background-work and lost-agent corrections.
