@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# The herdr app adapter refuses a status text, and says why, because the app
-# has no way yet to show one. See docs/design.md, "The herdr app adapter".
+# The herdr app adapter keeps a berth's status text in the terminal's
+# berth.status hc label, which the berth-pane mod shows beside the pane's
+# name. See docs/design.md, "The herdr app adapter".
 #
 # Run it under with-herdr-app-yard.
 #
@@ -19,25 +20,28 @@ check() { # <what> <want> <got>
   fi
 }
 
-refusal() { # <command>...
-  local err status=0
-  err=$("$@" 2>&1 >/dev/null) || status=$?
-  echo "$status ${err:+with a reason}"
+status_label() { # <id>
+  hc get "$1" --json | jq -r '.labels["berth.status"] // "none"'
 }
 
 seat=$(berth open --as independent --cwd "$work" -- sleep 600)
 
-err=$(berth status "$seat" "drafting the plan" 2>&1 >/dev/null)
-check "status is refused" 1 "$?"
-check "the refusal says the app cannot show a status text" true \
-  "$(case $err in *"cannot show a status text"*) echo true ;; *) echo false ;; esac)"
-check "status --clear is refused too" "1 with a reason" "$(refusal berth status "$seat" --clear)"
+berth status "$seat" "drafting the plan"
+check "status sets the berth.status label" "drafting the plan" "$(status_label "$seat")"
+berth status "$seat" "reviewing"
+check "a later status replaces it" reviewing "$(status_label "$seat")"
+berth status "$seat" --clear
+check "status --clear removes the label" none "$(status_label "$seat")"
 
 berth close "$seat"
+err=$(berth status "$seat" "too late" 2>&1 >/dev/null)
+check "status on a closed berth is refused" 1 "$?"
+check "the refusal says the berth is gone" true \
+  "$(case $err in *"is gone"*) echo true ;; *) echo false ;; esac)"
 
 echo
 if [ "$failures" -gt 0 ]; then
   echo "$failures failed."
   exit 1
 fi
-echo "The herdr app adapter refuses a status text, and says why."
+echo "The herdr app adapter keeps a berth's status text in an hc label."

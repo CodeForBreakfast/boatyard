@@ -42,6 +42,8 @@ Without Nix, put the scripts in `bin/` on your path.
 
 Install the packages even though the plugin carries the same scripts. A service manager does not see the plugin's `bin/`, so anything started outside Claude Code needs them on the path.
 
+Under the herdr app, a berth's status text shows only through the flake's `berth-pane` mod. Put the package's folder at `~/.config/herdr-app/mods/berth-pane`, and name `berth-pane` as the pane header in a layout of your own: `"header": { "content": { "mod": "berth-pane" } }`.
+
 ### The plugin
 
 Load the plugin from a checkout of the same revision as the packages:
