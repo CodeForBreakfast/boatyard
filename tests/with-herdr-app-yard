@@ -10,6 +10,11 @@
 # from another pane would be. It is stopped by the pid it was started
 # with, and by nothing else.
 #
+# The command runs as a seat in a dev shell would, with a folder of the seat's
+# own first on its PATH. A stand-in systemctl there reports the user manager's
+# environment, whose PATH is the one the run started with, and
+# BERTH_SESSION_PATH names it.
+#
 # Needs: bash, coreutils, flock, herdr-core, berth.
 set -euo pipefail
 
@@ -23,6 +28,12 @@ export HOME XDG_RUNTIME_DIR=$HOME/run XDG_STATE_HOME=$HOME/state XDG_CONFIG_HOME
 export XDG_DATA_HOME=$HOME/data
 mkdir -m 700 "$XDG_RUNTIME_DIR"
 export SHELL=${BASH:-bash}
+
+export BERTH_SESSION_PATH=$PATH
+mkdir "$HOME/seat"
+printf '#!%s\necho %q\n' "$(command -v bash)" "PATH=$PATH" >"$HOME/seat/systemctl"
+chmod +x "$HOME/seat/systemctl"
+PATH=$HOME/seat:$PATH
 
 lock=$XDG_STATE_HOME/herdr-core/default/core.lock
 up() { [ -f "$lock" ] && ! flock -n "$lock" true; }

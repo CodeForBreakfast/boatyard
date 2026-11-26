@@ -122,6 +122,10 @@ for assignment in ${BERTH_SERVED_WITH:-}; do
       "$([ "$(recorded "$work/$record" "${assignment%%=*}")" = "${assignment#*=}" ] && echo true || echo false)"
   done
 done
+# A pane opened by hand gets the user session's PATH, whatever PATH the yard
+# was served with. BERTH_SESSION_PATH names it, where a run sets it.
+[ -z "${BERTH_SESSION_PATH:-}" ] ||
+  check "a pane opened by hand has the user session's PATH" "$BERTH_SESSION_PATH" "$(recorded "$work/by-hand" PATH)"
 shell=$(recorded "$work/by-hand" SHELL)
 check "a pane opened by hand has a SHELL it can run" true "$([ -x "$shell" ] && echo true || echo false)"
 
