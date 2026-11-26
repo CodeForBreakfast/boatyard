@@ -30,8 +30,8 @@ check() { # <what> <want> <got>
   fi
 }
 
-cat >"$HOME/seat/herdr-app" <<'EOF'
-#!/usr/bin/env bash
+printf '#!%s\n' "$(command -v bash)" >"$HOME/seat/herdr-app"
+cat >>"$HOME/seat/herdr-app" <<'EOF'
 set -euo pipefail
 home=${HERDR_APP_HOME:-${XDG_CONFIG_HOME:-$HOME/.config}/herdr-app}
 [ -f "$home/shows" ] || { echo '{"error": "no window"}'; exit 1; }
