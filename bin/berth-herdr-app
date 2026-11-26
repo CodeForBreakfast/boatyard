@@ -110,9 +110,13 @@ terminal_agent_state() { # <terminal>
 # as an agent that left, stays open at a prompt. hc gives a terminal its id
 # only once it exists, so the command reads its BERTH_ID from the terminal.
 # The terminal runs in herdr-core's environment, not the caller's, so the
-# shell is named by its path.
+# shell is named by its path. That environment is whatever started the core,
+# which may be a herdr pane or a Claude Code session. herdr's pane variables
+# would then make the berth look like that pane, and Claude Code keeps no
+# transcript for a session it takes to be another's child.
 # shellcheck disable=SC2016 # the berth's own shell expands it
-berth_command=("$BASH" -c 'export BERTH_BACKEND=herdr-app BERTH_YARD=$1 BERTH_ID=$HC_TERMINAL_ID
+berth_command=("$BASH" -c 'unset "${!HERDR_@}" CLAUDE_CODE_CHILD_SESSION
+  export BERTH_BACKEND=herdr-app BERTH_YARD=$1 BERTH_ID=$HC_TERMINAL_ID
   shift; "$@"; exec "${SHELL:-sh}"' berth "$yard")
 
 state_dir() {
@@ -165,14 +169,13 @@ shell_settled() { # <id>
   done
 }
 
-# Types a command into a restored berth's shell, under the berth's own
-# variables, and says on the terminal what was done with its shell. hc types
-# nothing into a program that reports itself blocked.
+# Replaces a restored berth's shell with a command, started as a new berth's
+# command is, and says on the terminal what was done with its shell. hc types nothing into a program that reports itself blocked.
 type_command() { # <terminal> <outcome> <command>...
   local id pid line
   id=$(jq -r .address <<<"$1")
   pid=$(jq -r .pid <<<"$1")
-  printf -v line '%q ' env BERTH_BACKEND=herdr-app "BERTH_YARD=$yard" "BERTH_ID=$id" "${@:3}"
+  printf -v line '%q ' exec "${berth_command[@]}" "${@:3}"
   hc_call send -- "$id" "$line" >/dev/null
   hc_call label "$id" "berth.restore=$pid $2" >/dev/null
 }
