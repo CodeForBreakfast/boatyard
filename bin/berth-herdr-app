@@ -293,61 +293,80 @@ worker_tab() { # <opener> <space>
 
 # Names and focus belong to the window, so they wait on no window. A closed
 # one leaves Herdr's own names. The window may not have seen a new terminal's
-# labels yet, so a refusal is tried again for a while.
+# labels yet, so it is asked again for a while.
 window_wait_seconds=5
 
-window_open() {
-  command -v herdr-app >/dev/null && herdr-app status >/dev/null 2>&1
+# The app picks a window by its home. A yard's own window has the home
+# herdr-app-<yard>, and the default window may show the yard as a machine.
+window_homes() {
+  local config=${XDG_CONFIG_HOME:-$HOME/.config}
+  printf '%s\n' "${HERDR_APP_HOME:-$config/herdr-app}" "$config/herdr-app-$yard"
 }
 
-window() { # <command> <arguments>...
+# Prints the home of the window that shows a berth, and that window's ids for
+# the berth's space, tab and pane. A window prefixes the ids of a yard it shows
+# as a machine with the machine's name. The space id is the adapter's own and
+# unique, so a terminal with the same id in another yard never matches.
+window_place() { # <terminal>
+  local home homes=() place deadline=$((SECONDS + window_wait_seconds))
+  command -v herdr-app >/dev/null || return 1
+  while read -r home; do
+    HERDR_APP_HOME=$home herdr-app status >/dev/null 2>&1 && homes+=("$home")
+  done < <(window_homes)
+  [ ${#homes[@]} -gt 0 ] || return 1
+  while :; do
+    for home in "${homes[@]}"; do
+      place=$(HERDR_APP_HOME=$home herdr-app ls 2>/dev/null | jq -r --argjson berth "$1" '
+        first(.spaces[] | (if .machine then .machine + "/" else "" end) as $machine
+          | select(.id == $machine + $berth.labels["herdr.space"]) as $space
+          | .tabs[] | select(.id == $machine + $berth.labels["herdr.tab"]) as $tab
+          | .terminals[] | select(.terminal == $machine + $berth.address)
+          | [$space.id, $tab.id, .pane] | @tsv) // empty') || place=""
+      [ -z "$place" ] || { printf '%s\t%s\n' "$home" "$place"; return 0; }
+    done
+    if [ "$SECONDS" -ge "$deadline" ]; then
+      echo "berth (herdr-app): no window shows the berth $(jq -r .address <<<"$1")" >&2
+      return 1
+    fi
+    sleep 0.2
+  done
+}
+
+window() { # <home> <command> <arguments>...
   local out deadline=$((SECONDS + window_wait_seconds))
-  window_open || return 0
-  until out=$(herdr-app "do" "$@" 2>&1); do
+  until out=$(HERDR_APP_HOME=$1 herdr-app "do" "${@:2}" 2>&1); do
     if [ "$SECONDS" -ge "$deadline" ]; then
-      echo "berth (herdr-app): the window refused $1: $out" >&2
+      echo "berth (herdr-app): the window refused $2: $out" >&2
       return 0
     fi
     sleep 0.2
   done
-}
-
-# pane.rename takes a pane, which only the window's listing ties to a
-# terminal.
-name_pane() { # <terminal id> <label>
-  local pane deadline=$((SECONDS + window_wait_seconds))
-  window_open || return 0
-  until pane=$(herdr-app ls 2>/dev/null | jq -er --arg terminal "$1" '
-    first(.spaces[].tabs[].terminals[] | select(.terminal == $terminal) | .pane)'); do
-    if [ "$SECONDS" -ge "$deadline" ]; then
-      echo "berth (herdr-app): the window shows no pane for $1 to name" >&2
-      return 0
-    fi
-    sleep 0.2
-  done
-  window pane.rename --pane "$pane" --name "$2"
 }
 
 # Names a berth's pane, and whatever an independent berth's place gives it:
 # the space and its first tab for one opened apart, and the tab for one opened
-# in a tab. The window takes a command with no id to mean what it shows, so a
-# berth that the window does not show names nothing.
+# in a tab.
 name_place() { # <terminal> <label>
-  local space tab
-  space=$(jq -r '.labels["herdr.space"] // empty' <<<"$1")
-  tab=$(jq -r '.labels["herdr.tab"] // empty' <<<"$1")
-  [ -n "$space" ] && [ -n "$tab" ] || return 0
-  name_pane "$(jq -r .address <<<"$1")" "$2"
+  window "${shown_at[0]}" pane.rename --pane "${shown_at[3]}" --name "$2"
   jq -e '.labels["berth.relationship"] == "independent"' <<<"$1" >/dev/null || return 0
   case $(jq -r '.labels["berth.place"]' <<<"$1") in
-    apart) window space.rename --id "$space" --name "$2" ;&
-    tab) window tab.rename --id "$tab" --name "$2" ;;
+    apart) window "${shown_at[0]}" space.rename --id "${shown_at[1]}" --name "$2" ;&
+    tab) window "${shown_at[0]}" tab.rename --id "${shown_at[2]}" --name "$2" ;;
   esac
+}
+
+# Sets shown_at to the home and ids that window_place prints, for a berth that a
+# window shows. A berth with no space in its labels is one no window shows.
+shown() { # <terminal>
+  shown_at=()
+  jq -e '.labels["herdr.space"] and .labels["herdr.tab"]' <<<"$1" >/dev/null || return 1
+  IFS=$'\t' read -r -a shown_at < <(window_place "$1") || true
+  [ ${#shown_at[@]} = 4 ]
 }
 
 open() {
   local as=$1 place=$2 focus=$3 cwd=$4 label=$5 opener=$6 id line="" opener_terminal space="" tab=""
-  local workers_tab="" labels=() tender restoring
+  local workers_tab="" labels=() tender restoring terminal shown_at
   shift 6
   resume_seats
 
@@ -407,21 +426,24 @@ open() {
     -- "${berth_command[@]}" "$@" | jq -r .address)
   keep_command "$id" "$@"
   [ -n "$line" ] || hc_call label "$id" "berth.line=$id" >/dev/null
-  if [ -n "$space" ]; then
-    [ -z "$label" ] || name_place "$(hc_call get "$id")" "$label"
-    [ -z "$workers_tab" ] || window tab.rename --id "$workers_tab" --name workers
-    [ "$focus" != focus ] || window pane.focus --terminal "$id"
+  if [ -n "$label$workers_tab" ] || [ "$focus" = focus ]; then
+    terminal=$(hc_call get "$id")
+    if shown "$terminal"; then
+      [ -z "$label" ] || name_place "$terminal" "$label"
+      [ -z "$workers_tab" ] || window "${shown_at[0]}" tab.rename --id "${shown_at[2]}" --name workers
+      [ "$focus" != focus ] || window "${shown_at[0]}" pane.focus --pane "${shown_at[3]}"
+    fi
   fi
   printf '%s\n' "$id"
 }
 
 name() {
-  local id terminal
+  local id terminal shown_at
   id=$(berth_id "$1")
   resume_seats
   terminal=$(existing_terminal "$id" "it cannot be named")
   hc_call label "$id" "berth.label=$2" >/dev/null
-  name_place "$terminal" "$2"
+  ! shown "$terminal" || name_place "$terminal" "$2"
 }
 
 serve() {
