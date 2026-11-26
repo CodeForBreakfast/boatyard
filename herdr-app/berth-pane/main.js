@@ -2,7 +2,6 @@
 // `berth status` keeps the text in the terminal's berth.status hc label. A
 // layout names this mod as its pane header in place of Herdr's `pane`:
 //   { "tab": "active", "pane": { "header": { "content": { "mod": "berth-pane" } } } }
-// Props from the app: { pane, terminal }.
 
 import { View, div, svg } from "gpui-kit";
 import { h_flex } from "gpui-base";
