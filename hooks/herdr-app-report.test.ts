@@ -1,4 +1,4 @@
-import type { EngineInterface, On } from 'claude-code'
+import type { EngineInterface, On, RenderSurface } from 'claude-code'
 import { expect, test } from 'claude-code/testing'
 
 const ESC = '\x1b'
@@ -7,12 +7,14 @@ const report = (fields: string) => `${ESC}]7501;:${fields}:app=claude-code${ESC}
 const IN_APP_TERMINAL = { HC_TERMINAL_ID: 't7' }
 
 // The engine beneath the plugin: a Claude Code process whose pid is 4242, in a
-// terminal whose environment is `env`. A test reads back the status reports
-// written to that process's tty and the hc commands the plugin ran.
-function seat(on: On, env: Record<string, string> = IN_APP_TERMINAL) {
+// terminal whose environment is `env`, drawing on `surfaces`. A test reads
+// back the status reports written to that process's tty and the hc commands
+// the plugin ran.
+function seat(on: On, env: Record<string, string> = IN_APP_TERMINAL, surfaces: readonly RenderSurface[] = ['terminal']) {
   const world = { reports: [] as string[], hc: [] as string[][] }
   on('store.get', () => ({ value: undefined }))
   on('env.get', (_$, e) => ({ value: env[e.name] }))
+  on('session.surfaces', () => ({ value: surfaces }))
   on('process.hookEnv', () => ({ value: { CLAUDE_PID: '4242' } }))
   on('process.run', (_$, e) => {
     const [program, ...args] = e.argv
@@ -129,6 +131,31 @@ test('under herdr it does nothing, even inside an app terminal', async ($, on) =
   expect(app.hc).toEqual([])
 })
 
+test('a headless session in an app terminal leaves its label and status alone', async ($, on) => {
+  const app = seat(on, IN_APP_TERMINAL, [])
+  await startTurn($)
+  await $.classic.Notification({ ...SESSION, message: 'needs permission', notification_type: 'permission_prompt' })
+  await $.classic.Stop({ ...SESSION, stop_hook_active: false })
+  await $.classic.SessionEnd({ ...SESSION, reason: 'other' })
+  expect(app.reports).toEqual([])
+  expect(app.hc).toEqual([])
+})
+
+test('a subagent that starts in an app terminal leaves its label and status alone', async ($, on) => {
+  const app = seat(on)
+  await startTurn($)
+  await $.classic.SessionStart({ session_id: 'session-2', source: 'startup', agent_id: 'agent-1' })
+  expect(app.reports.at(-1)).toBe(report('state=working'))
+  expect(app.hc).toEqual([['label', 't7', 'claude.session=session-1']])
+})
+
+test("a subagent's permission prompt reports the terminal blocked", async ($, on) => {
+  const app = seat(on)
+  await startTurn($)
+  await $.classic.Notification({ ...SESSION, agent_id: 'agent-1', message: 'needs permission', notification_type: 'permission_prompt' })
+  expect(app.reports.at(-1)).toBe(report('state=blocked:kind=permission'))
+})
+
 test('a report that cannot be written leaves the session running, and says why in the debug log', async ($, on) => {
   const logged: string[] = []
   on('ui.log', (_$, e) => {
@@ -137,6 +164,7 @@ test('a report that cannot be written leaves the session running, and says why i
   })
   on('store.get', () => ({ value: undefined }))
   on('env.get', (_$, e) => ({ value: IN_APP_TERMINAL[e.name as keyof typeof IN_APP_TERMINAL] }))
+  on('session.surfaces', () => ({ value: ['terminal'] }))
   on('process.hookEnv', () => ({ value: { CLAUDE_PID: '4242' } }))
   on('process.run', () => ({ value: { exitCode: 1, stdout: '', stderr: 'no tty' } }))
   on('classic.SessionStart', () => ({}))

@@ -23,10 +23,13 @@ const WRITE_TO_TTY_OF = [
 ].join('\n')
 
 // herdr runs its own integration, and its panes inherit the app terminal's
-// variables when herdr itself runs inside one.
+// variables when herdr itself runs inside one. A -p or SDK session, which
+// draws nowhere, inherits them too when something in the terminal starts it.
 async function appTerminal($: EngineInterface): Promise<string | undefined> {
   if ((await $.env.get('HERDR_PANE_ID')) !== undefined) return undefined
-  return $.env.get('HC_TERMINAL_ID')
+  const terminal = await $.env.get('HC_TERMINAL_ID')
+  if (terminal === undefined || (await $.session.surfaces()).length === 0) return undefined
+  return terminal
 }
 
 async function run($: EngineInterface, argv: string[]) {
@@ -51,7 +54,9 @@ export const register: Register = (on) => {
   let last: State | undefined
 
   // A compaction keeps the session id, and may come in the middle of a turn.
+  // A subagent's start belongs to the session that runs it.
   on('classic.SessionStart', { source: ['startup', 'resume', 'clear', 'fork'] }, async ($, e, next) => {
+    if (e.agent_id !== undefined) return next(e)
     const terminal = await appTerminal($)
     if (terminal !== undefined) {
       last = await report($, 'idle')
