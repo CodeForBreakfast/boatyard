@@ -112,13 +112,18 @@ check "a tender's command learns its own BERTH_ID" "$tender" "$(recorded "$work/
 # A yard's server may have been started from another multiplexer's pane or
 # from inside a Claude Code session, and its environment then names that pane
 # or session. BERTH_SERVED_WITH holds the assignments the run started the
-# server with, and no berth's command carries any of them.
+# server with. Neither a berth's command nor a pane a person opens in the yard
+# carries any of them.
+# shellcheck disable=SC2016 # the pane's own shell expands it
+"$BERTH_OPEN_BY_HAND" bash -c 'env >"$1.part" && mv "$1.part" "$1"' recorder "$work/by-hand" >/dev/null
 for assignment in ${BERTH_SERVED_WITH:-}; do
-  for record in independent worker tender; do
-    check "the $record berth's command carries no ${assignment%%=*} from the yard's server" "" \
-      "$(recorded "$work/$record" "${assignment%%=*}")"
+  for record in independent worker tender by-hand; do
+    check "the $record command carries no $assignment from the yard's server" false \
+      "$([ "$(recorded "$work/$record" "${assignment%%=*}")" = "${assignment#*=}" ] && echo true || echo false)"
   done
 done
+shell=$(recorded "$work/by-hand" SHELL)
+check "a pane opened by hand has a SHELL it can run" true "$([ -x "$shell" ] && echo true || echo false)"
 
 check "every id is distinct" 4 "$(printf '%s\n' "$independent" "$worker" "$second_worker" "$tender" | sort -u | wc -l)"
 check "the list is JSON with the port's fields" true "$(berth list | jq 'all(.[]; keys == ["agent_session", "agent_state", "id", "label", "parent", "relationship", "state"])')"

@@ -8,7 +8,7 @@
 # yard is an hc session. The relationship, the opener, the line of work and
 # the label live on the terminal as hc labels.
 #
-# Needs: bash, coreutils, flock, grep, herdr-core, jq.
+# Needs: bash, coreutils, flock, grep, herdr-core, jq, and getent on Linux.
 set -euo pipefail
 
 yard=${BERTH_YARD:-${HC_SESSION:-default}}
@@ -31,10 +31,39 @@ yard_running() { # <yard>
   [ -f "$lock" ] && ! flock -n "$lock" true
 }
 
-# Inside a terminal, hc reaches the terminal's own core and takes the terminal
-# as its caller, so neither may override the yard.
+login_shell() {
+  local user shell
+  user=$(id -un)
+  shell=$(getent passwd "$user" 2>/dev/null | cut -d: -f7) ||
+    shell=$(dscl . -read "/Users/$user" UserShell 2>/dev/null | sed -n 's/^UserShell: //p') || shell=""
+  [ -x "$shell" ] || shell=/bin/sh
+  printf '%s\n' "$shell"
+}
+
+# The user's session, and nothing of the caller's seat.
+session_variables=(HOME USER LOGNAME PATH LANG LANGUAGE TZ SSH_AUTH_SOCK
+  XDG_RUNTIME_DIR XDG_STATE_HOME XDG_CONFIG_HOME XDG_DATA_HOME XDG_CACHE_HOME
+  XDG_CONFIG_DIRS XDG_DATA_DIRS XDG_CURRENT_DESKTOP XDG_SESSION_DESKTOP
+  XDG_SESSION_TYPE XDG_SESSION_ID XDG_SEAT XDG_VTNR
+  DISPLAY WAYLAND_DISPLAY DBUS_SESSION_BUS_ADDRESS)
+
+# herdr-core hands every terminal the environment it was started with, and
+# every hc command starts its session's core when none is running, in hc's own
+# environment. So hc and herdr-core get the user's session and login shell, and
+# never the caller's seat. Inside a terminal, hc would otherwise also reach the
+# terminal's own core and take the terminal as its caller, overriding the yard.
+session_environment() {
+  local name
+  session=()
+  for name in "${session_variables[@]}" "${!LC_@}"; do
+    [ -z "${!name+set}" ] || session+=("$name=${!name}")
+  done
+  session+=("SHELL=$(login_shell)" "HC_SESSION=$yard")
+}
+
 hc_env() {
-  env -u HC_TERMINAL_SOCKET -u HC_SOCKET -u HC_TERMINAL_ID HC_SESSION="$yard" "$@"
+  session_environment
+  env -i "${session[@]}" "$@"
 }
 
 # Prints what hc prints. Returns 3 for a terminal hc does not have, so a caller
@@ -378,7 +407,8 @@ name() {
 serve() {
   yard=$1
   ! yard_running "$yard" || die "the yard $yard is already being served."
-  exec env -u HC_TERMINAL_SOCKET -u HC_SOCKET -u HC_TERMINAL_ID HC_SESSION="$yard" herdr-core serve
+  session_environment
+  exec env -i "${session[@]}" herdr-core serve
 }
 
 stop() {

@@ -1,7 +1,7 @@
 # herdr and herdr-core are arguments so that a host can supply its own builds
 # of them. A host can instead name a herdr binary at run time with
 # BERTH_HERDR.
-{ lib, stdenvNoCC, makeWrapper, bash, coreutils, flock, gnugrep, jq, herdr, herdr-core }:
+{ lib, stdenvNoCC, makeWrapper, bash, coreutils, flock, getent, gnugrep, jq, herdr, herdr-core }:
 
 stdenvNoCC.mkDerivation {
   name = "berth";
@@ -25,7 +25,8 @@ stdenvNoCC.mkDerivation {
     wrapProgram $out/bin/berth-herdr --prefix PATH : ${lib.makeBinPath [ coreutils jq ]} \
       --set-default BERTH_HERDR ${herdr}/bin/herdr
     wrapProgram $out/bin/berth-herdr-state --prefix PATH : ${lib.makeBinPath [ jq ]}
-    wrapProgram $out/bin/berth-herdr-app --prefix PATH : ${lib.makeBinPath [ coreutils flock gnugrep jq herdr-core ]}
+    wrapProgram $out/bin/berth-herdr-app --prefix PATH : ${lib.makeBinPath ([ coreutils flock gnugrep jq herdr-core ]
+      ++ lib.optional stdenvNoCC.hostPlatform.isLinux getent)}
   '';
 
   meta.mainProgram = "berth";
