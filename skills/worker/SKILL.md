@@ -36,7 +36,7 @@ If the brief is incomplete or contradicts the bead, don't guess. Post the discre
 
 Two beads matter to you, and without a delivery formula they are the same bead:
 
-- **Your bead** is the one your brief names. It is your system of record, so your notes go on it. It is either one bead, or a parent whose small beads you work together.
+- **Your bead** is the one your brief names. It is your system of record, so your notes go on it. It is either one bead, or a big bead that depends on the small beads you work together.
 - **The bead you sit on** carries your seat: your berth in `agent_pane`, your Claude Code session in `agent_session`, your topic in `working_topic`, and the status that says the work is moving. It is the lowest bead that covers everything you are working. Without a delivery formula, that is your bead. Under one, it is the step of the formula you are working.
 
 As soon as you have oriented:
@@ -66,7 +66,7 @@ As soon as you have oriented:
 
    `bd unclaim` releases only an `in_progress` bead, and leaves it `open`.
 
-   **Where your bead is a parent, you take its small beads with it, and you never move between them.** Without a delivery formula you sit on the parent, and set each small bead `in_progress` as you start it. With direct delivery, close each once it is pushed. Where one pull request delivers them, each waits on its merge, as *Deliver* says.
+   **Where your bead depends on small beads that you work together, you take them with it, and you never move between them.** Without a delivery formula you sit on the big bead, and set each small bead `in_progress` as you start it. With direct delivery, close each once it is pushed. Where one pull request delivers them, each waits on its merge, as *Deliver* says.
 3. **Subscribe to your working topic, and only that**: `subscribe <channel>/<topic>`. Don't subscribe to the whole channel, because its other traffic is noise to you. Mentions of you always arrive without a subscription. This subscription is what lets the steward's relayed answers wake you while you sleep.
 4. **Post to the working topic.** Give a one-paragraph **assessment** of what you found, your **plan**, and a **checkpoint by `<time>`**, which is when you will next post. The steward watches for your death around that time, so it must be a real commitment. **Run `date` and quote local time.** Your context carries the date but not the clock, so a time you infer is usually wrong.
 
@@ -136,7 +136,7 @@ The first line names the default. A line with `for` names the formula for one ki
    bd note <id> "Delivering through <formula>, molecule <molecule>, outcome step <outcome-step>."
    ```
 
-   The molecule's id is `new_epic_id` in the output. `id_mapping` gives each step's id under `<formula>.<step>`, and a gated step's gate under `<formula>.gate-<step>`. One pour delivers one pull request. Where your bead is a parent, the pour names it, and each small bead the pull request delivers waits on the outcome step too.
+   The molecule's id is `new_epic_id` in the output. `id_mapping` gives each step's id under `<formula>.<step>`, and a gated step's gate under `<formula>.gate-<step>`. One pour delivers one pull request. Where your bead depends on small beads that you work together, the pour names it, and each small bead the pull request delivers waits on the outcome step too.
 
    **A formula's `gh:pr` gate is its merge step, so rewire it straight after the pour.** bd pours the gate in front of the step that declares it. Turn that edge round so the gate waits on the steps before it, make every following step wait on the gate, and give the gate its title. Where the merge is the outcome, the gate takes the `outcome` label, which is why the lookup above includes gates. `bd formula show <formula>` prints the formula's description, which gives the commands. Rewire before you look up the outcome step, or you will find none.
 2. **Work the steps in order, and sit on each one that is yours while you work it.** `bd mol current <molecule>` shows which steps are done and which are ready. A step's title states the outcome it reaches, and its description says who acts. Read the description with `bd show <step>`. A step whose description names the seat or the delivering seat is yours, merges included. Claim each as *Claim* says before you start it. When it is done, let it go and close it:
@@ -180,7 +180,7 @@ If that push is rejected because the branch is protected, the repo's statement w
    bd note <id> "PR opened: <url>. Closes on merge."
    ```
 
-   `bd gate create` copies `repo` only from a bead that already has one, so give the gate its repo yourself. Where your bead is a parent, make each small bead the pull request delivers wait on the same gate with `bd dep add <small-bead> "$g"`.
+   `bd gate create` copies `repo` only from a bead that already has one, so give the gate its repo yourself. Where your bead depends on small beads that you work together, make each small bead the pull request delivers wait on the same gate with `bd dep add <small-bead> "$g"`.
 
    **Don't close the bead, and don't set it `blocked`.** A closed bead tells the steward the work is delivered. While the bead stays open it blocks its dependents, so nothing starts against code that has not landed. The open gate keeps the bead out of `bd ready`, and the merge closes the gate. A bead set `blocked` stays out of `bd ready` even after that.
 4. **Post the pull request's address to the working topic**, then finish. Don't wait for the review. The steward watches the pull request from here, and starts a fresh seat on your bead if the reviewers ask for changes.
@@ -203,7 +203,7 @@ When the deliverable meets the brief's definition of done, wind the seat down in
 
    - **With direct delivery**, close your bead by your project's conventions.
    - **With a pull request and no formula**, leave your bead `open`, where the release left it. Its gate holds it, and the steward closes it once the work lands.
-   - **Under a delivery formula**, your bead already waits on the outcome step, and you never claimed it. If you closed the outcome step yourself, the work has landed, so close your bead and each small bead under it. Otherwise leave them open.
+   - **Under a delivery formula**, your bead already waits on the outcome step, and you never claimed it. If you closed the outcome step yourself, the work has landed, so close each small bead your bead depends on, then your bead. Otherwise leave them open.
 
    **If the steward has pointed you at a follow-up bead, stop finishing here and take it.** Read its brief, the first message of the topic the steward named. Unsubscribe from your old working topic, then claim the new bead as *Claim* says, with its own topic and your berth, and work it as you worked your first. You finish once, after your last bead.
 2. **Tear down.** Remove the worktree you made, by the project's rules.
