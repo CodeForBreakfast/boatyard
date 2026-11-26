@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+# The herdr app adapter refuses a status text, and says why, because the app
+# has no way yet to show one. See docs/design.md, "The herdr app adapter".
+#
+# Run it under with-herdr-app-yard.
+#
+# Needs: bash, coreutils, herdr-core, jq, berth.
+set -uo pipefail
+
+work=$(mktemp -d)
+failures=0
+
+check() { # <what> <want> <got>
+  if [ "$2" = "$3" ]; then
+    echo "ok: $1"
+  else
+    echo "FAIL: $1: wanted '$2', got '$3'"
+    failures=$((failures + 1))
+  fi
+}
+
+refusal() { # <command>...
+  local err status=0
+  err=$("$@" 2>&1 >/dev/null) || status=$?
+  echo "$status ${err:+with a reason}"
+}
+
+seat=$(berth open --as independent --cwd "$work" -- sleep 600)
+
+err=$(berth status "$seat" "drafting the plan" 2>&1 >/dev/null)
+check "status is refused" 1 "$?"
+check "the refusal says the app cannot show a status text" true \
+  "$(case $err in *"cannot show a status text"*) echo true ;; *) echo false ;; esac)"
+check "status --clear is refused too" "1 with a reason" "$(refusal berth status "$seat" --clear)"
+
+berth close "$seat"
+
+echo
+if [ "$failures" -gt 0 ]; then
+  echo "$failures failed."
+  exit 1
+fi
+echo "The herdr app adapter refuses a status text, and says why."

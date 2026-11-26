@@ -514,10 +514,14 @@ close() {
   rm -f "$(held_text "$id")" "$(state_dir)/$id".*.command
 }
 
+status() {
+  die "the herdr app cannot show a status text on a berth yet. herdr-core takes a terminal's status only from its own program, and the window shows no status text beside a pane's name."
+}
+
 verb=$1
 shift
 case "$verb" in
-  serve | stop | open | name | list | state | close | yards) "$verb" "$@" ;;
+  serve | stop | open | name | status | list | state | close | yards) "$verb" "$@" ;;
   yard) echo "$yard" ;;
   id) berth_id "$1" ;;
   send-text) send_text "$@" ;;

@@ -328,6 +328,16 @@ name() {
   esac
 }
 
+# herdr shows a pane's state label in place of the state's own word. The text
+# labels only working and idle, so a blocked or finished agent still says so.
+status() {
+  local id labels=(--clear-state-labels)
+  id=$(berth_id "$1")
+  [ -z "$2" ] || labels=(--state-label "working=$2" --state-label "idle=$2")
+  on_berth "$id" "it cannot take a status text" \
+    herdr_result pane report-metadata "$id" --source berth "${labels[@]}" >/dev/null
+}
+
 yard_running() {
   env -u HERDR_SOCKET_PATH "$herdr" --session "$yard" status server --json | jq -e .running >/dev/null
 }
@@ -472,7 +482,7 @@ close() {
 verb=$1
 shift
 case "$verb" in
-  serve | stop | open | name | list | state | close | yards) "$verb" "$@" ;;
+  serve | stop | open | name | status | list | state | close | yards) "$verb" "$@" ;;
   yard) echo "$yard" ;;
   id) berth_id "$1" ;;
   send-text) send_text "$@" ;;
