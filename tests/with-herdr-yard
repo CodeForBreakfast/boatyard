@@ -3,16 +3,18 @@
 # BERTH_YARD naming it.
 #
 # HOME is redirected and every HERDR_* variable unset, because an inherited
-# HERDR_SOCKET_PATH would otherwise drive the live session. XDG_STATE_HOME is
-# unset too, so the adapter keeps the yard's berths under that HOME. The server is
-# stopped by the pid it was started with, and by nothing else.
+# HERDR_SOCKET_PATH would otherwise drive the live session. Every HC_* variable
+# is unset too, so a pane of the yard is not also a herdr app terminal when the
+# command runs from one. XDG_STATE_HOME is unset too, so the adapter keeps
+# the yard's berths under that HOME. The server is stopped by the pid it was
+# started with, and by nothing else.
 #
 # Needs: bash, coreutils, herdr, jq.
 set -euo pipefail
 
 [ $# -gt 0 ] || { echo "usage: with-herdr-yard <command>..." >&2; exit 2; }
 
-unset "${!HERDR_@}" XDG_STATE_HOME
+unset "${!HERDR_@}" "${!HC_@}" XDG_STATE_HOME
 
 # A unix socket path has to fit in about a hundred bytes, so HOME stays short.
 HOME=$(mktemp -d "${TMPDIR:-/tmp}/yard.XXXXXX")

@@ -327,6 +327,65 @@ check "the berth opens in the yard berth resolves" true \
   "$(berth list | jq -r --arg id "$id" 'any(.[]; .id == $id)')"
 check "the command learns that BERTH_YARD" "$BERTH_YARD" "$(recorded plain BERTH_YARD)"
 
+echo "# a host that names the other frontend's backend"
+
+# A host may name one backend for its whole session, and that reaches a pane
+# of the other frontend too. Each suite has only its own backend on the path,
+# so a seat sent to the other one cannot open.
+case $BERTH_BACKEND in
+  herdr) other=herdr-app ;;
+  herdr-app) other=herdr ;;
+esac
+
+# A shell in a pane of this backend's own stands in for one a person opened by
+# hand. Each launch adds what the host's session would give it.
+caller=$(berth open --as independent --cwd "$work" -- "$BASH" --norc --noprofile)
+from_caller() { # <name> <environment>...
+  local name=$1 _
+  shift
+  berth send-text "$caller" "env -u BERTH_ID $* PATH='$PATH' SIGN_ON_MIN_MEMORY=0 \
+SIGN_ON_CLAUDE='$(seat "$name" rest 0)' sign-on --as independent --cwd '$work/project' go \
+>'$work/$name.out' 2>'$work/$name.err'; echo \$? >'$work/$name.status'"
+  berth send-key "$caller" Enter
+  for _ in $(seq 1 300); do
+    [ -s "$work/$name.status" ] && break
+    sleep 0.1
+  done
+}
+
+from_caller pane BERTH_BACKEND="$other" BERTH_YARD=no-such-yard
+check "a caller in a pane signs on whatever BERTH_BACKEND says" 0 "$(cat "$work/pane.status")"
+check "the seat opens in the caller's own backend" "$BERTH_BACKEND" "$(recorded pane BERTH_BACKEND)"
+check "in the yard the caller's pane is in" "$BERTH_YARD" "$(recorded pane BERTH_YARD)"
+check "and is listed there" true \
+  "$(berth list | jq -r --arg id "$(cat "$work/pane.out")" 'any(.[]; .id == $id)')"
+check "sign-on says it opened the seat there" true \
+  "$(contains "$(cat "$work/pane.err")" "BERTH_BACKEND")"
+
+if [ "$BERTH_BACKEND" = herdr ]; then
+  # herdr run inside an app terminal gives its panes the terminal's variables.
+  from_caller nested BERTH_BACKEND=herdr-app HC_TERMINAL_ID=an-app-terminal
+  check "a caller in a herdr pane inside an app terminal signs on" 0 "$(cat "$work/nested.status")"
+  check "the seat opens in herdr" herdr "$(recorded nested BERTH_BACKEND)"
+  check "sign-on says the caller was in both" true \
+    "$(contains "$(cat "$work/nested.err")" "both a herdr pane and a herdr app terminal")"
+fi
+
+mkdir -p "$work/backends"
+cat >"$work/backends/berth" <<EOF
+#!$BASH
+[ "\$1" != open ] || printf '%s\n' "\$BERTH_BACKEND" >>"$work/backends.log"
+exec $(command -v berth) "\$@"
+EOF
+chmod +x "$work/backends/berth"
+env -u HERDR_PANE_ID -u HC_TERMINAL_ID PATH="$work/backends:$PATH" BERTH_BACKEND="$other" \
+  SIGN_ON_CLAUDE="$(seat paneless rest 0)" sign-on --as independent --cwd "$work/project" go \
+  >/dev/null 2>&1
+check "a caller in no pane opens its seat in the backend BERTH_BACKEND names" "$other" \
+  "$(cat "$work/backends.log")"
+
+berth close "$caller"
+
 echo "# a seat already starting in a berth"
 
 # --pass-gate sends its failures to the system log, so a stand-in logger

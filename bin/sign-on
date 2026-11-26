@@ -178,6 +178,28 @@ if [ "$min_memory" -gt 0 ]; then
   fi
 fi
 
+# A host may name one backend for its whole session, and that reaches the
+# other frontend's panes too, so the caller's own pane names the backend.
+# herdr's panes inherit an app terminal's variables when herdr runs inside
+# one, so a caller in both is taken to be in herdr.
+case "${HC_TERMINAL_ID:+app}${HERDR_PANE_ID:+herdr}" in
+  app) own=herdr-app marker=HC_TERMINAL_ID ;;
+  herdr) own=herdr marker=HERDR_PANE_ID ;;
+  appherdr)
+    own=herdr marker=HERDR_PANE_ID
+    echo "sign-on: the caller is in both a herdr pane and a herdr app terminal, so the seat opens in herdr. A herdr-core started from a herdr pane gives its terminals that pane's HERDR_PANE_ID, which is then stale." >&2
+    ;;
+  *) own=${BERTH_BACKEND:-} ;;
+esac
+if [ "$own" != "${BERTH_BACKEND:-}" ]; then
+  if [ -n "${BERTH_BACKEND:-}" ]; then
+    echo "sign-on: the caller's pane is in $own, so the seat opens there and not in the $BERTH_BACKEND that BERTH_BACKEND names. To open it in $BERTH_BACKEND, sign it on with $marker unset." >&2
+    # An inherited BERTH_YARD names a yard of the other backend.
+    unset BERTH_YARD
+  fi
+  export BERTH_BACKEND=$own
+fi
+
 BERTH_YARD=$(berth yard)
 export BERTH_YARD
 
