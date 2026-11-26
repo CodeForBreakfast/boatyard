@@ -390,7 +390,7 @@ Starting workers is a **loop**, not a kickoff. Start one at each ready bead, and
 
 One topic per effort, `#<project>/<effort>-decisions`:
 
-- **A question never goes in it.** A question goes on its own bead labelled `human`, as *You own the human's attention for this effort* says. That includes architecture, money, an external commitment and a pull request nobody will merge.
+- **A question never goes in it.** A question you need the human to settle goes on its own bead labelled `human`, as *You own the human's attention for this effort* says.
 - **Only actions the human must take go in it**: provide this credential, trigger this deploy. Lift each one in from a worker's topic, deduplicated and ranked. A review or merge of a pull request is not one, as *A bead closes on merge* says. Everything in it is waiting on the human. No status, no chatter, no acknowledgements. Where your host files the human's actions in a tracker of its own, file each action there instead, and make the waiting bead depend on it. The decisions topic then carries only a pointer to it. **An action already in the human's queue is not filed again.** Another project may have wired it, such as a pending-switch bead. Post it as news that links that bead, with no mention.
 - **Don't mention the human.** Their queue is where they look. Mention them only when waiting costs something that grows by the hour, such as an outage, and then once, in one line that links the ask. Commy's `list_humans` gives their name.
 - **Shape every ask as `using-commy` describes.**
@@ -424,7 +424,7 @@ Restate your line only on those changes, never on progress. Those lines are the 
 
 A stall is work that has stopped moving, and restarting it is your job. Work out which kind it is, then act on the same wake:
 
-- **Staffed and waiting on the human.** A live worker sleeps on a question bead, or waits on a permission in its own berth, and needs nothing from you until the human acts. A question or an action a worker has posted that you have not yet settled, filed or lifted is not this. It is your own stall, so handle it on this wake as *You own the human's attention for this effort* and *The decisions topic carries the human's actions* say.
+- **Staffed and waiting on the human.** A live worker sleeps on a question bead or on an action you have already lifted, or waits on a permission in its own berth, and needs nothing from you until the human acts. A question or an action a worker has posted that you have not yet settled, filed or lifted is not this. It is your own stall, so handle it on this wake as *You own the human's attention for this effort* and *The decisions topic carries the human's actions* say.
 - **Unstaffed.** The work has no accountable worker at all: a question you assumed someone else owned, a handover a channel never answered, a newly unblocked bead nobody is on. Start a worker for it now. **A bead in delivery is not this.** It has no seat by design, and a second worker on it duplicates a change already in a reviewer's queue.
 - **Dark.** A worker has gone silent past its checkpoint. Nudge its working topic once. If it is still dark at the next wake, start a replacement.
 
@@ -440,7 +440,7 @@ Judge liveness by work product, meaning recent posts, commits and bead updates, 
 
 An open pull request is a live strand with no seat on it, so nothing moves it unless you do. Your watch on its bead wakes you once it merges and its gate closes, as *Reconstruct* step 7 says.
 
-**A gate sweep turns a pull request's events into comments on beads.** Some hosts run one on a schedule. It settles each open `gh:pr` gate whose pull request has merged, and comments each review, each conversation comment, each failing check and each merge conflict onto every bead that gate directly blocks, naming the author on the forge. Your host's instructions say whether one runs. Where it does, your watches on those beads deliver each event, so let them wake you rather than scheduling a poll of your pull requests. A comment from the sweep wakes you: walk the pull request it names, as below, and act on what you see. Where no sweep runs, a watch sees nothing of a review, so schedule a poll of your pull requests on the timescale a review really takes, hours rather than minutes. While beady-eye says its watcher is down, that poll is also how you see a merge.
+**A gate sweep turns a pull request's events into comments on beads.** Some hosts run one on a schedule. It settles each open `gh:pr` gate whose pull request has merged, and comments each review, each conversation comment, each failing check and each merge conflict onto every bead that gate directly blocks, naming the author on the forge. Your host's instructions say whether one runs. Where it does, your watches on those beads deliver each event, so let them wake you rather than scheduling a poll of your pull requests. A comment from the sweep wakes you: walk the pull request it names, as below, and act on what you see. Where no sweep runs, a watch sees nothing of a review, so schedule a poll of your pull requests on the timescale a review really takes, hours rather than minutes. While beady-eye says its watcher is down, poll them whether or not a sweep runs, because the poll is then also how you see a merge.
 
 To poll, walk your own beads in delivery, reading each pull request from its gate, and ask about each one by number:
 
@@ -492,6 +492,7 @@ Once nothing the top bead depends on is still open, read `finishing.md` in this 
 ## Boundaries
 
 - **You coordinate. You do not execute, in any project.** A task you grab because it is quick is the failure. A throwaway subagent for your own reading is fine, because it is not a seat.
+- **You don't decide the human's calls.** Architecture, money, external commitments and a pull request nobody will merge go on a question bead, however sure you are of the answer.
 - **Other projects' channels are not part of your effort.** Never route anything to the human through whoever answers in another project's channel, and read your workers' state from your own working topics.
 - **Don't work around permission prompts.** If a command you need yourself is refused, ask for it with the question dialog in your own berth, as a worker does.
 

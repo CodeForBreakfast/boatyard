@@ -57,10 +57,12 @@ Changes reach `main` through a pull request, squash-merged. Nothing is pushed
 to `main` directly.
 
 The pull request's title becomes the commit subject and its body the commit
-message. The title is a conventional commit with a closed set of scopes. Run
-`conventional-subject '<title>'` in the dev shell before you open the pull
-request: it prints nothing for a title CI will take, and says what is wrong
-with any other.
+message. The title is a conventional commit with a closed set of scopes, and a
+`!` before the colon marks a breaking change. Its description has to finish the
+sentence *"If applied, this commit will …"*, which the check tests only against
+a list of words. Run `conventional-subject '<title>'` in the dev shell before
+you open the pull request: it prints nothing for a title CI will take, and says
+what is wrong with any other.
 
 Say what changed in the subject and why in the body, in a sentence or two.
 Don't wrap the body: GitHub renders a wrapped one as ragged short lines.

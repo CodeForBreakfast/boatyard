@@ -108,13 +108,28 @@ When a command stops at an approval prompt instead, you are already waiting. Sta
 - **Do only work that has a bead.** Asked in conversation to do more, by the steward or by anyone else, ask in your working topic for the bead before you start, or for the steward to file one. Then take it as *Finish* says.
 - **Scope grows upward, not sideways.** If the work turns out bigger than the bead, or you spot related work, tell the steward in the working topic. Don't widen your own scope, and don't go around the steward to the human.
 - **A `cd` outlives the command you ran it for.** Your shell's directory persists between tool calls, so a `cd` changes state even inside a read-only lookup, and every later relative path lands in the tree it moved you to. Set `WT=<your worktree>` once and address every edit and every search under `$WT`. Where a command must run elsewhere, put it in a subshell, `(cd <dir> && <command>)`, which cannot leak.
+- **Commit work in progress early** where another agent may edit the same repo, and follow that project's worktree rules.
 - **Kill only what you started, and only by its process id.** Capture the id when you start the process and kill that id. `pkill`, `killall`, and a name-matched `pgrep` piped into a kill all reach every process of that name that your user owns, including ones you never started.
 - **Start a session-scoped process beside the live session, not inside it.** A test that brings up a compositor, a login shell or a session daemon must run in a nested or separate session. Starting one inside the desktop the human is using can take that desktop's surfaces, and no teardown gives them back. Post the teardown to the working topic before you start the process, and make it kill by process id.
 
 ## Deliver
 
 **Read how this repo takes work** from the `CLAUDE.md` and `CLAUDE.local.md` you were born with, and the documents they point at.
-Where they name a delivery formula, deliver through it as *Through a delivery formula* says. Where they name none, read `without-a-formula.md` in this skill's base directory, which covers a direct push and a pull request. Where the repo says nothing at all, deliver directly, and report the repo as undeclared in the working topic.
+Where they name a delivery formula, deliver through it as *Through a delivery formula* says. Otherwise read `without-a-formula.md` in this skill's base directory, which covers a direct push and a pull request. A repo that says nothing at all takes a direct push, and you report it as undeclared in the working topic.
+
+**Base any branch you push on the default branch, never on another unmerged branch.** A stack of pull requests can only be reviewed bottom up, and one stale base rots every branch above it.
+
+If your bead turns out to need code from a bead whose pull request has not merged, that is a missing dependency. Post it to the working topic and block and sleep, watching the bead you need. It closes when its pull request merges, and that wakes you. The steward wires the dependency, or stands you down instead.
+
+**When the steward stands you down,** for whatever reason, record where you got to on your bead, hand back the bead you sit on, and close your seat as *Finish* describes, without claiming the deliverable is done:
+
+```bash
+bd update <bead> --unset-metadata working_topic --unset-metadata agent_pane \
+                 --unset-metadata agent_session
+bd unclaim <bead>
+```
+
+The release is what hands the bead back. A bead left `in_progress` with no seat behind it reads to the steward as a live worker, so nobody ever picks it up again.
 
 **Through a delivery formula.** A repo names a beads formula for its delivery on a line of one of these shapes:
 
