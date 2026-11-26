@@ -12,6 +12,7 @@
 #   id <id>
 #   open <independent|worker|tender> <apart|beside|tab> <focus|no-focus> <cwd> <label> <opener> <command>...
 #   name <id> <label>
+#   status <id> <text>
 #   list <yard> <berths|all>
 #   send-text <id> <text>
 #   send-key <id> <key>
@@ -25,7 +26,8 @@
 # process. wait-text matches its text as a literal within one line of recent
 # output, and read prints the visible screen as plain text. yards prints
 # each running yard on a line of its own. list with all also lists each pane
-# berth did not open that runs an agent.
+# berth did not open that runs an agent. status with an empty text clears the
+# berth's status text.
 #
 # <opener> is BERTH_ID, and so is <id> when the caller gave none. Either is
 # empty when BERTH_ID is unset too, and the adapter then resolves the calling
@@ -47,6 +49,7 @@ usage: berth serve <yard>
        berth open --as independent|worker|tender --cwd <dir> [--label <text>] [--focus]
                   [--beside | --tab] -- <command>...
        berth name [<id>] <label>
+       berth status [<id>] <text> | --clear
        berth list [<yard>] [--all]
        berth send-text [<id>] <text>
        berth send-key [<id>] <key>
@@ -139,6 +142,20 @@ case "$verb" in
       2) exec "$adapter" wait-text "${args[0]}" "${args[1]}" "$timeout" ;;
       *) usage ;;
     esac
+    ;;
+  status)
+    case $# in
+      1) id=${BERTH_ID:-} text=$1 ;;
+      2) id=$1 text=$2 ;;
+      *) usage ;;
+    esac
+    [[ $id != -* ]] || usage
+    case $text in
+      --clear) text="" ;;
+      "") die "a status text cannot be empty. Clear it with --clear." ;;
+      -*) die "a status text cannot start with a dash." ;;
+    esac
+    exec "$adapter" status "$id" "$text"
     ;;
   yard | yards)
     [ $# = 0 ] || usage

@@ -61,7 +61,7 @@ berth=(bash "$work/berth")
 
 prints_usage "berth --help" "${berth[@]}" --help
 prints_usage "berth -h" "${berth[@]}" -h
-for verb in serve stop yard yards id open name list send-text send-key wait-text read state agent-state close; do
+for verb in serve stop yard yards id open name status list send-text send-key wait-text read state agent-state close; do
   prints_usage "berth $verb --help" "${berth[@]}" "$verb" --help
   prints_usage "berth $verb -h" "${berth[@]}" "$verb" -h
 done
@@ -89,6 +89,19 @@ refuses "name refuses a dashed label for a named berth" "${berth[@]}" name some-
 : >"$calls"
 "${berth[@]}" name some-berth "a plain label"
 check "name still sets a plain label" "name some-berth a plain label" "$(cat "$calls")"
+
+passes "status sets a named berth's text" "status some-berth drafting the plan" \
+  "${berth[@]}" status some-berth "drafting the plan"
+passes "status with no id sets the calling berth's text" "status any-berth drafting the plan" \
+  "${berth[@]}" status "drafting the plan"
+passes "status --clear passes an empty text" "status some-berth " "${berth[@]}" status some-berth --clear
+passes "status --clear with no id clears the calling berth's text" "status any-berth " \
+  "${berth[@]}" status --clear
+refuses "status needs a text" "${berth[@]}" status
+refuses "status refuses an empty text" "${berth[@]}" status some-berth ""
+refuses "status refuses a text that starts with a dash" "${berth[@]}" status --verbose
+refuses "status refuses a dashed text for a named berth" "${berth[@]}" status some-berth -x
+refuses "status refuses a berth that starts with a dash" "${berth[@]}" status --clear some-berth
 
 # A host such as one running herdr and the herdr app side by side names no
 # backend, and the calling pane's variables choose it.

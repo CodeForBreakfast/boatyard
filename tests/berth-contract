@@ -144,6 +144,22 @@ check "name with no id relabels the calling berth" "named by itself" "$(field "$
 berth name "$independent" "renamed line"
 check "name relabels an independent berth" "renamed line" "$(field "$independent" label)"
 
+echo "# status"
+
+# A status text shows only in the multiplexer, which the suite does not read,
+# so each case checks that the adapter took it.
+takes_status() { # <what> <command>...
+  local what=$1 status=0
+  shift
+  "$@" 2>/dev/null || status=$?
+  known_gap status-text "$what" 0 "$status"
+}
+
+takes_status "status sets a berth's status text" berth status "$worker" "drafting the plan"
+takes_status "status with no id sets the calling berth's" env BERTH_ID="$worker" berth status "reviewing"
+takes_status "status --clear clears it" berth status "$worker" --clear
+takes_status "status --clear with no id clears the calling berth's" env BERTH_ID="$worker" berth status --clear
+
 echo "# send-text, send-key, wait-text and read"
 
 # Every pattern this section waits for is built by the berth's command at
@@ -428,6 +444,7 @@ refused "a gone berth cannot take text" berth send-text "$independent" "too late
 refused "a gone berth cannot take a key" berth send-key "$independent" Enter
 refused "a gone berth cannot be waited on" berth wait-text "$independent" "too late" --timeout 1
 refused "a gone berth cannot be read" berth read "$independent"
+refused "a gone berth cannot take a status text" berth status "$independent" "too late"
 refused "serve needs a yard" berth serve
 refused "open needs a relationship it knows" berth open --as stranger --cwd "$work" -- true
 refused "open needs a command" berth open --as independent --cwd "$work"

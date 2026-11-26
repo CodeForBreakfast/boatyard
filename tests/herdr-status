@@ -1,0 +1,57 @@
+#!/usr/bin/env bash
+# The herdr adapter shows a berth's status text as the label of its pane's
+# working and idle states. See docs/design.md, "The herdr adapter".
+#
+# Run it under with-herdr-yard.
+#
+# Needs: bash, coreutils, herdr, jq, berth.
+set -uo pipefail
+
+work=$(mktemp -d)
+failures=0
+
+check() { # <what> <want> <got>
+  if [ "$2" = "$3" ]; then
+    echo "ok: $1"
+  else
+    echo "FAIL: $1: wanted '$2', got '$3'"
+    failures=$((failures + 1))
+  fi
+}
+
+state_labels() { # <id>
+  herdr --session "$BERTH_YARD" pane get "$1" | jq -cS '.result.pane.state_labels // {}'
+}
+
+seat=$(berth open --as independent --cwd "$work" --label "a seat" -- sleep 600)
+worker=$(BERTH_ID=$seat berth open --as worker --cwd "$work" -- sleep 600)
+
+berth status "$worker" "drafting the plan"
+check "status labels the working and idle states with the text" \
+  '{"idle":"drafting the plan","working":"drafting the plan"}' "$(state_labels "$worker")"
+check "status leaves the berth's relationship" worker \
+  "$(berth list | jq -r --arg id "$worker" '.[] | select(.id == $id) | .relationship')"
+
+berth status "$worker" "reviewing"
+check "a second status replaces the first" '{"idle":"reviewing","working":"reviewing"}' "$(state_labels "$worker")"
+check "status leaves other berths alone" '{}' "$(state_labels "$seat")"
+
+berth status "$worker" --clear
+check "status --clear removes the labels" '{}' "$(state_labels "$worker")"
+
+# herdr's own agent integration reports labels under a source of its own,
+# and berth's clear leaves them.
+herdr --session "$BERTH_YARD" pane report-metadata "$seat" --source herdr:claude \
+  --state-label blocked=asking >/dev/null
+berth status "$seat" "planning"
+berth status "$seat" --clear
+check "status --clear leaves labels another source set" '{"blocked":"asking"}' "$(state_labels "$seat")"
+
+berth close "$seat"
+
+echo
+if [ "$failures" -gt 0 ]; then
+  echo "$failures failed."
+  exit 1
+fi
+echo "The herdr adapter shows a berth's status text."
