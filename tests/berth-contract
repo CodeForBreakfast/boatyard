@@ -152,7 +152,7 @@ takes_status() { # <what> <command>...
   local what=$1 status=0
   shift
   "$@" 2>/dev/null || status=$?
-  known_gap status-text "$what" 0 "$status"
+  check "$what" 0 "$status"
 }
 
 takes_status "status sets a berth's status text" berth status "$worker" "drafting the plan"

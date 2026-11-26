@@ -514,8 +514,13 @@ close() {
   rm -f "$(held_text "$id")" "$(state_dir)/$id".*.command
 }
 
+# The berth-pane mod shows the berth.status label beside the pane's name. An
+# empty text removes the label.
 status() {
-  die "the herdr app cannot show a status text on a berth yet. herdr-core takes a terminal's status only from its own program, and the window shows no status text beside a pane's name."
+  local id
+  id=$(berth_id "$1")
+  existing_terminal "$id" "it cannot take a status text" >/dev/null
+  hc_call label "$id" "berth.status=$2" >/dev/null
 }
 
 verb=$1

@@ -23,12 +23,11 @@ let
 
   # Each suite runs against a herdr-core of its own inside the build sandbox.
   # hc cannot type text without pressing Enter, so text that berth holds for
-  # the next Enter does not show on screen until then. The app cannot show a
-  # status text, so the adapter refuses one.
+  # the next Enter does not show on screen until then.
   herdrAppSuite = suite: pkgs.runCommand "berth-${suite}-herdr-app"
     { nativeBuildInputs = [ berth sign-on pkgs.bash pkgs.coreutils pkgs.flock pkgs.herdr-core pkgs.jq ]; } ''
     export BERTH_OPEN_BY_HAND=${openByHandInApp}
-    export BERTH_CONTRACT_GAPS="unsent-text-shows status-text"
+    export BERTH_CONTRACT_GAPS="unsent-text-shows"
     bash ${../../tests/with-herdr-app-yard} bash ${../../tests + "/${suite}"}
     touch $out
   '';
