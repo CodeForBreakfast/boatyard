@@ -107,7 +107,7 @@ A steward that its multiplexer resumed breaks it as well, because its commy serv
    - **`waiting`** lines are every other bead, with its status and the dependencies it still waits on. An `in_progress` bead has a seat, or had one. A bead parked by status, `blocked` or `deferred`, appears here too.
    - **`unread`** names a tracker bdi could not read. A bead whose blocker sits there is reported as `held-by-unread`, never as ready. Read again next wake, as step 5 says.
 
-   **A ready bead whose parent names a live seat belongs to that seat.** The seat works its parent's small beads one at a time, so start no worker on it.
+   **A ready bead belongs to a live seat when a bead that names that seat depends on it.** A seat that works several small beads together sits on a big bead that depends on each of them, and works them one at a time, so start no worker on any of them.
 5. **Review the graph for errors.** bdi reports every edge in the effort's tree that leads nowhere. Read the top bead's tree from your project's directory. bdi also reads each blocker in another project, where bdi's config states that project's prefix:
 
    ```bash
@@ -216,7 +216,7 @@ You bloat, and force expensive compaction, by pulling detail of the work into yo
 
 Each bead is one outcome, as the bar says. The bead graph is your plan for parallelism: independent beads run in parallel, and a bead too big for one worker's context is split into outcomes before it is handed out. Each part is held to the bar as *Track discovered work* says. Wire dependencies with `bd dep add` so that bdi's `ready` tells you, and a restarted you, what can start now.
 
-How many beads one worker takes is your staffing choice when you start the seat, never a reason to file or merge beads. A bead may be a parent whose small beads one worker finishes together, under one pull request. Brief the parent, and the worker takes its small beads with it.
+How many beads one worker takes is your staffing choice when you start the seat, never a reason to file or merge beads. One worker may finish several small beads together, under one pull request. A big bead depends on each of them through a dependency edge, never a parent link. Brief the big bead, and the worker takes its small beads with it.
 
 **No seat does work that has no bead.** New work goes into a bead before any seat does it, whether that seat is new or already running. Nothing is handed to a seat only in conversation.
 
