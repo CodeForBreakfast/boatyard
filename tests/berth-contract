@@ -109,6 +109,17 @@ check "a tender is listed as a tender" tender "$(field "$tender" relationship)"
 check "a tender's parent is its opener" "$independent" "$(field "$tender" parent)"
 check "a tender's command learns its own BERTH_ID" "$tender" "$(recorded "$work/tender" BERTH_ID)"
 
+# A yard's server may have been started from another multiplexer's pane or
+# from inside a Claude Code session, and its environment then names that pane
+# or session. BERTH_SERVED_WITH holds the assignments the run started the
+# server with, and no berth's command carries any of them.
+for assignment in ${BERTH_SERVED_WITH:-}; do
+  for record in independent worker tender; do
+    check "the $record berth's command carries no ${assignment%%=*} from the yard's server" "" \
+      "$(recorded "$work/$record" "${assignment%%=*}")"
+  done
+done
+
 check "every id is distinct" 4 "$(printf '%s\n' "$independent" "$worker" "$second_worker" "$tender" | sort -u | wc -l)"
 check "the list is JSON with the port's fields" true "$(berth list | jq 'all(.[]; keys == ["agent_session", "agent_state", "id", "label", "parent", "relationship", "state"])')"
 

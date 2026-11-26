@@ -6,7 +6,9 @@
 # HERDR_* variable unset, because an inherited HC_TERMINAL_SOCKET would
 # otherwise drive the live core. The caller's own berth variables are unset
 # too, because the core hands its environment to each terminal. The core is
-# stopped by the pid it was started with, and by nothing else.
+# started with the assignments in BERTH_SERVED_WITH, if any, as a core started
+# from another pane would be. It is stopped by the pid it was started
+# with, and by nothing else.
 #
 # Needs: bash, coreutils, flock, herdr-core.
 set -euo pipefail
@@ -25,7 +27,8 @@ export SHELL=${BASH:-bash}
 lock=$XDG_STATE_HOME/herdr-core/default/core.lock
 up() { [ -f "$lock" ] && ! flock -n "$lock" true; }
 
-herdr-core serve >"$HOME/core.log" 2>&1 &
+# shellcheck disable=SC2086 # each assignment is a word of its own
+env ${BERTH_SERVED_WITH:-} herdr-core serve >"$HOME/core.log" 2>&1 &
 core=$!
 stop_core() {
   kill "$core" 2>/dev/null || true

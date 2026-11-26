@@ -41,7 +41,8 @@ echo "#!$(command -v bash)" >"$work/claude"
 cat >>"$work/claude" <<'EOF'
 log=$1
 shift
-echo "args=$* id=$BERTH_ID yard=$BERTH_YARD backend=$BERTH_BACKEND seat=${SEAT:-none}" >>"$log"
+echo "args=$* id=$BERTH_ID yard=$BERTH_YARD backend=$BERTH_BACKEND seat=${SEAT:-none}" \
+  "pane=${HERDR_PANE_ID:-none} child=${CLAUDE_CODE_CHILD_SESSION:-none}" >>"$log"
 echo "$SIGN_ON_GATE"
 read -r reply
 echo "passed${reply:+ $reply}" >>"$log"
@@ -100,12 +101,13 @@ yard_up() {
 }
 # Serving straight after a stop now and then finds the yard briefly held by
 # a core the suite did not start, so the suite serves until its own core
-# holds the yard.
+# holds the yard. It serves the core as if from a Claude Code session in a
+# herdr pane, so every shell the core restores receives those variables.
 serving=""
 trap 'kill "$serving" 2>/dev/null; wait "$serving" 2>/dev/null' EXIT
 serve_again() {
   eventually yard_down || return 1
-  berth serve "$BERTH_YARD" >"$work/serve.log" 2>&1 &
+  HERDR_PANE_ID=w1:p1 CLAUDE_CODE_CHILD_SESSION=1 berth serve "$BERTH_YARD" >"$work/serve.log" 2>&1 &
   serving=$!
   eventually yard_up && sleep 0.5 && kill -0 "$serving" 2>/dev/null
 }
@@ -125,7 +127,7 @@ eventually has_session "$seat"
 check "a seat comes back under the same berth with its agent session" s-1 "$(session_of "$seat")"
 check "the seat starts once more" 2 "$(starts "$work/seat.log")"
 check "it resumes its session in place of its prompt, under its own environment" \
-  "args=--model m --resume s-1 id=$seat yard=$BERTH_YARD backend=herdr-app seat=one" \
+  "args=--model m --resume s-1 id=$seat yard=$BERTH_YARD backend=herdr-app seat=one pane=none child=none" \
   "$(tail -n 2 "$work/seat.log" | head -n 1)"
 eventually test "$(passed "$work/seat.log")" = 2
 check "sign-on gets it past its startup gate" 2 "$(passed "$work/seat.log")"

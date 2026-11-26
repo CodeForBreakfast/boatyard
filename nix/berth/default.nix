@@ -37,7 +37,10 @@ in
 
   checks = {
     berth-contract-herdr = herdrSuite "berth-contract";
-    berth-contract-herdr-app = herdrAppSuite "berth-contract";
+    # The core is served as if from a Claude Code session in a herdr pane.
+    berth-contract-herdr-app = (herdrAppSuite "berth-contract").overrideAttrs {
+      BERTH_SERVED_WITH = "HERDR_PANE_ID=w1:p1 HERDR_ENV=1 CLAUDE_CODE_CHILD_SESSION=1";
+    };
     berth-herdr-app-caller = herdrAppSuite "herdr-app-caller";
     berth-herdr-app-layout = herdrAppSuite "herdr-app-layout";
     berth-herdr-app-restore = herdrAppSuite "herdr-app-restore";
