@@ -54,6 +54,8 @@ A seat that muster has just handed the effort to breaks it too, because it may h
 
 A steward that its multiplexer resumed breaks it as well, because its commy server comes back bound. The boatyard plugin sends such a seat a message as it resumes, and the seat does *Reachable*, then *Reconstruct*.
 
+The test breaks the other way when commy's server restarts under a running session, because the new server reads `unbound` while your context still holds the effort. Nothing was handed over, so post no announcement. Subscribe to your topics again as *Reachable* step 2 says, then do *Reconstruct*.
+
 ### Reachable, on a fresh start only
 
 1. **Bind and announce.** Your first action is a post to the effort's coordination topic, not to the decisions topic: "picking up `<top-bead>`". Reads do not acquire a commy identity, and a post does, so this binds you and tells workers and the human that a live steward holds the effort. Then:
