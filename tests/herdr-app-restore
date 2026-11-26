@@ -35,15 +35,16 @@ eventually() { # <command>...
 
 # A stand-in for Claude Code shows a startup gate, then records the session
 # id on its terminal as the plugin's mod does, and reports itself at rest. Each
-# start logs what it was started with.
+# start logs what it was started with. A restored shell holds only the core's
+# environment, so the gate is written into the stand-in.
 export SIGN_ON_GATE="Press Enter to go on"
-echo "#!$(command -v bash)" >"$work/claude"
+printf '#!%s\ngate=%q\n' "$(command -v bash)" "$SIGN_ON_GATE" >"$work/claude"
 cat >>"$work/claude" <<'EOF'
 log=$1
 shift
 echo "args=$* id=$BERTH_ID yard=$BERTH_YARD backend=$BERTH_BACKEND seat=${SEAT:-none}" \
   "pane=${HERDR_PANE_ID:-none} child=${CLAUDE_CODE_CHILD_SESSION:-none}" >>"$log"
-echo "$SIGN_ON_GATE"
+echo "$gate"
 read -r reply
 echo "passed${reply:+ $reply}" >>"$log"
 hc label "$HC_TERMINAL_ID" claude.session=s-1 >/dev/null
