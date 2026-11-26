@@ -8,7 +8,8 @@
 # yard is an hc session. The relationship, the opener, the line of work and
 # the label live on the terminal as hc labels.
 #
-# Needs: bash, coreutils, flock, grep, herdr-core, jq, and getent on Linux.
+# Needs: bash, coreutils, flock, grep, herdr-core, jq, and getent on Linux. It
+# asks the host's own systemctl for the user session's PATH, where it has one.
 set -euo pipefail
 
 yard=${BERTH_YARD:-${HC_SESSION:-default}}
@@ -40,8 +41,18 @@ login_shell() {
   printf '%s\n' "$shell"
 }
 
+# A seat's PATH may put a shell of its own first, and a NixOS login shell keeps
+# whatever PATH it is given once the user manager has set up the session. So a
+# terminal takes PATH from the user manager, and from the caller only where no
+# user manager answers.
+session_path() {
+  local path
+  path=$(systemctl --user show-environment 2>/dev/null | grep '^PATH=' | cut -d= -f2-) || path=""
+  printf '%s\n' "${path:-$PATH}"
+}
+
 # The user's session, and nothing of the caller's seat.
-session_variables=(HOME USER LOGNAME PATH LANG LANGUAGE TZ SSH_AUTH_SOCK
+session_variables=(HOME USER LOGNAME LANG LANGUAGE TZ SSH_AUTH_SOCK
   XDG_RUNTIME_DIR XDG_STATE_HOME XDG_CONFIG_HOME XDG_DATA_HOME XDG_CACHE_HOME
   XDG_CONFIG_DIRS XDG_DATA_DIRS XDG_CURRENT_DESKTOP XDG_SESSION_DESKTOP
   XDG_SESSION_TYPE XDG_SESSION_ID XDG_SEAT XDG_VTNR
@@ -52,18 +63,27 @@ session_variables=(HOME USER LOGNAME PATH LANG LANGUAGE TZ SSH_AUTH_SOCK
 # environment. So hc and herdr-core get the user's session and login shell, and
 # never the caller's seat. Inside a terminal, hc would otherwise also reach the
 # terminal's own core and take the terminal as its caller, overriding the yard.
+# The session's PATH may name other builds of hc and herdr-core, so the adapter
+# finds its own on its own PATH.
 session_environment() {
   local name
-  session=()
+  session=("PATH=$(session_path)")
   for name in "${session_variables[@]}" "${!LC_@}"; do
     [ -z "${!name+set}" ] || session+=("$name=${!name}")
   done
   session+=("SHELL=$(login_shell)" "HC_SESSION=$yard")
 }
 
-hc_env() {
+in_session() { # <command> <argument>...
+  local command
+  command=$(command -v "$1") || die "$1 is not on berth's PATH."
   session_environment
-  env -i "${session[@]}" "$@"
+  session_command=(env -i "${session[@]}" "$command" "${@:2}")
+}
+
+hc_env() { # <command> <argument>...
+  in_session "$@"
+  "${session_command[@]}"
 }
 
 # Prints what hc prints. Returns 3 for a terminal hc does not have, so a caller
@@ -407,8 +427,8 @@ name() {
 serve() {
   yard=$1
   ! yard_running "$yard" || die "the yard $yard is already being served."
-  session_environment
-  exec env -i "${session[@]}" herdr-core serve
+  in_session herdr-core serve
+  exec "${session_command[@]}"
 }
 
 stop() {
