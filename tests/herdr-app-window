@@ -1,0 +1,163 @@
+#!/usr/bin/env bash
+# The herdr app adapter names and focuses a berth in the window that shows its
+# yard, when several yards run. See docs/design.md, "The herdr app adapter".
+#
+# Run it under with-herdr-app-yard. It serves a second yard of its own, so
+# that each yard holds a berth with the same terminal id, and a call sent by
+# that id alone lands on the wrong berth.
+#
+# No window can open in the build sandbox, so a stand-in herdr-app answers in
+# its place. A stand-in window lists the terminals that hc labels with a
+# herdr.space, as the app does, and keeps every command it is sent. It shows
+# its own yard, and any yard it shows as a machine, whose ids it prefixes
+# with the machine's name, as the app does.
+#
+# Needs: bash, coreutils, herdr-core, jq, berth.
+set -uo pipefail
+
+: "${BERTH_BACKEND:?}"
+yard=other
+work=$(mktemp -d)
+failures=0
+config=${XDG_CONFIG_HOME:-$HOME/.config}
+
+check() { # <what> <want> <got>
+  if [ "$2" = "$3" ]; then
+    echo "ok: $1"
+  else
+    echo "FAIL: $1: wanted '$2', got '$3'"
+    failures=$((failures + 1))
+  fi
+}
+
+printf '#!%s\n' "$(command -v bash)" >"$HOME/seat/herdr-app"
+cat >>"$HOME/seat/herdr-app" <<'EOF'
+set -euo pipefail
+home=${HERDR_APP_HOME:-${XDG_CONFIG_HOME:-$HOME/.config}/herdr-app}
+[ -f "$home/shows" ] || { echo '{"error": "no window"}'; exit 1; }
+listing() {
+  local machine yard prefix
+  while read -r machine yard; do
+    [ "$machine" = - ] && prefix="" || prefix=$machine/
+    env -u HC_TERMINAL_SOCKET -u HC_TERMINAL_ID HC_SESSION="$yard" hc connect \
+      <<<'{"jsonrpc":"2.0","id":1,"method":"terminal.list","params":{}}' |
+      jq -c --arg m "$prefix" '.result.terminals[] | select(.labels["herdr.space"]) | {
+        space: ($m + .labels["herdr.space"]), tab: ($m + .labels["herdr.tab"]),
+        terminal: ($m + .address), pane: ($m + "p" + .address),
+        machine: (if $m == "" then null else $m | rtrimstr("/") end)}'
+  done <"$home/shows" | jq -s '{spaces: group_by(.space) | map({id: .[0].space, machine: .[0].machine,
+    tabs: group_by(.tab) | map({id: .[0].tab, terminals: map({terminal, pane})})})}'
+}
+case $1 in
+  status) echo '{}' ;;
+  ls) listing ;;
+  do)
+    shift
+    listing >"$home/listing.json"
+    target=$(jq -nr --args '$ARGS.positional as $a | [range(0; $a | length; 2) as $i
+      | select($a[$i] | IN("--id", "--pane", "--terminal")) | $a[$i + 1]] | first // empty' -- "${@:2}")
+    if [ -n "$target" ] && ! jq -e --arg t "$target" \
+      'any(.spaces[]; .id == $t or any(.tabs[]; .id == $t or any(.terminals[]; .pane == $t or .terminal == $t)))' \
+      "$home/listing.json" >/dev/null; then
+      echo "{\"error\": \"no $target\"}"
+      exit 1
+    fi
+    echo "$*" >>"$home/calls"
+    ;;
+esac
+EOF
+chmod +x "$HOME/seat/herdr-app"
+
+# Opens a stand-in window in <home> that shows each <machine>:<yard>, with a
+# machine of - for the window's own yard.
+show() { # <home> <machine>:<yard>...
+  local pair
+  mkdir -p "$1"
+  rm -f "$1/calls"
+  for pair in "${@:2}"; do
+    echo "${pair%%:*} ${pair#*:}"
+  done >"$1/shows"
+}
+
+close_window() { # <home>
+  rm -f "$1/shows"
+}
+
+calls() { # <home>
+  cat "$1/calls" 2>/dev/null
+}
+
+sent() { # <home> <command>
+  if calls "$1" | grep -qxF -- "$2"; then echo yes; else echo no; fi
+}
+
+unset BERTH_YARD BERTH_ID
+berth serve "$yard" >"$work/serve.log" 2>&1 &
+serving=$!
+trap 'kill "$serving" 2>/dev/null' EXIT
+for _ in $(seq 1 100); do
+  berth list "$yard" >/dev/null 2>&1 && break
+  sleep 0.1
+done
+
+default_window=$config/herdr-app
+yard_window=$config/herdr-app-$yard
+
+echo "# one window shows both yards, the other yard as a machine"
+
+show "$default_window" -:default far:"$yard"
+here=$(BERTH_YARD=default berth open --as independent --cwd "$work" --label here -- true)
+there=$(BERTH_YARD=$yard berth open --as independent --cwd "$work" --label there --focus -- true)
+check "the two yards each hold a berth with the same id" "$here" "$there"
+check "the other yard's berth names its own pane" yes \
+  "$(sent "$default_window" "pane.rename --pane far/p$there --name there")"
+check "the other yard's berth takes focus in its own pane" yes \
+  "$(sent "$default_window" "pane.focus --pane far/p$there")"
+check "the other yard's berth names its own space" yes \
+  "$(calls "$default_window" | grep -q "^space.rename --id far/sp[0-9a-f]* --name there$" && echo yes || echo no)"
+check "the other yard's berth renames no pane of the default yard" no \
+  "$(sent "$default_window" "pane.rename --pane p$here --name there")"
+
+rm -f "$default_window/calls"
+BERTH_YARD=$yard berth name "$there" "there again"
+check "naming the other yard's berth names its own pane" yes \
+  "$(sent "$default_window" "pane.rename --pane far/p$there --name there again")"
+check "naming the other yard's berth leaves the default yard's pane alone" no \
+  "$(sent "$default_window" "pane.rename --pane p$here --name there again")"
+
+echo "# each yard has a window of its own"
+
+show "$default_window" -:default
+show "$yard_window" -:"$yard"
+mine=$(BERTH_YARD=$yard berth open --as independent --cwd "$work" --label mine --focus -- true)
+check "the berth is named in its yard's window" yes \
+  "$(sent "$yard_window" "pane.rename --pane p$mine --name mine")"
+check "the berth takes focus in its yard's window" yes \
+  "$(sent "$yard_window" "pane.focus --pane p$mine")"
+check "the default yard's window is sent nothing" "" "$(calls "$default_window")"
+
+rm -f "$yard_window/calls"
+ours=$(BERTH_YARD=default berth open --as independent --cwd "$work" --label ours --focus -- true)
+check "a default yard's berth is named in the default window" yes \
+  "$(sent "$default_window" "pane.rename --pane p$ours --name ours")"
+check "the other yard's window is sent nothing" "" "$(calls "$yard_window")"
+
+echo "# no window shows the yard"
+
+close_window "$default_window"
+close_window "$yard_window"
+start=$SECONDS
+unseen=$(BERTH_YARD=$yard berth open --as independent --cwd "$work" --label unseen --focus -- true 2>"$work/unseen.err")
+check "the berth still opens" open "$(BERTH_YARD=$yard berth state "$unseen")"
+check "it waits on no window" true "$([ $((SECONDS - start)) -lt 3 ] && echo true || echo false)"
+
+berth stop "$yard"
+wait "$serving"
+trap - EXIT
+
+echo
+if [ "$failures" -gt 0 ]; then
+  echo "$failures failed."
+  exit 1
+fi
+echo "A berth is named and focused in the window that shows its yard."

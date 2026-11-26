@@ -46,6 +46,7 @@ in
     berth-herdr-app-layout = herdrAppSuite "herdr-app-layout";
     berth-herdr-app-restore = herdrAppSuite "herdr-app-restore";
     berth-herdr-app-status = herdrAppSuite "herdr-app-status";
+    berth-herdr-app-window = herdrAppSuite "herdr-app-window";
     berth-herdr-layout = herdrSuite "herdr-layout";
     berth-herdr-lost-agent = herdrSuite "herdr-lost-agent";
     berth-herdr-session = herdrSuite "herdr-session";
@@ -76,7 +77,8 @@ in
         ${../../tests/herdr-status} ${../../tests/herdr-app-status} \
         ${../../tests/berth-usage} ${../../tests/herdr-open-by-hand} \
         ${../../bin/berth-herdr-app} ${../../tests/with-herdr-app-yard} ${../../tests/herdr-app-open-by-hand} \
-        ${../../tests/herdr-app-caller} ${../../tests/herdr-app-layout} ${../../tests/herdr-app-restore}
+        ${../../tests/herdr-app-caller} ${../../tests/herdr-app-layout} ${../../tests/herdr-app-restore} \
+        ${../../tests/herdr-app-window}
       touch $out
     '';
   };
