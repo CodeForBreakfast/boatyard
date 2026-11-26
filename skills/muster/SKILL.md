@@ -1,6 +1,6 @@
 ---
 name: muster
-description: Turns a body of work, usually beads that already exist and possibly spread across several projects, into one boatyard effort that a steward can drive cold, then hands it to a steward: a person's own seat takes the effort over, a seat with a standing role that another seat asked hands the steward's start back to that seat, and a seat with a standing role acting for itself starts one with sign-on. Builds and wires the bead graph, shapes other projects' slices over commy with whoever answers in each project's channel, and checks the graph can be driven before the launch. Use only when invoked by name, as `/boatyard:muster` or an explicit instruction to muster an effort.
+description: Turns a body of work, usually beads that already exist and possibly spread across several projects, into one boatyard effort that a steward can drive cold, then hands it to a steward. Use only when invoked by name, as `/boatyard:muster` or an explicit instruction to muster an effort.
 argument-hint: <beads, a label or a query naming the work>
 ---
 
@@ -13,10 +13,6 @@ The steward consumes a wired graph of outcome beads under one top bead and never
 Coordination runs over commy: see its `using-commy` skill for channels, topics and tone. The `steward` skill is what consumes your output, and the `worker` skill is the seat that does the work.
 
 **The bar a good bead meets is written in `references/good-bead.md` under the plugin's root,** which is two directories above this skill's base directory. It covers each bead, the graph that wires them and the top bead. Read it before you build anything, because every bead, edge and top bead you hand over meets it.
-
-## Are you meant to be mustering?
-
-If nobody invoked you by name, or told you in so many words to muster an effort, you are not preparing one. Leave this skill.
 
 ## Scale to the work
 
@@ -49,13 +45,9 @@ The top bead states the outcome the effort delivers, such as "installed and work
 
 The top bead is the effort's cold-restart record, as the bar describes. It lives in the project you are running in, which is the project the steward runs in. Whoever closes it has seen the evidence that its outcome is true, and the effort ends when it closes.
 
-## File the work as outcomes
+## File and audit the work as outcomes
 
-**File the work as outcome beads that meet the bar for each bead, and wire each outcome to the outcomes it needs.**
-
-## Audit local beads against the bar
-
-Hold each local bead to the bar for each bead. **Split** any bead whose title or definition of done holds several outcomes, as your host's rule on splitting an outcome says. Say so as you split it so the human can interrupt, but don't wait for approval. Where a bead is thin on what a brief needs, flesh it out now.
+File new work as outcome beads that meet the bar for each bead, and wire each outcome to the outcomes it needs. Hold each existing local bead to the bar for each bead. **Split** any bead whose title or definition of done holds several outcomes, as your host's rule on splitting an outcome says. Say so as you split it so the human can interrupt, but don't wait for approval. Where a bead is thin on what a brief needs, flesh it out now.
 
 ## Shape other projects' slices over commy
 
@@ -138,7 +130,7 @@ sign-on --as independent --cwd <this project's checkout> --label <effort> \
   "/boatyard:steward <top-bead>"
 ```
 
-The steward's berth is independent of yours, so closing your seat leaves the steward running. `sign-on` starts Claude Code there, gets it past its startup gate, opts it in to the compaction mod, and prints the new berth's id. It births the seat in the project's main checkout, where the top bead's tracker and instructions are.
+The steward's berth is independent of yours, so closing your seat leaves the steward running. `sign-on` prints the new berth's id. It births the seat in the project's main checkout, where the top bead's tracker and instructions are.
 
 If `sign-on` fails, report its message. Where the message says your seat is in no multiplexer, because no backend is named or your seat is in no pane, give the human the line `/boatyard:steward <top-bead>` to start by hand, and say which project the top bead lives in. Where it opened a berth and then got stuck, its message names that berth, so pass the name on for the human to read and close.
 

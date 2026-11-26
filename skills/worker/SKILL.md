@@ -94,7 +94,7 @@ You will most often stall on something only the human can give you: an answer to
 
 ## Getting the human's permission
 
-Permission is the one thing you ever need from the human in your berth. When your host's permission mode refuses a command you need, only the human can let it through, and they have to do it in your berth. A permission classifier judges a command by the conversation of the seat that runs it, so an approval given on a bead or on commy never reaches it. An approval typed in your berth clears it only if it names the action.
+Permission is the one thing you ever need from the human in your berth. When your host's permission mode refuses a command you need, don't work around it. Only the human can let it through, and they have to do it in your berth. A permission classifier judges a command by the conversation of the seat that runs it, so an approval given on a bead or on commy never reaches it. An approval typed in your berth clears it only if it names the action.
 
 1. **Record it on your bead, and stay on the bead you sit on,** as step 1 of *Block and sleep* says. A permission is not a question, so it never goes to your steward or on a bead.
 2. **Ask with the question dialog in your own berth, and wait at it.** `AskUserQuestion` is a deferred tool, so load it first. Name the exact command and why the work needs it, and word the approving option so it names the action, such as "Go ahead and copy the key". The dialog leaves your berth `blocked`, and a blocked berth is how the human learns that a seat needs them. Don't also post the ask to your working topic or anywhere else, because that would be a second copy of the same ask.
@@ -110,12 +110,11 @@ When a command stops at an approval prompt instead, you are already waiting. Sta
 - **A `cd` outlives the command you ran it for.** Your shell's directory persists between tool calls, so a `cd` changes state even inside a read-only lookup, and every later relative path lands in the tree it moved you to. Set `WT=<your worktree>` once and address every edit and every search under `$WT`. Where a command must run elsewhere, put it in a subshell, `(cd <dir> && <command>)`, which cannot leak.
 - **Kill only what you started, and only by its process id.** Capture the id when you start the process and kill that id. `pkill`, `killall`, and a name-matched `pgrep` piped into a kill all reach every process of that name that your user owns, including ones you never started.
 - **Start a session-scoped process beside the live session, not inside it.** A test that brings up a compositor, a login shell or a session daemon must run in a nested or separate session. Starting one inside the desktop the human is using can take that desktop's surfaces, and no teardown gives them back. Post the teardown to the working topic before you start the process, and make it kill by process id.
-- **Shared working trees.** Where another agent may edit the same repo at the same time, follow that project's worktree rules: commit work in progress early, and use a worktree for substantial edits.
 
 ## Deliver
 
 **Read how this repo takes work** from the `CLAUDE.md` and `CLAUDE.local.md` you were born with, and the documents they point at.
-Where they name a delivery formula, deliver through it as *Through a delivery formula* says. Where the repo says nothing, deliver directly and push. A protected branch rejects the push. Either way, report the repo as undeclared in the working topic.
+Where they name a delivery formula, deliver through it as *Through a delivery formula* says. Where they name none, read `without-a-formula.md` in this skill's base directory, which covers a direct push and a pull request. Where the repo says nothing at all, deliver directly, and report the repo as undeclared in the working topic.
 
 **Through a delivery formula.** A repo names a beads formula for its delivery on a line of one of these shapes:
 
@@ -154,37 +153,6 @@ The first line names the default. A line with `for` names the formula for one ki
 
    **Leave your bead open.** The outcome step holds it, and the bead goes ready only once that step closes. If you closed the outcome step yourself, the work has landed, so close your bead in *Finish* as for direct delivery.
 
-**Direct to the default branch.** Commit and push by the project's conventions. The work is delivered when it is pushed, and your bead closes in *Finish*. Nothing else in this section applies.
-
-If that push is rejected because the branch is protected, the repo's statement was wrong or missing. Don't improvise a pull request. Post the rejection to the working topic and block and sleep. The steward settles the mode and briefs you again.
-
-**Through a pull request.** The default branch is protected, so a push is not delivery, and neither is an open pull request. **The work lands when the pull request merges**, usually days after your seat has gone. So:
-
-1. **Base your branch on the default branch, never on another unmerged branch.** A stack of pull requests can only be reviewed bottom up, and one stale base rots every branch above it.
-
-   If your bead turns out to need code from a bead whose pull request has not merged, that is a missing dependency. Post it to the working topic and block and sleep, watching the bead you need. It closes when its pull request merges, and that wakes you. The steward wires the dependency, or stands you down instead. If you are stood down, record where you got to on your bead, hand back the bead you sit on, and close your seat as *Finish* describes, without claiming the deliverable is done:
-
-   ```bash
-   bd update <bead> --unset-metadata working_topic --unset-metadata agent_pane \
-                    --unset-metadata agent_session
-   bd unclaim <bead>
-   ```
-
-   The release is what hands the bead back. A bead left `in_progress` with no seat behind it reads to the steward as a live worker, so nobody ever picks it up again.
-2. **Open the pull request as a draft** unless the repo says otherwise, **and mark it ready for review when you hand it over.** Once the checks are green for the commit you pushed, which `gh pr checks <n> --watch` waits on, run `gh pr ready <n>`. A draft means only that work is still under way.
-3. **Block the bead on the pull request with a `gh:pr` gate:**
-
-   ```bash
-   g=$(bd gate create --type=gh:pr --blocks <id> --await-id=<n> --json | jq -r .id)
-   bd update "$g" --set-metadata repo=<owner>/<repo>
-   bd note <id> "PR opened: <url>. Closes on merge."
-   ```
-
-   `bd gate create` copies `repo` only from a bead that already has one, so give the gate its repo yourself. Where your bead depends on small beads that you work together, make each small bead the pull request delivers wait on the same gate with `bd dep add <small-bead> "$g"`.
-
-   **Don't close the bead, and don't set it `blocked`.** A closed bead tells the steward the work is delivered. While the bead stays open it blocks its dependents, so nothing starts against code that has not landed. The open gate keeps the bead out of `bd ready`, and the merge closes the gate. A bead set `blocked` stays out of `bd ready` even after that.
-4. **Post the pull request's address to the working topic**, then finish. Don't wait for the review. The steward watches the pull request from here, and starts a fresh seat on your bead if the reviewers ask for changes.
-
 **If your brief says your bead already has a pull request, you are a rework seat.** Your bead sits `open` behind its gate, so claim it as *Claim* says. The claim leaves the gate in place. Move that pull request rather than replacing it: push to its existing branch, and never open a second pull request for the same bead. Its gate already waits on that pull request, so make no second gate. When you finish, release the bead as *Finish* says. Under a delivery formula you sit on the reopened step instead, as *Claim* says, and release and close it again once the checks are green. A bead left claimed with no seat on it reads to the steward as unstaffed work.
 
 ## Finish
@@ -215,7 +183,5 @@ When the deliverable meets the brief's definition of done, wind the seat down in
 ## Boundaries
 
 - **The terminal is not a channel.** Never read another berth's screen or type into it to coordinate. Coordination state travels in beads and commy only.
-- **This skill owns lifecycle and communication. The brief owns the task.**
 - **Don't speak for the project or make commitments.** Surfacing information is fine. Deciding the human's calls is not.
-- **Don't work around permission prompts.** A command you need that is refused, or that stops at a prompt, goes to the human as *Getting the human's permission* says.
 - **Don't bootstrap or re-initialise the tracker when `bd` fails.** Report the failure in the working topic.
