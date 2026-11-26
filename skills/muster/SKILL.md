@@ -53,9 +53,9 @@ The top bead is the effort's cold-restart record, as the bar describes. It lives
 
 **File the work as outcome beads that meet the bar for each bead, and wire each outcome to the outcomes it needs.**
 
-## Audit local beads for size and briefability
+## Audit local beads against the bar
 
-Hold each local bead to the bar for each bead. **Split** any bead that holds two outcomes, or that is too big for one worker's context, into beads that each hold one outcome. Say so as you split it so the human can interrupt, but don't wait for approval. Where a bead is thin on what a brief needs, flesh it out now.
+Hold each local bead to the bar for each bead. **Split** any bead whose title or definition of done holds several outcomes, as your host's rule on splitting an outcome says. Say so as you split it so the human can interrupt, but don't wait for approval. Where a bead is thin on what a brief needs, flesh it out now.
 
 ## Shape other projects' slices over commy
 
