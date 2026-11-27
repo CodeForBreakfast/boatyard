@@ -134,13 +134,15 @@ printf 'shell = ["%s", "--rcfile", "%s", "-i"]\n' "$(command -v bash)" "$work/sl
 # a core the suite did not start, so the suite serves until its own core
 # holds the yard. It serves the core as if from a Claude Code session in a
 # herdr pane, so every shell the core restores receives those variables. It
-# makes no berth call once it has served the core, so whatever resumes a
-# seat comes from the serve itself.
+# names the yard only as the serve's argument, as a service unit does, and
+# makes no berth call once it has served the core, so whatever resumes a seat
+# comes from the serve itself.
 serving=""
 trap 'kill "$serving" 2>/dev/null; wait "$serving" 2>/dev/null' EXIT
 serve_again() {
   eventually yard_down || return 1
-  HERDR_PANE_ID=w1:p1 CLAUDE_CODE_CHILD_SESSION=1 berth serve "$BERTH_YARD" >>"$work/serve.log" 2>&1 &
+  env -u BERTH_YARD -u HC_SESSION HERDR_PANE_ID=w1:p1 CLAUDE_CODE_CHILD_SESSION=1 \
+    berth serve "$BERTH_YARD" >>"$work/serve.log" 2>&1 &
   serving=$!
   sleep 1
   kill -0 "$serving" 2>/dev/null

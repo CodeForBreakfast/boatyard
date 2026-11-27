@@ -162,11 +162,15 @@ terminal_agent_state() { # <terminal>
 # shell is named by its path. That environment is whatever started the core,
 # which may be a herdr pane or a Claude Code session. herdr's pane variables
 # would then make the berth look like that pane, and Claude Code keeps no
-# transcript for a session it takes to be another's child.
-# shellcheck disable=SC2016 # the berth's own shell expands it
-berth_command=("$BASH" -c 'unset "${!HERDR_@}" CLAUDE_CODE_CHILD_SESSION
-  export BERTH_BACKEND=herdr-app BERTH_YARD=$1 BERTH_ID=$HC_TERMINAL_ID
-  shift; "$@"; exec "${SHELL:-sh}"' berth "$yard")
+# transcript for a session it takes to be another's child. serve and list take
+# their yard as an argument, so the command names the yard as it is when the
+# berth is started.
+berth_command() {
+  # shellcheck disable=SC2016 # the berth's own shell expands it
+  berth=("$BASH" -c 'unset "${!HERDR_@}" CLAUDE_CODE_CHILD_SESSION
+    export BERTH_BACKEND=herdr-app BERTH_YARD=$1 BERTH_ID=$HC_TERMINAL_ID
+    shift; "$@"; exec "${SHELL:-sh}"' berth "$yard")
+}
 
 state_dir() {
   echo "${XDG_STATE_HOME:-$HOME/.local/state}/berth/herdr-app/$yard"
@@ -224,10 +228,11 @@ shell_settled() { # <id>
 # Replaces a restored berth's shell with a command, started as a new berth's
 # command is, and says on the terminal what was done with its shell. hc types nothing into a program that reports itself blocked.
 type_command() { # <terminal> <outcome> <command>...
-  local id pid line
+  local id pid line berth
   id=$(jq -r .address <<<"$1")
   pid=$(jq -r .pid <<<"$1")
-  printf -v line '%q ' exec "${berth_command[@]}" "${@:3}"
+  berth_command
+  printf -v line '%q ' exec "${berth[@]}" "${@:3}"
   hc_call send -- "$id" "$line" >/dev/null
   hc_call label "$id" "berth.restore=$pid $2" >/dev/null
 }
@@ -399,7 +404,7 @@ shown() { # <terminal>
 
 open() {
   local as=$1 place=$2 focus=$3 cwd=$4 label=$5 opener=$6 id line="" opener_terminal space="" tab=""
-  local workers_tab="" labels=() tender restoring terminal shown_at
+  local workers_tab="" labels=() tender restoring terminal shown_at berth
   shift 6
   resume_seats
 
@@ -453,10 +458,11 @@ open() {
   # parent. A kept terminal comes back as a bare shell when herdr-core
   # restarts, where a terminal not kept would come back finished.
   [ "$as" = independent ] || labels+=(--label "berth.parent=$opener")
+  berth_command
   id=$(hc_call run --bg --keep --no-parent --no-notify --cwd "$cwd" \
     --label "berth.relationship=$as" --label "berth.place=$place" \
     ${label:+--label "berth.label=$label"} "${labels[@]}" \
-    -- "${berth_command[@]}" "$@" | jq -r .address)
+    -- "${berth[@]}" "$@" | jq -r .address)
   keep_command "$id" "$@"
   [ -n "$line" ] || hc_call label "$id" "berth.line=$id" >/dev/null
   if [ -n "$label$workers_tab" ] || [ "$focus" = focus ]; then

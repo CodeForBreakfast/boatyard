@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Runs a command against a throwaway herdr app yard, a herdr-core session of
-# its own, with BERTH_BACKEND and BERTH_YARD naming it.
+# its own, with BERTH_BACKEND and BERTH_YARD naming it. BERTH_TEST_YARD names
+# the yard, which is default unless it says otherwise.
 #
 # HOME and every XDG folder hc uses are redirected, and every HC_* and
 # HERDR_* variable unset, because an inherited HC_TERMINAL_SOCKET would
@@ -20,7 +21,8 @@ set -euo pipefail
 
 [ $# -gt 0 ] || { echo "usage: with-herdr-app-yard <command>..." >&2; exit 2; }
 
-unset "${!HC_@}" "${!HERDR_@}" BERTH_BACKEND BERTH_YARD BERTH_ID
+yard=${BERTH_TEST_YARD:-default}
+unset "${!HC_@}" "${!HERDR_@}" BERTH_BACKEND BERTH_YARD BERTH_ID BERTH_TEST_YARD
 
 # A unix socket path has to fit in about a hundred bytes, so HOME stays short.
 HOME=$(mktemp -d "${TMPDIR:-/tmp}/yard.XXXXXX")
@@ -35,11 +37,11 @@ printf '#!%s\necho %q\n' "$(command -v bash)" "PATH=$PATH" >"$HOME/seat/systemct
 chmod +x "$HOME/seat/systemctl"
 PATH=$HOME/seat:$PATH
 
-lock=$XDG_STATE_HOME/herdr-core/default/core.lock
+lock=$XDG_STATE_HOME/herdr-core/$yard/core.lock
 up() { [ -f "$lock" ] && ! flock -n "$lock" true; }
 
 # shellcheck disable=SC2086 # each assignment is a word of its own
-env ${BERTH_SERVED_WITH:-} BERTH_BACKEND=herdr-app berth serve default >"$HOME/core.log" 2>&1 &
+env ${BERTH_SERVED_WITH:-} BERTH_BACKEND=herdr-app berth serve "$yard" >"$HOME/core.log" 2>&1 &
 core=$!
 stop_core() {
   kill "$core" 2>/dev/null || true
@@ -56,5 +58,5 @@ until up; do
   sleep 0.1
 done
 
-export BERTH_BACKEND=herdr-app BERTH_YARD=default
+export BERTH_BACKEND=herdr-app BERTH_YARD=$yard
 "$@"
