@@ -34,9 +34,9 @@ eventually() { # <command>...
 }
 
 # A stand-in for Claude Code shows a startup gate, then records the session
-# id on its terminal as the plugin's mod does, and reports itself at rest. Each
-# start logs what it was started with. A restored shell holds only the core's
-# environment, so the gate is written into the stand-in.
+# id that SESSION names on its terminal as the plugin's mod does, and reports
+# itself at rest. Each start logs what it was started with. A restored shell
+# holds only the core's environment, so the gate is written into the stand-in.
 export SIGN_ON_GATE="Press Enter to go on"
 printf '#!%s\ngate=%q\n' "$(command -v bash)" "$SIGN_ON_GATE" >"$work/claude"
 cat >>"$work/claude" <<'EOF'
@@ -47,7 +47,7 @@ echo "args=$* id=$BERTH_ID yard=$BERTH_YARD backend=$BERTH_BACKEND seat=${SEAT:-
 echo "$gate"
 read -r reply
 echo "passed${reply:+ $reply}" >>"$log"
-hc label "$HC_TERMINAL_ID" claude.session=s-1 >/dev/null
+hc label "$HC_TERMINAL_ID" "claude.session=${SESSION:-s-1}" >/dev/null
 printf '\e]7501;:state=idle:app=claude-code\e\\'
 exec sleep 600
 EOF
@@ -65,9 +65,18 @@ session_of() { # <id>
   berth list 2>>"$work/list.err" | jq -r --arg id "$1" '.[] | select(.id == $id) | .agent_session // "none"'
 }
 
-has_session() { # <id>
-  [ "$(session_of "$1")" = s-1 ]
+has_session() { # <id> [<session>]
+  [ "$(session_of "$1")" = "${2:-s-1}" ]
 }
+
+# Claude Code keeps a session's transcript under its config folder, in a
+# folder named for the session's working directory, and writes none until the
+# session's first turn.
+transcript() { # <config folder> <session>
+  mkdir -p "$1/projects/-a-folder"
+  echo '{}' >"$1/projects/-a-folder/$2.jsonl"
+}
+transcript "$HOME/.claude" s-1
 
 # sign-on puts the seat's environment before the command, and its prompt last
 # after --.
@@ -76,6 +85,21 @@ seat=$(berth open --as independent --cwd "$work" --label seat -- \
 eventually test "$(starts "$work/seat.log")" = 1
 berth send-key "$seat" Enter
 eventually has_session "$seat"
+
+# A seat signed on bare and left idle has a session with no transcript.
+fresh=$(berth open --as independent --cwd "$work" --label fresh -- \
+  env SESSION=s-2 "$work/claude" "$work/fresh.log" --model m)
+eventually test "$(starts "$work/fresh.log")" = 1
+berth send-key "$fresh" Enter
+eventually has_session "$fresh" s-2
+
+# A seat's environment can name another config folder for Claude Code.
+transcript "$work/elsewhere" s-3
+elsewhere=$(berth open --as independent --cwd "$work" --label elsewhere -- \
+  env CLAUDE_CONFIG_DIR="$work/elsewhere" SESSION=s-3 "$work/claude" "$work/elsewhere.log" --model m -- "a prompt")
+eventually test "$(starts "$work/elsewhere.log")" = 1
+berth send-key "$elsewhere" Enter
+eventually has_session "$elsewhere" s-3
 
 # A command whose -- is not just before its last word is not one the adapter
 # knows how to resume.
@@ -142,6 +166,19 @@ check "sign-on gets it past its startup gate" 2 "$(passed "$work/seat.log")"
 check "and nothing else is typed into it" passed "$(grep '^passed' "$work/seat.log" | tail -n 1)"
 check "the seat is under the same berth with its agent session" s-1 "$(session_of "$seat")"
 
+eventually test "$(passed "$work/fresh.log")" = 2
+check "a seat whose session has no transcript starts its command fresh" \
+  "args=--model m id=$fresh yard=$BERTH_YARD backend=herdr-app seat=none pane=none child=none" \
+  "$(grep '^args=' "$work/fresh.log" | tail -n 1)"
+check "and sign-on gets it past its startup gate" 2 "$(passed "$work/fresh.log")"
+check "and the serve says so" true \
+  "$(grep -q "berth $fresh .*started fresh" "$work/serve.log" && echo true || echo false)"
+
+eventually test "$(passed "$work/elsewhere.log")" = 2
+check "a seat whose transcript is in the config folder its command names resumes it" \
+  "args=--model m --resume s-3 id=$elsewhere yard=$BERTH_YARD backend=herdr-app seat=none pane=none child=none" \
+  "$(grep '^args=' "$work/elsewhere.log" | tail -n 1)"
+
 berth list >/dev/null 2>&1
 sleep 1
 check "a later call does not resume it again" 2 "$(starts "$work/seat.log")"
@@ -170,7 +207,7 @@ check "the seat starts once more" 3 "$(starts "$work/seat.log")"
 check "and sign-on gets it past its startup gate once" 3 "$(passed "$work/seat.log")"
 check "and nothing else is typed into it" passed "$(grep '^passed' "$work/seat.log" | tail -n 1)"
 
-for id in "$view" "$odd" "$seat"; do
+for id in "$view" "$odd" "$elsewhere" "$fresh" "$seat"; do
   berth close "$id"
 done
 

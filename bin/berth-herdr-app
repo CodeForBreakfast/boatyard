@@ -240,12 +240,36 @@ not_resumed() { # <terminal> <why>
   hc_call label "$id" "berth.restore=$pid not resumed: $2" >/dev/null
 }
 
+# A berth's command reaches Claude Code under the core's environment and the
+# assignments the command starts with, so Claude Code's config folder is the
+# command's last CLAUDE_CONFIG_DIR, or the user's own.
+claude_config_dir() { # <command>...
+  local dir=$HOME/.claude word
+  if [ "${1##*/}" = env ]; then
+    for word in "${@:2}"; do
+      [[ $word =~ ^[A-Za-z_][A-Za-z0-9_]*= ]] || break
+      [[ $word != CLAUDE_CONFIG_DIR=* ]] || dir=${word#*=}
+    done
+  fi
+  printf '%s\n' "$dir"
+}
+
+# Claude Code writes a session's transcript at its first turn, in a folder
+# named for the session's working directory, and can resume no session
+# without one.
+has_transcript() { # <session> <command>...
+  local transcripts
+  transcripts=("$(claude_config_dir "${@:2}")"/projects/*/"$1".jsonl)
+  [ -e "${transcripts[0]}" ]
+}
+
 # Resumes each seat that herdr-core restored, from the session id the plugin's
 # mod left on its terminal. sign-on launches a seat with its prompt last, after
-# --, so the resume takes the prompt's place. sign-on then gets the seat past
-# its startup gate.
+# --, so the resume takes the prompt's place. A session with no transcript
+# never took a turn, so its seat starts its command again as it was opened.
+# sign-on then gets the seat past its startup gate.
 resume_seats() {
-  local seats terminal id file command at restoring
+  local seats terminal id file command at session restoring
   restore_lock
   mapfile -t seats < <(terminals | jq -c ".[] | select($seat and $restored)")
   for terminal in "${seats[@]}"; do
@@ -254,15 +278,21 @@ resume_seats() {
     file=$(kept_command "$terminal")
     [ -f "$file" ] || { not_resumed "$terminal" "its command was not kept"; continue; }
     mapfile -d '' -t command <"$file"
-    for ((at = 0; at < ${#command[@]}; at++)); do
-      [ "${command[at]}" != -- ] || break
-    done
-    case $((${#command[@]} - at)) in
-      0) ;;
-      2) command=("${command[@]:0:at}") ;;
-      *) not_resumed "$terminal" "its command has more after -- than a prompt"; continue ;;
-    esac
-    type_command "$terminal" resumed "${command[@]}" --resume "$(jq -r '.labels["claude.session"]' <<<"$terminal")"
+    session=$(jq -r '.labels["claude.session"]' <<<"$terminal")
+    if has_transcript "$session" "${command[@]}"; then
+      for ((at = 0; at < ${#command[@]}; at++)); do
+        [ "${command[at]}" != -- ] || break
+      done
+      case $((${#command[@]} - at)) in
+        0) ;;
+        2) command=("${command[@]:0:at}") ;;
+        *) not_resumed "$terminal" "its command has more after -- than a prompt"; continue ;;
+      esac
+      type_command "$terminal" resumed "${command[@]}" --resume "$session"
+    else
+      echo "berth (herdr-app): the berth $id is started fresh, because its session $session has no transcript." >&2
+      type_command "$terminal" "started fresh" "${command[@]}"
+    fi
     if command -v sign-on >/dev/null; then
       BERTH_BACKEND=herdr-app BERTH_YARD=$yard sign-on --pass-gate "$id" </dev/null >/dev/null 2>&1 {restoring}>&- &
     else
