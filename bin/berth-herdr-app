@@ -225,14 +225,39 @@ shell_settled() { # <id>
   done
 }
 
+# A new berth's command starts in the core's environment, with the variables
+# herdr-core gives each terminal of its own. hc exec runs its command in the
+# core's environment, beside a working directory and the variables a shell
+# sets for itself, which the berth's own shell sets afresh.
+terminal_variables=(HC_TERMINAL_ID HC_TERMINAL_SOCKET HC_SCOPE TERM COLORTERM TERM_PROGRAM)
+
+core_environment() {
+  local entry
+  core=()
+  while IFS= read -r -d '' entry; do
+    [[ $entry =~ ^(PWD|OLDPWD|SHLVL|_)= ]] || core+=("$entry")
+  done < <(hc_env hc exec env -0)
+  [ ${#core[@]} -gt 0 ] || die "hc exec could not report the core's environment in yard $yard."
+}
+
+# A restored terminal's shell has run its own start-up, so the command it is
+# replaced with starts from the core's environment, and keeps only the
+# terminal's own variables from the shell.
+# shellcheck disable=SC2016 # the restored terminal's bash expands it
+from_core='core=("${@:2:$1}"); shift "$(($1 + 1))"
+  for name in '"${terminal_variables[*]}"'; do [ -z "${!name+set}" ] || core+=("$name=${!name}"); done
+  exec env -i "${core[@]}" "$@"'
+
 # Replaces a restored berth's shell with a command, started as a new berth's
-# command is, and says on the terminal what was done with its shell. hc types nothing into a program that reports itself blocked.
+# command is, and says on the terminal what was done with its shell. hc types
+# nothing into a program that reports itself blocked.
 type_command() { # <terminal> <outcome> <command>...
-  local id pid line berth
+  local id pid line berth core
   id=$(jq -r .address <<<"$1")
   pid=$(jq -r .pid <<<"$1")
   berth_command
-  printf -v line '%q ' exec "${berth[@]}" "${@:3}"
+  core_environment
+  printf -v line '%q ' exec "$BASH" -c "$from_core" berth "${#core[@]}" "${core[@]}" "${berth[@]}" "${@:3}"
   hc_call send -- "$id" "$line" >/dev/null
   hc_call label "$id" "berth.restore=$pid $2" >/dev/null
 }
