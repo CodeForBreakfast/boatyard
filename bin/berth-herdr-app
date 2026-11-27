@@ -187,9 +187,12 @@ keep_command() { # <id> <command>...
   (umask 077 && mkdir -p "${file%/*}" && printf '%s\0' "$@" >"$file")
 }
 
-# herdr-core restarts a kept terminal with the shell alone as its program. The
-# berth.restore label names the shell the adapter has already acted on.
-restored='(.argv | length) == 1 and ((.labels["berth.restore"] // "") | split(" ")[0]) != (.pid | tostring)'
+# herdr-core restarts a kept terminal with its shell as the program, in place
+# of the berth's command, and a terminal has no pid until that shell starts.
+# The berth.restore label names the shell the adapter has already acted on.
+restored='.pid != null and (.argv[1] != "-c" or .argv[3] != "berth")
+  and ((.labels["berth.restore"] // "") | split(" ")[0]) != (.pid | tostring)'
+seat='(.labels["berth.relationship"] and .labels["claude.session"])'
 
 # Two berth calls at once would each type into the same restored shell, and
 # the second line would land in the agent the first one started. So one call
@@ -214,7 +217,7 @@ shell_settled() { # <id>
   local _
   for _ in $(seq 1 "$shell_settle_polls"); do
     sleep "$shell_poll_seconds"
-    terminal_get "$1" | jq -e '.foreground.pid == .pid' >/dev/null || return 1
+    terminal_get "$1" | jq -e '.pid != null and .foreground.pid == .pid' >/dev/null || return 1
   done
 }
 
@@ -237,29 +240,59 @@ not_resumed() { # <terminal> <why>
   hc_call label "$id" "berth.restore=$pid not resumed: $2" >/dev/null
 }
 
+# A berth's command reaches Claude Code under the core's environment and the
+# assignments the command starts with, so Claude Code's config folder is the
+# command's last CLAUDE_CONFIG_DIR, or the user's own.
+claude_config_dir() { # <command>...
+  local dir=$HOME/.claude word
+  if [ "${1##*/}" = env ]; then
+    for word in "${@:2}"; do
+      [[ $word =~ ^[A-Za-z_][A-Za-z0-9_]*= ]] || break
+      [[ $word != CLAUDE_CONFIG_DIR=* ]] || dir=${word#*=}
+    done
+  fi
+  printf '%s\n' "$dir"
+}
+
+# Claude Code writes a session's transcript at its first turn, in a folder
+# named for the session's working directory, and can resume no session
+# without one.
+has_transcript() { # <session> <command>...
+  local transcripts
+  transcripts=("$(claude_config_dir "${@:2}")"/projects/*/"$1".jsonl)
+  [ -e "${transcripts[0]}" ]
+}
+
 # Resumes each seat that herdr-core restored, from the session id the plugin's
 # mod left on its terminal. sign-on launches a seat with its prompt last, after
-# --, so the resume takes the prompt's place. sign-on then gets the seat past
-# its startup gate.
+# --, so the resume takes the prompt's place. A session with no transcript
+# never took a turn, so its seat starts its command again as it was opened.
+# sign-on then gets the seat past its startup gate.
 resume_seats() {
-  local seats terminal id file command at restoring
+  local seats terminal id file command at session restoring
   restore_lock
-  mapfile -t seats < <(terminals | jq -c ".[] | select(.labels[\"berth.relationship\"] and .labels[\"claude.session\"] and $restored)")
+  mapfile -t seats < <(terminals | jq -c ".[] | select($seat and $restored)")
   for terminal in "${seats[@]}"; do
     id=$(jq -r .address <<<"$terminal")
     shell_settled "$id" || continue
     file=$(kept_command "$terminal")
     [ -f "$file" ] || { not_resumed "$terminal" "its command was not kept"; continue; }
     mapfile -d '' -t command <"$file"
-    for ((at = 0; at < ${#command[@]}; at++)); do
-      [ "${command[at]}" != -- ] || break
-    done
-    case $((${#command[@]} - at)) in
-      0) ;;
-      2) command=("${command[@]:0:at}") ;;
-      *) not_resumed "$terminal" "its command has more after -- than a prompt"; continue ;;
-    esac
-    type_command "$terminal" resumed "${command[@]}" --resume "$(jq -r '.labels["claude.session"]' <<<"$terminal")"
+    session=$(jq -r '.labels["claude.session"]' <<<"$terminal")
+    if has_transcript "$session" "${command[@]}"; then
+      for ((at = 0; at < ${#command[@]}; at++)); do
+        [ "${command[at]}" != -- ] || break
+      done
+      case $((${#command[@]} - at)) in
+        0) ;;
+        2) command=("${command[@]:0:at}") ;;
+        *) not_resumed "$terminal" "its command has more after -- than a prompt"; continue ;;
+      esac
+      type_command "$terminal" resumed "${command[@]}" --resume "$session"
+    else
+      echo "berth (herdr-app): the berth $id is started fresh, because its session $session has no transcript." >&2
+      type_command "$terminal" "started fresh" "${command[@]}"
+    fi
     if command -v sign-on >/dev/null; then
       BERTH_BACKEND=herdr-app BERTH_YARD=$yard sign-on --pass-gate "$id" </dev/null >/dev/null 2>&1 {restoring}>&- &
     else
@@ -446,9 +479,52 @@ name() {
   ! shown "$terminal" || name_place "$terminal" "$2"
 }
 
+# A core that finds its lock taken, even for a moment by someone checking
+# whether it is up, exits without serving. A core writes its lock once it
+# holds it, so a change in the lock's stamp says the core holds the lock,
+# without taking it.
+lock_stamp() {
+  stat -c %y "$(core_lock "$yard")" 2>/dev/null || true
+}
+
+core_holds_lock() { # <the lock's stamp before the core started>
+  [ -s "$(core_lock "$yard")" ] && [ "$(lock_stamp)" != "$1" ]
+}
+
+waiting_seats() {
+  terminals | jq -e "any(.[]; $seat and (.pid == null or $restored))" >/dev/null
+}
+
+# A restored shell can take as long to settle as a dev shell takes to load.
+resume_wait_seconds=120
+
+# Resumes the yard's restored seats as soon as the core that berth serve
+# started has them, and goes on until each one is resumed or marked as not.
+resume_at_start() { # <the core's pid> <the lock's stamp before the core started>
+  local core=$1 deadline=$((SECONDS + resume_wait_seconds))
+  until core_holds_lock "$2"; do
+    kill -0 "$core" 2>/dev/null && [ "$SECONDS" -lt "$deadline" ] || return 0
+    sleep "$shell_poll_seconds"
+  done
+  while kill -0 "$core" 2>/dev/null; do
+    resume_seats
+    waiting_seats || return 0
+    if [ "$SECONDS" -ge "$deadline" ]; then
+      echo "berth (herdr-app): some restored berths in the yard $yard had not settled after ${resume_wait_seconds}s, so the next berth call resumes them." >&2
+      return 0
+    fi
+    sleep "$shell_poll_seconds"
+  done
+}
+
+# The core takes berth serve's process, so a service manager supervises the
+# core itself. The resume runs apart from it, so the core never has to reap it.
 serve() {
+  local stamp
   yard=$1
   ! yard_running "$yard" || die "the yard $yard is already being served."
+  stamp=$(lock_stamp)
+  (resume_at_start $$ "$stamp" </dev/null &)
   in_session herdr-core serve
   exec "${session_command[@]}"
 }
