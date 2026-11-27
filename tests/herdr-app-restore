@@ -35,8 +35,9 @@ eventually() { # <command>...
 
 # A stand-in for Claude Code shows a startup gate, then records the session
 # id that SESSION names on its terminal as the plugin's mod does, and reports
-# itself at rest. Each start logs what it was started with. A restored shell
-# holds only the core's environment, so the gate is written into the stand-in.
+# itself at rest. Each start logs what it was started with, and keeps its
+# environment beside the log, numbered for the start. A seat starts with only
+# the core's environment, so the gate is written into the stand-in.
 export SIGN_ON_GATE="Press Enter to go on"
 printf '#!%s\ngate=%q\n' "$(command -v bash)" "$SIGN_ON_GATE" >"$work/claude"
 cat >>"$work/claude" <<'EOF'
@@ -44,6 +45,7 @@ log=$1
 shift
 echo "args=$* id=$BERTH_ID yard=$BERTH_YARD backend=$BERTH_BACKEND seat=${SEAT:-none}" \
   "pane=${HERDR_PANE_ID:-none} child=${CLAUDE_CODE_CHILD_SESSION:-none}" >>"$log"
+env | sort >"$log.env.$(grep -c '^args=' "$log")"
 echo "$gate"
 read -r reply
 echo "passed${reply:+ $reply}" >>"$log"
@@ -52,6 +54,12 @@ printf '\e]7501;:state=idle:app=claude-code\e\\'
 exec sleep 600
 EOF
 chmod +x "$work/claude"
+
+# A seat's environment at a start, without its scope, which herdr-core gives
+# each process of its own.
+environment() { # <log> <start>
+  grep -v '^HC_SCOPE=' "$1.env.$2"
+}
 
 starts() { # <log>
   grep -c '^args=' "$1" 2>/dev/null || echo 0
@@ -124,9 +132,13 @@ yard_up() {
 }
 
 # A restored shell takes a while to settle, as one whose start-up loads a dev
-# shell does. Job control gives the start-up's command the foreground.
+# shell does. Job control gives the start-up's command the foreground. The
+# start-up sets up the shell's environment, as a person's own does.
 mkdir -p "$XDG_CONFIG_HOME/herdr-core"
-echo 'set -m; sleep 3' >"$work/slow-start"
+cat >"$work/slow-start" <<EOF
+export SHELL_SETUP=on PATH=$(printf '%q' "$work/shell-setup"):\$PATH
+set -m; sleep 3
+EOF
 printf 'shell = ["%s", "--rcfile", "%s", "-i"]\n' "$(command -v bash)" "$work/slow-start" \
   >"$XDG_CONFIG_HOME/herdr-core/config.toml"
 
@@ -167,6 +179,8 @@ eventually test "$(passed "$work/seat.log")" = 2
 check "sign-on gets it past its startup gate" 2 "$(passed "$work/seat.log")"
 check "and nothing else is typed into it" passed "$(grep '^passed' "$work/seat.log" | tail -n 1)"
 check "the seat is under the same berth with its agent session" s-1 "$(session_of "$seat")"
+check "it has the environment it started with, and none of the restored shell's setup" "" \
+  "$(diff <(environment "$work/seat.log" 1) <(environment "$work/seat.log" 2))"
 
 eventually test "$(passed "$work/fresh.log")" = 2
 check "a seat whose session has no transcript starts its command fresh" \
@@ -175,6 +189,8 @@ check "a seat whose session has no transcript starts its command fresh" \
 check "and sign-on gets it past its startup gate" 2 "$(passed "$work/fresh.log")"
 check "and the serve says so" true \
   "$(grep -q "berth $fresh .*started fresh" "$work/serve.log" && echo true || echo false)"
+check "and it has the environment it started with, and none of the restored shell's setup" "" \
+  "$(diff <(environment "$work/fresh.log" 1) <(environment "$work/fresh.log" 2))"
 
 eventually test "$(passed "$work/elsewhere.log")" = 2
 check "a seat whose transcript is in the config folder its command names resumes it" \
