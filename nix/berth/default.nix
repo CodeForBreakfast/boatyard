@@ -44,7 +44,11 @@ in
     };
     berth-herdr-app-caller = herdrAppSuite "herdr-app-caller";
     berth-herdr-app-layout = herdrAppSuite "herdr-app-layout";
-    berth-herdr-app-restore = herdrAppSuite "herdr-app-restore";
+    # A yard other than the default one shows a seat taking its yard from
+    # the serve rather than from a fallback.
+    berth-herdr-app-restore = (herdrAppSuite "herdr-app-restore").overrideAttrs {
+      BERTH_TEST_YARD = "spare";
+    };
     berth-herdr-app-status = herdrAppSuite "herdr-app-status";
     berth-herdr-app-window = herdrAppSuite "herdr-app-window";
     berth-herdr-layout = herdrSuite "herdr-layout";
