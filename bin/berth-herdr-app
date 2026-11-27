@@ -225,10 +225,10 @@ shell_settled() { # <id>
   done
 }
 
-# A new berth's command starts in the core's environment, with the variables
-# herdr-core gives each terminal of its own. hc exec runs its command in the
-# core's environment, beside a working directory and the variables a shell
-# sets for itself, which the berth's own shell sets afresh.
+# A new berth's command starts in the core's environment, plus the variables
+# herdr-core gives each terminal. hc exec reports the core's environment, along
+# with its own working directory and the variables a shell sets for itself,
+# which the berth's shell sets afresh.
 terminal_variables=(HC_TERMINAL_ID HC_TERMINAL_SOCKET HC_SCOPE TERM COLORTERM TERM_PROGRAM)
 
 core_environment() {
