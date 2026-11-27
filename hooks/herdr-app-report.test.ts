@@ -9,12 +9,14 @@ const IN_APP_TERMINAL = { HC_TERMINAL_ID: 't7' }
 // The engine beneath the plugin: a Claude Code process whose pid is 4242, in a
 // terminal whose environment is `env`, drawing on `surfaces`. A test reads
 // back the status reports written to that process's tty and the hc commands
-// the plugin ran.
+// the plugin ran, and may change what the session draws on.
 function seat(on: On, env: Record<string, string> = IN_APP_TERMINAL, surfaces: readonly RenderSurface[] = ['terminal']) {
-  const world = { reports: [] as string[], hc: [] as string[][] }
+  const world = { reports: [] as string[], hc: [] as string[][], surfaces }
   on('store.get', () => ({ value: undefined }))
   on('env.get', (_$, e) => ({ value: env[e.name] }))
-  on('session.surfaces', () => ({ value: surfaces }))
+  on('session.surfaces', () => ({ value: world.surfaces }))
+  on('session.id', () => ({ value: SESSION.session_id }))
+  on('session.start', (_$, e) => ({ cwd: e.cwd }))
   on('process.hookEnv', () => ({ value: { CLAUDE_PID: '4242' } }))
   on('process.run', (_$, e) => {
     const [program, ...args] = e.argv
@@ -31,6 +33,29 @@ function seat(on: On, env: Record<string, string> = IN_APP_TERMINAL, surfaces: r
 
 const SESSION = { session_id: 'session-1' }
 
+// How a session starts in an app terminal, in the orders Claude Code 2.1.332
+// was seen to raise its events there. One that opens straight onto its prompt
+// draws on the terminal before SessionStart. One held at a startup dialog,
+// such as the warning --dangerously-load-development-channels raises, draws
+// on nothing at SessionStart and attaches the terminal at session.start. A -p
+// or SDK session draws on nothing at either.
+async function startAtPrompt($: EngineInterface) {
+  await $.session.start({ cwd: '/work', surface: 'terminal', isInteractive: true })
+  await $.classic.SessionStart({ ...SESSION, source: 'startup' })
+}
+
+async function startPastDialog($: EngineInterface, world: { surfaces: readonly RenderSurface[] }) {
+  world.surfaces = []
+  await $.classic.SessionStart({ ...SESSION, source: 'startup' })
+  world.surfaces = ['terminal']
+  await $.session.start({ cwd: '/work', surface: 'terminal', isInteractive: true })
+}
+
+async function startHeadless($: EngineInterface) {
+  await $.classic.SessionStart({ ...SESSION, source: 'startup' })
+  await $.session.start({ cwd: '/work', surface: null, isInteractive: false })
+}
+
 async function startTurn($: EngineInterface) {
   await $.classic.SessionStart({ ...SESSION, source: 'resume' })
   await $.classic.UserPromptSubmit({ ...SESSION, prompt: 'go' })
@@ -38,7 +63,14 @@ async function startTurn($: EngineInterface) {
 
 test('a session start reports idle and labels the terminal with the session id', async ($, on) => {
   const app = seat(on)
-  await $.classic.SessionStart({ ...SESSION, source: 'resume' })
+  await startAtPrompt($)
+  expect(app.reports).toEqual([report('state=idle')])
+  expect(app.hc).toEqual([['label', 't7', 'claude.session=session-1']])
+})
+
+test('a session held at a startup dialog labels the terminal once it draws there', async ($, on) => {
+  const app = seat(on)
+  await startPastDialog($, app)
   expect(app.reports).toEqual([report('state=idle')])
   expect(app.hc).toEqual([['label', 't7', 'claude.session=session-1']])
 })
@@ -133,7 +165,8 @@ test('under herdr it does nothing, even inside an app terminal', async ($, on) =
 
 test('a headless session in an app terminal leaves its label and status alone', async ($, on) => {
   const app = seat(on, IN_APP_TERMINAL, [])
-  await startTurn($)
+  await startHeadless($)
+  await $.classic.UserPromptSubmit({ ...SESSION, prompt: 'go' })
   await $.classic.Notification({ ...SESSION, message: 'needs permission', notification_type: 'permission_prompt' })
   await $.classic.Stop({ ...SESSION, stop_hook_active: false })
   await $.classic.SessionEnd({ ...SESSION, reason: 'other' })

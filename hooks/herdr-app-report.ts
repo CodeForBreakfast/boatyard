@@ -50,18 +50,36 @@ async function report($: EngineInterface, state: State, kind?: Kind): Promise<St
   return state
 }
 
+// Answers the state reported, or undefined where the session reports nowhere.
+async function startReporting($: EngineInterface, sessionId: string): Promise<State | undefined> {
+  const terminal = await appTerminal($)
+  if (terminal === undefined) return undefined
+  const state = await report($, 'idle')
+  await run($, ['hc', 'label', terminal, `claude.session=${sessionId}`])
+  return state
+}
+
 export const register: Register = (on) => {
   let last: State | undefined
+  // A session held at a startup dialog, such as the warning that
+  // --dangerously-load-development-channels raises, has its SessionStart
+  // before it draws anywhere, and draws on the terminal from session.start.
+  let startedBeforeDrawing: string | undefined
+
+  on('session.start', { isInteractive: true }, async ($, e, next) => {
+    const sessionId = startedBeforeDrawing
+    startedBeforeDrawing = undefined
+    if (sessionId !== undefined) last = (await startReporting($, sessionId)) ?? last
+    return next(e)
+  })
 
   // A compaction keeps the session id, and may come in the middle of a turn.
   // A subagent's start belongs to the session that runs it.
   on('classic.SessionStart', { source: ['startup', 'resume', 'clear', 'fork'] }, async ($, e, next) => {
     if (e.agent_id !== undefined) return next(e)
-    const terminal = await appTerminal($)
-    if (terminal !== undefined) {
-      last = await report($, 'idle')
-      await run($, ['hc', 'label', terminal, `claude.session=${e.session_id}`])
-    }
+    const started = await startReporting($, e.session_id)
+    if (started === undefined) startedBeforeDrawing = e.session_id
+    else last = started
     return next(e)
   })
 
