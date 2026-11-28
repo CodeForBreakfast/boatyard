@@ -44,6 +44,7 @@ in
     };
     berth-herdr-app-caller = herdrAppSuite "herdr-app-caller";
     berth-herdr-app-layout = herdrAppSuite "herdr-app-layout";
+    berth-herdr-app-long-list = herdrAppSuite "herdr-app-long-list";
     # A yard other than the default one shows a seat taking its yard from
     # the serve rather than from a fallback.
     berth-herdr-app-restore = (herdrAppSuite "herdr-app-restore").overrideAttrs {
@@ -82,7 +83,7 @@ in
         ${../../tests/berth-usage} ${../../tests/herdr-open-by-hand} \
         ${../../bin/berth-herdr-app} ${../../tests/with-herdr-app-yard} ${../../tests/herdr-app-open-by-hand} \
         ${../../tests/herdr-app-caller} ${../../tests/herdr-app-layout} ${../../tests/herdr-app-restore} \
-        ${../../tests/herdr-app-window}
+        ${../../tests/herdr-app-window} ${../../tests/herdr-app-long-list}
       touch $out
     '';
   };
