@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Prints one JSON line per boatyard effort that bdi finds across every
-# configured project: its top bead, its steward, the ready work, gates
-# and human questions among everything it depends on, and the sign-on line that
-# restarts its steward.
+# configured project: its top bead, its steward, the ready work, gates, the
+# human's moves on gates and human questions among everything it depends on, and
+# the sign-on line that restarts its steward.
 #
 # Needs: bash, jq, awk, bdi.
 set -euo pipefail
@@ -48,7 +48,8 @@ jq -c --argjson checkouts "$checkouts" '
   | select(any($efforts[]; .top != $effort.top and any(.closure[]; .id == $effort.top)) | not)
   | {project, top, also, slug, status, steward,
      ready: [.closure[] | select(.id != $effort.top and .ready and .issue_type != "gate" and (.labels | index("human") | not))] | length,
-     gates: [.closure[] | select(.issue_type == "gate") | .id],
+     gates: [.closure[] | select(.issue_type == "gate" and (.labels | index("human-move") | not)) | .id],
+     moves: [.closure[] | select(.issue_type == "gate" and (.labels | index("human-move"))) | {id, title}],
      asks: [.closure[] | select(.labels | index("human")) | {id, title}],
      restart: "sign-on --as independent --cwd \($checkouts[.project] | @sh) --label \(.slug | @sh) \("/boatyard:steward \(.top)" | @sh)"}
 ' <<<"$beads"

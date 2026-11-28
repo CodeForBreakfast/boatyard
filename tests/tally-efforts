@@ -82,7 +82,15 @@ cat > "$work/beads.json" <<'EOF'
   {"project": "chandlery", "id": "ch-4", "status": "open", "issue_type": "task", "ready": false,
    "blocked_by": ["ch-5"], "agent": null, "labels": [], "metadata": {}},
   {"project": "chandlery", "id": "ch-5", "status": "open", "issue_type": "task", "ready": true,
-   "blocked_by": [], "agent": null, "labels": ["human"], "title": "Which canvas weight?", "metadata": {}}
+   "blocked_by": [], "agent": null, "labels": ["human"], "title": "Which canvas weight?", "metadata": {}},
+
+  {"project": "shipwright", "id": "ex-8", "status": "open", "issue_type": "feature", "ready": false,
+   "blocked_by": ["ex-9"], "agent": null, "labels": [],
+   "assignee": "rigging-steward", "lease_expires_at": "2099-01-01T00:00:00Z",
+   "metadata": {"effort_slug": "rigging-rules"}},
+  {"project": "shipwright", "id": "ex-9", "status": "open", "issue_type": "gate", "ready": true,
+   "blocked_by": [], "agent": null, "labels": ["outcome", "human-move"],
+   "title": "Merge the pull request for the rigging rules", "metadata": {}}
 ]}
 EOF
 
@@ -102,7 +110,7 @@ effort() { # <top> <jq filter>
 }
 
 check "one line per effort, folding the effort another depends on and the shared slug" \
-  '["ch-2","ch-3","ex-1","ex-3","ex-7"]' "$(jq -sc 'map(.top) | sort' <<<"$output")"
+  '["ch-2","ch-3","ex-1","ex-3","ex-7","ex-8"]' "$(jq -sc 'map(.top) | sort' <<<"$output")"
 
 check "every line holds the fields outside products rely on" '[]' \
   "$(jq -sc 'map(["project","top","slug","steward","ready","restart"] - keys | select(length > 0)) | unique' <<<"$output")"
@@ -121,6 +129,13 @@ check "a claim on a bead other than the top is not the steward" 'null' "$(effort
 check "a gate and a question are not ready work, a folded effort's top is" '1' "$(effort ex-3 .ready)"
 check "a gate is listed as a wait" '["ex-5"]' "$(effort ex-3 .gates)"
 check "a question labelled human is an ask" '[{"id":"ex-4","title":"Which survey window?"}]' "$(effort ex-3 .asks)"
+check "a gate without the human-move label is not a move" '[]' "$(effort ex-3 .moves)"
+
+check "a gate labelled human-move is a move of the human's" \
+  '[{"id":"ex-9","title":"Merge the pull request for the rigging rules"}]' "$(effort ex-8 .moves)"
+check "a gate labelled human-move is not also a waiting gate" '[]' "$(effort ex-8 .gates)"
+check "a gate labelled human-move is not a question" '[]' "$(effort ex-8 .asks)"
+check "a gate labelled human-move is not ready work" '0' "$(effort ex-8 .ready)"
 
 check "a question behind a blocker in another project is an ask" \
   '[{"id":"ch-5","title":"Which canvas weight?"}]' "$(effort ex-7 .asks)"
