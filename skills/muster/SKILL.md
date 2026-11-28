@@ -104,7 +104,7 @@ For a graph that is not trivial, give **one** throwaway subagent an adversarial 
 
 Who becomes the steward depends on the role your seat already holds. Decide it from that role, and don't ask the person.
 
-- **A seat a person works in takes the effort over itself,** in the berth where the person talked it through. No second steward starts.
+- **A seat a person works in takes the effort over itself,** in the berth where the person talked it through. No second steward starts. A seat that already stewards an effort is the exception, below.
 - **A seat that already stewards an effort starts a separate steward,** such as to muster a bug its own effort does not need.
 - **A seat with a standing role hands the start back** when another seat asked it to muster, as *Hand the start back* says. A standing role is one such as answering in a project's channel. The asking seat starts the steward on its own host, so the work runs where it was asked for.
 - **A seat with a standing role acting on its own judgement starts a separate steward** where it runs. A person asking it directly counts as its own judgement.
@@ -148,7 +148,7 @@ If `sign-on` fails, report its message. Where the message says your seat is in n
 Handing the effort to a steward ends the preparation. A seat that started a separate steward, or handed its start back, does not stay to watch it or to rework the graph, because the steward owns the effort from the moment it runs.
 
 1. **Record the preparation** as your host asks of finished work, such as a journal entry: the effort, the top bead, the beads including foreign ones, the splits and edges you made, and the steward's berth or the seat you handed its start to.
-2. **Say plainly that preparation is finished.** Name the top bead and the steward's berth, or the seat you handed the start to. A seat that takes the effort over then loads the steward skill. Any other seat stops.
+2. **Say plainly that preparation is finished.** Name the top bead and the steward's berth, or the seat you handed the start to. A seat that takes the effort over then loads the steward skill. A seat that already stewards an effort goes back to it. Any other seat stops.
 
 If you could not start the steward and handed the human its line instead, still record and sign off. The graph is the preparation's deliverable, and only the start is left to the human.
 
