@@ -2,6 +2,8 @@
 
 Each line the graph review prints starts with the bead that holds the error, and its project says whose tracker that is. **Fix only what is in your own tracker.** For an error on another project's bead, post the bead and the edge in that project's channel, and edit nothing there.
 
+A question bead or an action you file for one of these is wired and watched like any other: the bead it holds up depends on it.
+
 In your own tracker:
 
 - **`unconfigured` on an id written `<project>:<id>` is a malformed edge.** bd names another project's bead by its bare id. Remove the edge with `bd dep remove <bead> <project>:<id>`, then add it again with `bd dep add <bead> <id>`.

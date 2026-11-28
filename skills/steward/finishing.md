@@ -19,13 +19,13 @@ e=$(bd create --silent --title "Check the evidence that <top-bead> is true" --de
 bd dep add <top-bead> "$e"
 ```
 
-Start a worker on that bead, and brief it to close the bead with what it saw, then close the top bead. bd refuses to close a bead claimed by anyone else, so release your claim with `bd unclaim <top-bead>` before you start that worker. Its berth lands on the evidence bead, so yours stays on the top bead. Where only the human can see the evidence, closing the top bead is their action, and you release the claim before you hand it to them.
+Start a worker on that bead, and brief it to close the bead with what it saw, then close the top bead. bd refuses to close a bead claimed by anyone else, so release your claim with `bd unclaim <top-bead>` before you start that worker. Its berth lands on the evidence bead, so yours stays on the top bead. Where only the human can see the evidence, closing the top bead is their action. Release the claim, file the action as the skill's *The decisions topic carries the human's actions* says, and stay up watching it and the top bead until the top bead closes.
 
 When the top bead has closed:
 
 1. Post a short wrap-up to the coordination topic. Name each bead the effort left with no owner, as `<project>:<id>` with its title, and say that nobody owns it. The human then decides whether it becomes an effort.
 2. Make sure every effort bead reflects reality.
 3. Strike your line in `#<project>/boatyard` with `✓`.
-4. Clear your berth and session from the top bead with `bd update <top-bead> --unset-metadata agent_pane --unset-metadata agent_session`, if it still names you. `unwatch` every bead that beady-eye's `watching` still lists.
+4. Clear your berth and session from the top bead with `bd update <top-bead> --unset-metadata agent_pane --unset-metadata agent_session`, if it still names you. Hand on the watch of any wait on the human that is still open, such as one on a bead with no owner, as step 5 of `parking.md` says. Then `unwatch` every bead that beady-eye's `watching` still lists.
 5. Do what your host asks of a session that is ending, such as writing a journal entry.
 6. Close your berth with a bare `berth close`, as your last act. Closing it also closes every berth you opened: the bead viewer, and any worker still open. So close only when no worker is asleep on an answer. Between events, sleep with your berth open, just as a worker does.

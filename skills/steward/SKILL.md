@@ -26,7 +26,9 @@ That is also why you must be miserly with your own context. The effort outlives 
 
 **Your host's rule for asking the human wins over this skill.** Where its `CLAUDE.md`, or a document it names, says how a seat reaches the human, follow that and read this section as the default it replaces.
 
-Workers never ping the human. **A worker takes its question to you, in its working topic.** You have more context than the worker, so settle it if you can. Answer in the topic, mention the worker, and record the answer and why on the worker's bead. Put to the human only what you cannot settle, after any review your host has you give a question first. A question that a seat waits on goes on its own bead labelled `human`, in the tracker of the project whose work waits on it, and the waiting bead depends on it. For a worker's question, that is the bead the worker sits on. Name the question bead in the worker's topic and mention the worker, so it watches the bead. That label is the human's queue, so a question needs no other post and no mention of the human. A permission waits in the berth of the seat that needs it, as *A worker's permission waits in its own berth* says. An action only the human can take goes where your host files the human's actions, and to the decisions topic only where it names no such place. **Ask in your berth only to answer what the human asked you there, and to follow up on that same point.** Every other question goes on a question bead, even while the human is typing to you. That covers a question a worker raised and one that comes from your own reading. Your reply in the berth may point at the bead. Anything else needs a bead or the decisions topic, and you keep both current.
+Workers never ping the human. **A worker takes its question to you, in its working topic.** You have more context than the worker, so settle it if you can. Answer in the topic, mention the worker, and record the answer and why on the worker's bead. Put to the human only what you cannot settle, after any review your host has you give a question first. A question that a seat waits on goes on its own bead labelled `human`, in the tracker of the project whose work waits on it, and the waiting bead depends on it. For a worker's question, that is the bead the worker sits on. Name the question bead in the worker's topic and mention the worker, so it watches the bead. That label is the human's queue, so a question needs no other post and no mention of the human. A permission waits in the berth of the seat that needs it, as *A worker's permission waits in its own berth* says. An action only the human can take goes where your host files the human's actions, and to the decisions topic only where it names no such place. A gate whose next move is theirs on GitHub, such as a merge or a review, carries the `human-move` label, set by whoever hands them the move. **Ask in your berth only to answer what the human asked you there, and to follow up on that same point.** Every other question goes on a question bead, even while the human is typing to you. That covers a question a worker raised and one that comes from your own reading. Your reply in the berth may point at the bead. Anything else needs a bead or the decisions topic, and you keep both current.
+
+**Every wait on the human has an agent watching it.** While you run, that is you, whoever filed the wait and whether or not a seat sleeps on it, as *Reconstruct* step 7 says. When you park or finish, you hand the watch to whoever your host names.
 
 ## Topics
 
@@ -147,7 +149,7 @@ The test breaks the other way when commy's server restarts under a running sessi
    The beads in delivery are the `delivery` lines of step 4, each with its pull request and its gate. Under a delivery formula, the line names the work bead that waits on its molecule's outcome step.
 
    Then close the berths you started that are no longer on open work, as *Watching the berths you started* says. A berth whose bead no longer names it appears in none of the lists above.
-7. **Match your watches to the effort's waits.** Every open question bead a sleeping worker depends on, every foreign dependency that holds a bead in push-gate state 6, and every bead in delivery gets a beady-eye `watch`. The bead in delivery to watch is the work bead: under a delivery formula, the bead that waits on the outcome step, and otherwise the bead behind its own `gh:pr` gate. It goes ready once that step or gate closes. Where a gate sweep runs, as *Watching your pull requests* says, also watch every bead that an open `gh:pr` gate of the effort directly blocks, because the sweep comments there. Without a formula that is the work bead again. Under one it can be a later step of the molecule. `bd dep list <gate> --direction up --type blocks` lists them. Name the project for a foreign bead. Compare beady-eye's `watching` list against those waits. Watch what is missing, which after a fresh start is all of them, and `unwatch` what no longer holds anything up.
+7. **Match your watches to the effort's waits.** Every open question bead and filed action the effort waits on, whether or not a worker sleeps on it, every open gate labelled `human-move`, every foreign dependency that holds a bead in push-gate state 6, and every bead in delivery gets a beady-eye `watch`. The bead in delivery to watch is the work bead: under a delivery formula, the bead that waits on the outcome step, and otherwise the bead behind its own `gh:pr` gate. It goes ready once that step or gate closes. Where a gate sweep runs, as *Watching your pull requests* says, also watch every bead that an open `gh:pr` gate of the effort directly blocks, because the sweep comments there. Without a formula that is the work bead again. Under one it can be a later step of the molecule. `bd dep list <gate> --direction up --type blocks` lists them. Name the project for a foreign bead. Compare beady-eye's `watching` list against those waits. Watch what is missing, which after a fresh start is all of them, and `unwatch` what no longer holds anything up.
 8. **Read the topics.** Read the decisions topic and each active worker's working topic: who is mid-flight, who is blocked, and what has been asked of the human. After a compaction you are still subscribed to every topic an earlier you created. The only subscription you might still owe is to a topic someone else created.
 
 You are now bound, reachable, and hold the whole state. Reconstruct from these reads, never from memory.
@@ -196,7 +198,7 @@ You bloat, and force expensive compaction, by pulling detail of the work into yo
 
   **A wait for a date goes on its bead, not only in a wake.** A `ScheduleWakeup` dies with your session, so put the bead behind a timer gate as push-gate state 7 says. You may also schedule a wake for the date. If your session has gone by then, the bead goes ready once its gate closes, and the effort waits for a steward as *Parking* says.
 
-  **A bead you wait on wakes you through your watch on it.** A closed question bead or foreign dependency ends a wait, so `unwatch` it and run the wake ritual. A comment, or any change that leaves the bead open, is nothing to act on unless it is a question for you, or a gate sweep's report of a pull-request event.
+  **A bead you wait on wakes you through your watch on it.** A closed question bead, action or foreign dependency ends a wait, so `unwatch` it and run the wake ritual. A comment, or any change that leaves the bead open, is nothing to act on unless it is a question for you, or a gate sweep's report of a pull-request event.
 
   **While beady-eye says its watcher is down, your watches wake no one.** Until it says the watcher is answering again, poll the beads you watch within the hour, because workers sleep on them, and when a question bead closes, post its answer, quoted from the bead, into its worker's working topic.
 - **You act; you don't report.** The wake ritual's output is for you. Never narrate your orientation or your plan into the terminal, where it reaches no one. What you emit is actions: a brief, an ask, a bead update.
@@ -223,6 +225,8 @@ Work you discover mid-effort, such as a follow-up a worker raises or a dependenc
 
 Then push the home-project bead onto a seat born in that project.
 
+**A bug is filed and mustered, never fixed in place.** That holds however small the fix looks and whoever mentions the bug, the human in your berth included. File it in its home project. Where your effort's outcome needs the fix, wire it in and staff it as above. Where it does not, have it mustered as an effort of its own, as your host asks. Where your host names no way, load `boatyard:muster`, which starts a separate steward for it.
+
 ## How each repo takes delivery
 
 Some repos take a commit on the default branch. Others take a pull request. That changes **when a bead is done**, so settle it **once per repo**, from the repo, and never from a bead. A repo's rules change without anyone editing a bead.
@@ -243,7 +247,7 @@ The worker reads the rest from the repo: whether a pull request opens as a draft
 
 The worker opens the pull request, blocks its bead on it with a `gh:pr` gate that names the repo, leaves the bead `open`, and leaves. The gate holds the bead in delivery. **You close that bead, and only once the pull request merges.** The merge closes the gate, and bdi then lists the bead as `delivered` rather than `ready`, so close it rather than start a worker on it.
 
-**The human's review or merge of a pull request is not an action.** The gate that holds the bead is the one record of it, and the human sees it in the tracker. File nothing for it and post nothing about it.
+**The human's review or merge of a pull request is not an action.** The gate that holds the bead is the one record of it, and the `human-move` label is how the human finds it while the move is theirs. File nothing for it and post nothing about it.
 
 A bead closed while its pull request is open lets its dependents start against unmerged work, and the effort becomes a stack of pull requests that can only be reviewed bottom up.
 
@@ -273,7 +277,7 @@ Act on each open step that is ready by the actor its title and description name.
 
 - **A step that names you is yours.** Do it, such as merging a pull request whose checks are green, and close it when it is done.
 - **A step that names the seat or the delivering seat belongs to the worker while its seat is up.** The seat sits on the step it is working, which shows `in_progress` with its berth. It merges, settles the gate and closes the outcome step itself, so leave those steps alone. If that seat has signed off or died with such a step still open, start a seat on the work bead to finish it.
-- **A step that names the human is theirs, and the step is the one record of it.** The human sees it ready in the tracker, so file nothing and post nothing for it.
+- **A step that names the human is theirs.** Where the step is a gate, the gate is the one record of it, so file nothing and post nothing. Make sure it carries `human-move`, and add the label with `bd update <gate> --add-label human-move` where it is missing. Where that gate is in another project's tracker, ask in that project's channel for the label. A step that is not a gate is an action of theirs, so file it as *The decisions topic carries the human's actions* says.
 - **A step that names the worker needs a seat**, such as a rework after review. Start one on the work bead as *Rework on a bead that already has a pull request* says.
 
 A `gh:pr` gate carries its pull request. Watch that pull request as *Watching your pull requests* says. `bd gate check` closes the gate once the pull request merges.
@@ -393,7 +397,7 @@ Starting workers is a **loop**, not a kickoff. Start one at each ready bead, and
 One topic per effort, `#<project>/<effort>-decisions`:
 
 - **A question never goes in it.** A question you need the human to settle goes on its own bead labelled `human`, as *You own the human's attention for this effort* says.
-- **Only actions the human must take go in it**: provide this credential, trigger this deploy. Lift each one in from a worker's topic, deduplicated and ranked. A review or merge of a pull request is not one, as *A bead closes on merge* says. Everything in it is waiting on the human. No status, no chatter, no acknowledgements. Where your host files the human's actions in a tracker of its own, file each action there instead, and make the waiting bead depend on it. The decisions topic then carries only a pointer to it. **An action already in the human's queue is not filed again.** Another project may have wired it, such as a pending-switch bead. Post it as news that links that bead, with no mention.
+- **Only actions the human must take go in it**: provide this credential, trigger this deploy. Lift each one in from a worker's topic, deduplicated and ranked. A review or merge of a pull request is not one, as *A bead closes on merge* says. Everything in it is waiting on the human. No status, no chatter, no acknowledgements. Where your host files the human's actions in a tracker of its own, file each action there instead, and make the waiting bead depend on it. Watch it, and name it to any worker that waits on it, in that worker's topic with a mention. The decisions topic then carries only a pointer to it. **An action already in the human's queue is not filed again.** Another project may have wired it, such as a pending-switch bead. Post it as news that links that bead, with no mention.
 - **Don't mention the human.** Their queue is where they look. Mention them only when waiting costs something that grows by the hour, such as an outage, and then once, in one line that links the ask. Commy's `list_humans` gives their name.
 - **Shape every ask as `using-commy` describes.**
 - **Keep it current.** When the human acts, edit or close that item with `edit_message`, so the topic never shows a stale ask.
@@ -457,12 +461,12 @@ Then act on `state` first:
 
 | What you see | What you do |
 |---|---|
-| `OPEN`, a draft, or not a draft with no `reviewDecision` | Nothing. It waits on the human's review or merge, and its gate is the one record of that. |
+| `OPEN`, a draft, or waiting on a review or a merge | Where the next move is the human's, make sure the gate carries `human-move`. It waits on their review or merge, and the gate is the one record of that. |
 | `OPEN`, not a draft, every check green, **and the repo's declared policy says its agents merge on green** | Merge it with `gh pr merge <n> -R "$OWNER/$REPO" --squash --delete-branch`, then act on the `MERGED` row in the same pass. Without that policy this row does not exist, and the merge is the human's. |
-| `OPEN`, `reviewDecision: CHANGES_REQUESTED`, a failing check, or a comment that asks for a change | Start a rework seat on the same bead, with the review comments in the brief. |
-| `OPEN`, `mergeStateStatus: BEHIND` or `DIRTY` | Start a rework seat on the same bead to rebase. |
+| `OPEN`, `reviewDecision: CHANGES_REQUESTED`, a failing check, or a comment that asks for a change | Where a rework has already answered it, the move is the human's again, as the first row says. Otherwise take `human-move` off the gate with `bd update <gate> --remove-label human-move`, then start a rework seat on the same bead, with the review comments in the brief. |
+| `OPEN`, `mergeStateStatus: BEHIND` or `DIRTY` | Take `human-move` off the gate, then start a rework seat on the same bead to rebase. |
 | `MERGED` | Close its gate with `bd gate resolve <gate>`, close the bead, fast-forward the main checkout as *Advancing the chain* says, then sort the graph again as *Reconstruct* step 4 says. |
-| `CLOSED` | Nobody will merge it, and its gate stays open. File a question bead, asking whether to reopen it, redo it, or drop the bead. A bead in delivery on a dead pull request blocks its dependents for ever. Once the human answers, close the gate with `bd gate resolve <gate>`, unless they reopen the pull request. |
+| `CLOSED` | Nobody will merge it, and its gate stays open. File a question bead, asking whether to reopen it, redo it, or drop the bead. Make the bead behind the gate depend on it, take `human-move` off the gate, and watch the question. A bead in delivery on a dead pull request blocks its dependents for ever. Once the human answers, close the gate with `bd gate resolve <gate>`, unless they reopen the pull request. |
 
 **Under a delivery formula, the molecule decides who reviews and who merges.** The row that waits on the human and the merge-on-green row give way to the molecule's ready steps, as *A bead delivered by a formula* says. On `MERGED`, close the gate but not the bead: the bead closes once its outcome step has.
 
@@ -479,7 +483,7 @@ A rework seat is an ordinary start with two differences:
 
 On every completion, merge or unblock, update the bead graph, sort it again as *Reconstruct* step 4 says, and start the next workers. You close this loop again and again, ready then brief then start then watch then relay, until the top bead closes. A quiet moment is not the end. It is a prompt to run the push gate again.
 
-**Keep your project's main checkout current as work lands.** After every merge or direct push into your project, fast-forward the main checkout with `git pull --ff-only --no-recurse-submodules`. `sign-on` births every seat there, so a stale checkout hands the next worker stale instructions and stale skills. If the fast-forward refuses, leave the tree alone, because it may hold the human's uncommitted work, and raise it in the decisions topic.
+**Keep your project's main checkout current as work lands.** After every merge or direct push into your project, fast-forward the main checkout with `git pull --ff-only --no-recurse-submodules`. `sign-on` births every seat there, so a stale checkout hands the next worker stale instructions and stale skills. If the fast-forward refuses, leave the tree alone, because it may hold the human's uncommitted work, and raise it as an action for the human.
 
 ## Finishing
 

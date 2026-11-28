@@ -244,6 +244,8 @@ The skills contain no multiplexer syntax. They call only `sign-on` and `berth`. 
 
 Readiness comes from `bdi`, the reader in [beady-eye](https://github.com/CodeForBreakfast/beady-eye), because an effort's edges cross trackers and `bd ready` and `bd blocked` do not follow an edge into another tracker. The steward and `muster` judge from the top bead's tree in `bdi` what can start, what waits and what is in delivery, and `tally` reads every effort through it. `bd` stays for looking a record up by id, label, metadata or closed status.
 
+Every wait on a person is marked and watched. A question is a bead labelled `human`, an action only they can take is filed where the host keeps their actions, and a gate whose next move is theirs carries `human-move`. A gate never carries `human`, because answering or dismissing such a bead closes it. The steward watches each wait while it runs, and hands the watch to whoever the host names when it parks or finishes. A bug that a seat finds or hears of is filed and mustered, never fixed in place, so that all engineering work reaches the graph.
+
 Pull requests are GitHub's. The skills read, wait on and merge them with `gh` and bd's `gh:pr` gates, so a repo hosted anywhere else takes its work by a direct push.
 
 ## Packaging

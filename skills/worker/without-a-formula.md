@@ -17,5 +17,11 @@ If that push is rejected because the branch is protected, the repo's statement w
 
    `bd gate create` copies `repo` only from a bead that already has one, so give the gate its repo yourself. Where your bead depends on small beads that you work together, make each small bead the pull request delivers wait on the same gate with `bd dep add <small-bead> "$g"`.
 
+   Unless the repo's declared policy has its agents merge on green, the next move is the human's, so label the gate for them. A draft that waits on their review is their move too:
+
+   ```bash
+   bd update "$g" --add-label human-move
+   ```
+
    **Don't close the bead, and don't set it `blocked`.** A closed bead tells the steward the work is delivered. While the bead stays open it blocks its dependents, so nothing starts against code that has not landed. The open gate keeps the bead out of `bd ready`, and the merge closes the gate. A bead set `blocked` stays out of `bd ready` even after that.
 3. **Post the pull request's address to the working topic**, then finish. Don't wait for the review. The steward watches the pull request from here, and starts a fresh seat on your bead if the reviewers ask for changes.

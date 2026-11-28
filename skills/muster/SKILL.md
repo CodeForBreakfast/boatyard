@@ -73,6 +73,12 @@ bd update <top-bead> --set-metadata effort_slug=<slug>
 
 Then run the bar's test: a fresh steward holding only the top bead and the graph can rebuild the whole effort.
 
+## What waits on the human
+
+A blocker you raise with the human while preparing goes on a question bead that the held bead depends on.
+
+Each wait needs an agent watching it. A steward you start, or become, watches them from its first wake. Where no steward starts, because you handed the start back or `sign-on` failed, watch each one and the top bead with beady-eye, and `unwatch` them once the top bead is claimed.
+
 ## The readiness gate
 
 Before you start the steward, confirm that the graph can be driven. All of these must hold:
@@ -98,7 +104,8 @@ For a graph that is not trivial, give **one** throwaway subagent an adversarial 
 
 Who becomes the steward depends on the role your seat already holds. Decide it from that role, and don't ask the person.
 
-- **A seat a person works in takes the effort over itself,** in the berth where the person talked it through. No second steward starts.
+- **A seat a person works in takes the effort over itself,** in the berth where the person talked it through. No second steward starts. A seat that already stewards an effort is the exception, below.
+- **A seat that already stewards an effort starts a separate steward,** such as to muster a bug its own effort does not need.
 - **A seat with a standing role hands the start back** when another seat asked it to muster, as *Hand the start back* says. A standing role is one such as answering in a project's channel. The asking seat starts the steward on its own host, so the work runs where it was asked for.
 - **A seat with a standing role acting on its own judgement starts a separate steward** where it runs. A person asking it directly counts as its own judgement.
 
@@ -132,7 +139,7 @@ sign-on --as independent --cwd <this project's checkout> --label <effort> \
 
 The steward's berth is independent of yours, so closing your seat leaves the steward running. `sign-on` prints the new berth's id. It births the seat in the project's main checkout, where the top bead's tracker and instructions are.
 
-If `sign-on` fails, report its message. Where the message says your seat is in no multiplexer, because no backend is named or your seat is in no pane, give the human the line `/boatyard:steward <top-bead>` to start by hand, and say which project the top bead lives in. Where it opened a berth and then got stuck, its message names that berth, so pass the name on for the human to read and close.
+If `sign-on` fails, report its message. Where the message says your seat is in no multiplexer, because no backend is named or your seat is in no pane, give the human the line `/boatyard:steward <top-bead>` to start by hand, and say which project the top bead lives in. Where they are not at your seat, file it as an action where your host keeps their actions. Where it opened a berth and then got stuck, its message names that berth, so pass the name on for the human to read and close.
 
 **You do not close your own seat.** A seat with a standing role that musters an effort, whether it started the steward or handed the start back, has to outlive the preparation. Sign off, and whatever role you had before carries on.
 
@@ -141,11 +148,11 @@ If `sign-on` fails, report its message. Where the message says your seat is in n
 Handing the effort to a steward ends the preparation. A seat that started a separate steward, or handed its start back, does not stay to watch it or to rework the graph, because the steward owns the effort from the moment it runs.
 
 1. **Record the preparation** as your host asks of finished work, such as a journal entry: the effort, the top bead, the beads including foreign ones, the splits and edges you made, and the steward's berth or the seat you handed its start to.
-2. **Say plainly that preparation is finished.** Name the top bead and the steward's berth, or the seat you handed the start to. A seat that takes the effort over then loads the steward skill. Any other seat stops.
+2. **Say plainly that preparation is finished.** Name the top bead and the steward's berth, or the seat you handed the start to. A seat that takes the effort over then loads the steward skill. A seat that already stewards an effort goes back to it. Any other seat stops.
 
 If you could not start the steward and handed the human its line instead, still record and sign off. The graph is the preparation's deliverable, and only the start is left to the human.
 
 ## Boundaries
 
 - **You prepare the effort and hand it over. You neither execute nor coordinate.** You never do an effort bead's work. A seat that takes the effort over coordinates it only once it has loaded the steward skill, and then as the steward.
-- **Don't work around permission prompts.** If the simplest form of a command you need is denied, that is a real gap to raise with the human.
+- **Don't work around permission prompts.** If the simplest form of a command you need is denied, ask for it with the question dialog in your own berth.
