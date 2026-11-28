@@ -10,7 +10,7 @@
    ```bash
    bd note <top-bead> "Parked: <what a resuming steward needs>"
    ```
-5. **Hand on the watch for a scheduled run.** Where you park to wait for one, the bead that checks the run waits on a timer gate, as push-gate state 7 says. Your host's instructions name who watches a parked effort's check, and where to tell them. Send them one message, naming the check bead and the top bead, each written as `<project>:<id>`. Leave the human no reminder of the run, because the watcher starts a steward once the gate closes and the check goes ready. Where your host names no watcher, the check still goes ready, tally shows the effort with no live steward, and a person starts one.
+5. **Hand on your watches.** Two kinds of wait outlive you: every wait on the human, and the check of a scheduled run you park to wait for. A wait on the human is an open `human` bead, a filed action or an open gate labelled `human-move` in the effort. The bead that checks a run waits on a timer gate, as push-gate state 7 says. Your host's instructions name who watches a parked effort's waits, and where to tell them. Send them one message, naming each bead and the top bead, each written as `<project>:<id>`. Leave the human no reminder of a run, because the watcher starts a steward once the gate closes and the check goes ready. Where your host names no watcher, say in the coordination topic which waits nobody watches. A check still goes ready, tally shows the effort with no live steward, and a person starts one.
 6. **Let go of the effort.** `unwatch` every bead that beady-eye's `watching` still lists, then release your claim on the top bead and clear your berth and session from it:
 
    ```bash
