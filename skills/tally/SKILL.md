@@ -22,7 +22,8 @@ An effort is open while its top bead is unfinished. Its steward is whoever holds
    | `project`, `top`, `slug` | Where the effort lives, its top bead, and its slug. `also` lists other beads sharing the slug. |
    | `steward` | The holder of the top bead's claim while its lease is live, or `null` where no live steward holds it. |
    | `ready` | How many beads in the effort are ready to work. A gate and a question labelled `human` are not counted. |
-   | `gates` | The open gates in the effort, which wait on a merge or another outside event. |
+   | `gates` | The open gates in the effort that are not labelled `human-move`, which wait on a merge or another outside event. |
+   | `moves` | The open gates labelled `human-move` in the effort, whose next move is the human's, such as their merge of a pull request. Each comes with its id and title. |
    | `asks` | The open questions labelled `human` in the effort, each with its id and title. |
    | `restart` | The `sign-on` line that starts a steward on the top bead in its project's checkout. |
 
@@ -34,8 +35,8 @@ An effort is open while its top bead is unfinished. Its steward is whoever holds
 2. **Read each live effort's decisions topic.** For an effort with a steward, `read_thread` the `#<channel>/<slug>-decisions` topic in its project's channel. The latest unresolved item is an open ask, alongside the effort's `asks`. A parked effort's new steward reads its decisions topic as it starts, so skip those.
 3. **Roll up, the efforts that need the human first.** Give one line per effort:
    - ⚫ **Parked with ready work.** No steward, and `ready` above zero. Give its `restart` line.
-   - 🔴 **Waiting on you.** It has an open question or an unresolved decisions item.
-   - 🟡 **Waiting on a merge.** No ready work, and open gates. A merge is usually a review only the human can move.
+   - 🔴 **Waiting on you.** It has an open question, a move of yours on a gate, or an unresolved decisions item.
+   - 🟡 **Waiting on a merge.** No ready work, and open gates. These gates wait on someone other than the human, such as a seat's merge or a check.
    - 🟢 **Running clean.** A steward, and none of the above.
    - ⚪ **Parked with nothing ready.** No steward, and nothing to start one for yet. It waits on a date, a status of `blocked`, or work in another effort.
 
@@ -47,12 +48,13 @@ A compact list, most urgent first:
 ⚫ ex-8w3 · shipwright/mast-step     · parked, 3 ready: sign-on --as independent --cwd '/srv/yard/shipwright' --label 'mast-step' '/boatyard:steward ex-8w3'
 🔴 ex-4k2 · shipwright/hull-survey   · waiting on you: choose the survey window
 🔴 ex-9q7 · chandlery/stock-sync     · waiting on you: ex-9q7.4, which supplier feed to trust
+🔴 ex-6p2 · shipwright/deck-plan     · waiting on you: ex-6p2.2, merge the pull request for the deck plan
 🟡 ex-3m1 · shipwright/rigging-rules · waiting on 2 merges
 🟢 ex-7d5 · chandlery/price-feed     · running clean
 ⚪ ex-2c6 · chandlery/winter-refit   · parked, nothing ready
 ```
 
-Keep each to one line: the top bead's id, the project and slug, and what the effort needs. Name a question bead by its id and title. Where an effort has several asks, give the count and name one. The human reads this to decide where to spend attention, then opens the decisions topic or the question bead, or runs the restart line.
+Keep each to one line: the top bead's id, the project and slug, and what the effort needs. Name a question bead or a gate in `moves` by its id and title. Where an effort has several asks and moves, give the count and name one. The human reads this to decide where to spend attention, then opens the decisions topic or the question bead, or runs the restart line.
 
 ## Caveats
 
