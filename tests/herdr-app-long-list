@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+# The herdr app adapter lists a yard whose terminal list runs past 128 KiB,
+# the most Linux takes in one environment string, for a caller whose dev
+# shell exports out, as mkShell does.
+#
+# Run it under with-herdr-app-yard.
+#
+# Needs: bash, coreutils, herdr-core, jq, berth.
+set -uo pipefail
+
+work=$(mktemp -d)
+failures=0
+
+check() { # <what> <want> <got>
+  if [ "$2" = "$3" ]; then
+    echo "ok: $1"
+  else
+    echo "FAIL: $1: wanted '$2', got '$3'"
+    failures=$((failures + 1))
+  fi
+}
+
+export out=/nix/store/00000000000000000000000000000000-dev-shell
+
+long_status=$(head -c 40000 /dev/zero | tr '\0' x)
+seats=()
+for _ in 1 2 3 4; do
+  seat=$(berth open --as independent --cwd "$work" -- sleep 600)
+  berth status "$seat" "$long_status"
+  seats+=("$seat")
+done
+
+list_bytes=$(hc connect <<<'{"jsonrpc":"2.0","id":1,"method":"terminal.list","params":{}}' | wc -c)
+check "the yard's terminal list runs past 128 KiB" true "$([ "$list_bytes" -gt 131072 ] && echo true || echo false)"
+
+listed=$(berth list 2>"$work/list.err")
+check "berth list exits 0" 0 "$?"
+check "berth list says nothing on stderr" "" "$(head -c 300 "$work/list.err")"
+check "berth list lists every berth" "$(printf '%s\n' "${seats[@]}" | sort | paste -sd ' ')" \
+  "$(jq -r '[.[].id] | sort | join(" ")' <<<"$listed" 2>/dev/null)"
+
+for seat in "${seats[@]}"; do berth close "$seat"; done
+
+echo
+if [ "$failures" -gt 0 ]; then
+  echo "$failures failed."
+  exit 1
+fi
+echo "The herdr app adapter lists a yard whose terminal list runs past 128 KiB."

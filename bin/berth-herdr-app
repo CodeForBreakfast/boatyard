@@ -86,10 +86,16 @@ hc_env() { # <command> <argument>...
   "${session_command[@]}"
 }
 
+# A caller's dev shell exports out, as mkShell does, and bash exports a local
+# that shadows an exported name. Linux refuses to start a command with any one
+# environment string over 128 KiB, so a local that holds hc's answer is never
+# exported.
+
 # Prints what hc prints. Returns 3 for a terminal hc does not have, so a caller
 # can answer gone. Anything else that fails ends berth.
 hc_call() {
-  local out status=0 message
+  local +x out
+  local status=0 message
   yard_running "$yard" || die "the yard $yard is not up."
   out=$(hc_env hc "$1" --json "${@:2}" 2>&1) || status=$?
   [ "$status" = 0 ] && { printf '%s\n' "$out"; return; }
@@ -112,7 +118,7 @@ on_berth() { # <id> <what the verb could not do> <call>...
 
 # A finished terminal is gone, as one that hc has removed is.
 terminal_get() { # <id>
-  local terminal
+  local +x terminal
   terminal=$(hc_call get "$1") || return
   jq -e '.state == "live"' <<<"$terminal" >/dev/null || return 3
   printf '%s\n' "$terminal"
@@ -124,7 +130,7 @@ existing_terminal() { # <id> <what the verb could not do>
 
 # Every live terminal of the yard, in one call.
 terminals() {
-  local out
+  local +x out
   yard_running "$yard" || die "the yard $yard is not up."
   out=$(hc_env hc connect <<<'{"jsonrpc":"2.0","id":1,"method":"terminal.list","params":{}}' 2>&1) ||
     die "hc connect failed in yard $yard: $out"
